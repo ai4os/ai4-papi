@@ -73,10 +73,14 @@ def get_deployments(
             a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
 
             tmp['alloc_ID'] = a['ID']
+
+            res = a['AllocatedResources']
+            devices = res['Tasks']['usertask']['Devices']
             tmp['resources'] = {
-                'cpu_num': a['Resources']['CPU'],
-                'memoryMB': a['Resources']['MemoryMB'],
-                'diskMB': a['Resources']['DiskMB'],
+                'cpu_num': res['Tasks']['usertask']['Cpu']['CpuShares'],
+                'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,
+                'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
+                'diskMB': res['Shared']['DiskMB'],
             }
 
             public_ip = 'https://xxx.xxx.xxx.xxx'  # todo: replace when ready
@@ -200,6 +204,6 @@ def delete_deployment(
 # print(os.getenv('NOMAD_ADDR', ''))
 
 # create_deployment(owner='janedoe')
-# get_deployments(owner='janedoe')
+get_deployments(owner='janedoe')
 # delete_deployment('example2', owner='janedoe')
 pass
