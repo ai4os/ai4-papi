@@ -198,12 +198,3 @@ def delete_deployment(
     Nomad.job.deregister_job(deployment_id)
 
     return {'status': 'success'}
-
-
-# import os
-# print(os.getenv('NOMAD_ADDR', ''))
-
-# create_deployment(owner='janedoe')
-get_deployments(owner='janedoe')
-# delete_deployment('example2', owner='janedoe')
-pass
