@@ -160,7 +160,7 @@ def create_deployment(
         response = Nomad.jobs.register_job({'Job': job_conf})
         return {
             'status': 'success',
-            'id': job_conf['ID'],
+            'job_id': job_conf['ID'],
         }
     except Exception as e:
         return {
