@@ -1,0 +1,4 @@
+pyyaml
+python-nomad
+fastapi
+uvicorn[standard]
