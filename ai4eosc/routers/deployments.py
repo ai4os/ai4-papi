@@ -1,8 +1,10 @@
 """
 Manage deployments with Nomad.
 
-todo: Once authentication is implemented, the `owner` param in the functions can possibly
+todo: 
+* Once authentication is implemented, the `owner` param in the functions can possibly
  be removed and derived from the token
+* should '/deployments' be renamed to '/trainings'?
 """
 from copy import deepcopy
 from datetime import datetime
@@ -29,7 +31,7 @@ Nomad = nomad.Nomad()
 # * ai4eosc.deployments.get() --> less verbose IMHO
 
 
-@router.get("/get_deployments/")
+@router.get("/")
 def get_deployments(
         owner: str = None,
 ):
@@ -101,7 +103,18 @@ def get_deployments(
     return fjobs
 
 
-@router.get("/create_deployment/")
+@router.get("/{deployment_uuid}")
+def get_deployment(
+        deployment_uuid: str,
+        owner: str = None,
+):
+    """
+    Retrieve the info of a specific deployment.
+    """
+    raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
+
+
+@router.put("/")
 def create_deployment(
         owner: str = None,
         conf: dict = {},
@@ -169,15 +182,15 @@ def create_deployment(
         }
 
 
-@router.get("/delete_deployment/")
+@router.delete("/{deployment_uuid}")
 def delete_deployment(
-        deployment_id: str,
+        deployment_uuid: str,
         owner: str = None,
 ):
     """
     Delete a deployment. Users can only delete their own deployments.
 
-    :param deployment_id:
+    :param deployment_uuid:
     :param owner:
     :return: Dict with status
     """
@@ -188,13 +201,13 @@ def delete_deployment(
 
     # Check the deployment exists and belongs to the user
     deployments = get_deployments(owner=owner)
-    if deployment_id not in {d['ID'] for d in deployments}:
+    if deployment_uuid not in {d['ID'] for d in deployments}:
         return {
             'status': 'fail',
             'error_msg': 'Deployment does not exist, or does not belong to the provided owner.',
         }
 
     # Delete deployment
-    Nomad.job.deregister_job(deployment_id)
+    Nomad.job.deregister_job(deployment_uuid)
 
     return {'status': 'success'}
