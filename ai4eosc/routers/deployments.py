@@ -114,7 +114,7 @@ def get_deployment(
     raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
 
 
-@router.put("/")
+@router.post("/")
 def create_deployment(
         owner: str = None,
         conf: dict = {},
