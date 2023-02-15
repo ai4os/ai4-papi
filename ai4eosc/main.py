@@ -4,7 +4,7 @@ Create an app with FastAPI
 
 from fastapi import Depends, FastAPI
 
-from ai4eosc.routers import deployments
+from ai4eosc.routers import deployments, info
 # from ai4eosc.dependencies import get_query_token, get_token_header
 # from .internal import admin
 
@@ -14,6 +14,7 @@ app = FastAPI(
 )
 
 app.include_router(deployments.router)
+app.include_router(info.router)
 # app.include_router(
 #     admin.router,
 #     prefix="/admin",
