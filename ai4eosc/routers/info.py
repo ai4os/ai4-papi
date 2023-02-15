@@ -15,11 +15,10 @@ router = APIRouter(
 
 
 @router.get("/conf")
-def get_user_conf(
+def get_default_deployment_conf(
 ):
     """
-    Returns default user configuration for a running a training.
-    This should be used as basis for parameters to create a deployment.
+    Returns default configuration for creating a deployment.
 
     Returns a dict.
     """
