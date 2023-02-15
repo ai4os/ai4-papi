@@ -39,8 +39,10 @@ def get_deployments(
     Retrieve all deployments belonging to a user.
     If no username is provided return all deployments.
 
-    :param owner:
-    :return: list of deployments
+    Parameters:
+    * **owner**: string with username (will be removed once we implement token authentication)
+    
+    Returns a list of deployments.
     """
     jobs = Nomad.jobs.get_jobs()  # job summaries
 
@@ -122,10 +124,13 @@ def create_deployment(
     """
     Submit a deployment to Nomad.
 
-    :param owner: Owner of the deployment
-    :param conf: Configuration of the deployment to be submitted. If only a partial configuration is submitted,
-    the remaining will be filled with default args.
-    :return: Dict with status
+    Parameters:
+    * **owner**: string with username (will be removed once we implement token authentication)
+    * **conf**: configuration dict of the deployment to be submitted. 
+    If only a partial configuration is submitted, the remaining will be
+    filled with default args (see GET(`/info/conf`) method).
+    
+    Returns a dict with status
     """
     # Enforce job owner
     if not owner:
@@ -190,9 +195,11 @@ def delete_deployment(
     """
     Delete a deployment. Users can only delete their own deployments.
 
-    :param deployment_uuid:
-    :param owner:
-    :return: Dict with status
+    Parameters:
+    * **owner**: string with username (will be removed once we implement token authentication)
+    * **deployment_uuid**: uuid of deployment to delete
+
+    Returns a dict with status
     """
 
     # Enforce job owner

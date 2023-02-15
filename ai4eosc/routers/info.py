@@ -21,6 +21,6 @@ def get_user_conf(
     Returns default user configuration for a running a training.
     This should be used as basis for parameters to create a deployment.
 
-    :return: dict
+    Returns a dict.
     """
     return USER_CONF
