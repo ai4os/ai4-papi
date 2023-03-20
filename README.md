@@ -18,7 +18,6 @@ This makes it possible for example to automate training launch and effectively d
 
 > **TODO list** (in priority order):
 > * (IISAS) implement authentication decorators to the functions (possibly using flaat?) (see [Authentication in FastAPI](https://fastapi.tiangolo.com/tutorial/security/) first)
-> * (CSIC) add additional functionalities (module marketplace creation, module listing, etc)
 > * (CSIC) if needed, create a database for trainings (instead of parsing Nomad) for better performance
 
 
@@ -43,7 +42,38 @@ pip install git+https://github.com/ai4eosc/ai4-lib.git
 
 ## Usage
 
-Currently, only basic functionalities for interacting with the deployments are implemented.
+To deploy the API, run:
+
+```bash
+uvicorn main:app --reload
+```
+
+and go to http://127.0.0.1:8000/docs to check the API methods in the Swagger UI.
+
+Here follows an overview of the available methods. The :lock: symbol indicates the method needs authentication to be accessed and :red_circle: methods that are planned but not implemented yet.
+
+
+### Exchange API
+
+The Exchange API offers the possibility to interact with the metadata of the modules in the marketplace.
+
+Methods:
+* `GET(/modules)`: returns a list of all modules in the Marketplace
+* `GET(/modules/metadata/{module_name})`: returns the metadata of a specific module
+* `PUT(/modules/metadata/{module_name})`: :lock: :red_circle: updates the metadata of a specific module
+
+
+### Training API
+
+The Training API offers the possibility to interact with the metadata of the modules in the marketplace.
+
+Methods:
+* `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a user.
+* `POST(/deployments)`: :lock: create a new deployment belonging to the user. 
+* `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only delete their own deployments.
+
+
+The functionalities can also be accessed without the API:
 
 ```python
 from ai4eosc.routers import deployments
@@ -74,14 +104,6 @@ deployments.create_deployment(
     username='janedoe'
 )
 ```
-
-You can also run it as a server to make calls via the API:
-
-```bash
-uvicorn main:app --reload
-```
-
-and go to http://127.0.0.1:8000/docs to check the API methods in the Swagger UI.
 
 
 ## Description
