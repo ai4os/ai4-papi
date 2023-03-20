@@ -1,5 +1,5 @@
 """
-Manage deployments with Nomad.
+Manage deployments with Nomad (Training API).
 
 todo: 
 * Once authentication is implemented, the `owner` param in the functions can possibly
@@ -25,10 +25,6 @@ router = APIRouter(
 )
 
 Nomad = nomad.Nomad()
-
-# todo: rethink function naming, which of the two alternatives is better?
-# * ai4eosc.deployments.get_deployments() --> follows same convention as Nomad
-# * ai4eosc.deployments.get() --> less verbose IMHO
 
 
 @router.get("/")
