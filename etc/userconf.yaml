@@ -3,7 +3,7 @@
 # Additional non-customizable values (eg. ports) are hardcoded in `job.nomad`.
 
 # All conf parameters follow the same structure:
-#varname:
+# varname:
 #  name: name of the parameter to be displayed to end user (mandatory)
 #  value: (default) value of the parameter (mandatory)
 #  options: restricted set of values that the parameter can take (optional)
@@ -53,7 +53,7 @@ hardware:
 
   disk:
     name: Disk memory (in MB)
-    value: 50000
+    value: 20000
 
 storage:
 

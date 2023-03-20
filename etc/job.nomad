@@ -1,5 +1,6 @@
 job "userjob" {
-  datacenters = ["dc2"]
+  # todo: remove? do we need to hardcode the datacenter? Can it be found directly at runtime?  
+  datacenters = ["dc1_dw_ifca"]
   type = "service"
   region = "global"
 
