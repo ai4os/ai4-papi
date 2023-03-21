@@ -9,11 +9,12 @@ We can always move this to another repo/API in the future if needed.
 Implementation notes:
 ====================
 * Output caching
-We are in a transition time where users still edit their modules metadata in their githubs repo.
-But reading metadata from github and returning it isn't fast enough for a seamless experience (~0.3s / module).
-This is especially critical for the Overview of the Dashboard where one retrieves metadata of all the modules.
+We are in a transition time, where users still edit their modules metadata in their Github repos.
+But reading metadata from Github and returning it isn't fast enough for a seamless experience (~0.3s / module).
+This is especially critical for the Overview of the Dashboard where one retrieves metadata of all the modules (N * 0.3s).
 We decide to cache the outputs of the functions for up to six hours to enable fast calls in the meantime.
 This caching can be eventually removed when we move the metadata to the Exchange database.
+Or the caching time be reduced if needed, though 6 hours seems to be a decent compromise, as metadata is not constantly changing.
 """
 import configparser
 import json
@@ -44,13 +45,30 @@ def get_modules_list():
     return modules
 
 
+@router.get("/summary")
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+def get_modules_summary():
+    """
+    Retrieve a list of all modules' basic metadata
+    (name, title, summary, keywords).
+    """
+    summary = []
+    keys = ['title', 'summary', 'keywords']
+    for m in get_modules_list():
+        meta1 = get_module_metadata(m)
+        meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
+        meta['name'] = m
+        summary.append(meta)
+    return summary
+
+
 @router.get("metadata/{module_name}")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_module_metadata(
         module_name: str,
 ):
     """
-    Get the module's metadata.
+    Get the module's full metadata.
     """
 
     # Check the module is in the modules list

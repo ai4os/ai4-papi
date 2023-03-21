@@ -59,9 +59,11 @@ The Exchange API offers the possibility to interact with the metadata of the mod
 
 Methods:
 * `GET(/modules)`: returns a list of all modules in the Marketplace
-* `GET(/modules/metadata/{module_name})`: returns the metadata of a specific module
+* `GET(/modules/summary)`: returns a list of all modules' basic metadata (name, title, summary, keywords)
+* `GET(/modules/metadata/{module_name})`: returns the full metadata of a specific module
 * `PUT(/modules/metadata/{module_name})`: :lock: :red_circle: updates the metadata of a specific module
 
+**Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see [doctring](./ai4eosc/routers/modules.py)).
 
 ### Training API
 
