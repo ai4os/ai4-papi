@@ -98,7 +98,8 @@ def get_module_metadata(
     metadata = json.loads(r.text)
 
     # Format "description" field nicely
-    metadata["description"] = " ".join(metadata["description"])
+    metadata["description"] = [i if i!="" else "\n" for i in metadata["description"]]  # replace: "" --> "\n"
+    metadata["description"] = " ".join(metadata["description"])  # single string
 
     return metadata
 
