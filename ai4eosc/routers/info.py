@@ -2,7 +2,10 @@
 Get information from the API (no authentication needed)
 """
 
-from fastapi import APIRouter
+from copy import deepcopy
+
+from fastapi import APIRouter, HTTPException
+import requests
 
 from ai4eosc.conf import USER_CONF
 
@@ -18,8 +21,43 @@ router = APIRouter(
 def get_default_deployment_conf(
 ):
     """
-    Returns default configuration for creating a deployment.
+    Returns default configuration for creating a generic deployment.
 
     Returns a dict.
     """
     return USER_CONF
+
+
+@router.get("/conf/{module_name}")
+def get_default_deployment_conf(
+        module_name: str,
+):
+    """
+    Returns the default configuration for creating a deployment
+    for a specific module. It is prefilled with the appropriate
+    docker image and the available docker tags.
+
+    Returns a dict.
+    """
+    conf = deepcopy(USER_CONF)
+
+    # Fill with correct Docker image
+    conf["general"]["docker_image"]["value"] = f"deephdc/{module_name}"
+
+    # Add available Docker tags
+    url = f"https://registry.hub.docker.com/v2/repositories/deephdc/{module_name}/tags"
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        r = r.json()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not retrieve Docker tags from {module_name}.",
+            )
+
+    tags = [i["name"] for i in r["results"]]
+    conf["general"]["docker_tag"]["options"] = tags
+    conf["general"]["docker_tag"]["value"] = tags[0]
+
+    return conf

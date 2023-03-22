@@ -11,25 +11,37 @@
 
 general:
 
+  title:
+    name: Deployment title
+    value: ''
+    description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
+
+  desc:
+    name: Deployment description
+    value: ''
+    description: Provide some additional extended information about this deployment.
+
   docker_image:
     name: Docker image
-    value: 'deephdc/deep-oc-image-classification-tf:cpu'
-    description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf:gpu`.
+    value: 'deephdc/deep-oc-image-classification-tf'
+    description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
+
+  docker_tag:
+    name: Docker tag
+    value: 'latest'
+    description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
+    options: ['latest']
 
   service:
     name: Service to run
     value: 'deepaas'
+    description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`.
     options: ['deepaas', 'jupyterlab']
 
   jupyter_password:
     name: Jupyter password
     value: ''
     description: Select a password for JupyterLab. It should have at least 9 characters.
-
-  desc:
-    name: Deployment description
-    value: ''
-    description: Provide some information about this deployment. Useful when you have lots of different active deployments.
 
 hardware:
 

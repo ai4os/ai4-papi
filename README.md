@@ -73,7 +73,8 @@ Methods:
 * `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a user.
 * `POST(/deployments)`: :lock: create a new deployment belonging to the user. 
 * `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only delete their own deployments.
-
+* `GET(/info/conf)`: returns default configuration for creating a generic deployment.
+* `GET(/info/conf/{module_name}`: returns the default configuration for creating a deployment for a specific module.
 
 The functionalities can also be accessed without the API:
 

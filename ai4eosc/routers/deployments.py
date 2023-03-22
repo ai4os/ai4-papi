@@ -141,14 +141,17 @@ def create_deployment(
     # job_conf['ID'] = uuid.uuid1()  # id is generated from (MAC address+timestamp) so it's unique
 
     job_conf['Meta']['owner'] = owner  # todo: is there a more appropriate field than `meta` for this?
+    job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
     job_conf['Meta']['description'] = user_conf['general']['desc']
 
     # Replace user conf in Nomad job
     task = job_conf['TaskGroups'][0]['Tasks'][0]
 
-    task['Config']['image'] = user_conf['general']['docker_image']
+    task['Config']['image'] = f"{user_conf['general']['docker_image']}:{user_conf['general']['docker_tag']}"
     task['Config']['command'] = "deep-start"
     task['Config']['args'] = [f"--{user_conf['general']['service']}"]
+
+    # TODO: add `docker_privileged` arg if we still need it
 
     task['Resources']['CPU'] = user_conf['hardware']['cpu_num']
     task['Resources']['MemoryMB'] = user_conf['hardware']['ram']

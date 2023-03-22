@@ -6,6 +6,7 @@ job "userjob" {
 
   meta {
     owner = "janedoe"
+    title = ""
     description = ""
   }
 
