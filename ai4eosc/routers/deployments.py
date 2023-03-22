@@ -131,6 +131,16 @@ def create_deployment(
     # Enforce job owner
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
+    
+    # Enforce JupyterLab password minimum number of characters
+    if (
+        user_conf['general']['service'] == 'jupyterlab' and
+        len(user_conf['general']['jupyter_password']) < 9
+        ):
+        raise HTTPException(
+            status_code=501,
+            detail="JupyterLab password should have at least 9 characters."
+            )
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
