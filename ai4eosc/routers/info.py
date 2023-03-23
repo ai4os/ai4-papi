@@ -42,10 +42,10 @@ def get_default_deployment_conf(
     conf = deepcopy(USER_CONF)
 
     # Fill with correct Docker image
-    conf["general"]["docker_image"]["value"] = f"deephdc/{module_name}"
+    conf["general"]["docker_image"]["value"] = f"deephdc/{module_name.lower()}"
 
     # Add available Docker tags
-    url = f"https://registry.hub.docker.com/v2/repositories/deephdc/{module_name}/tags"
+    url = f"https://registry.hub.docker.com/v2/repositories/deephdc/{module_name.lower()}/tags"
     try:
         r = requests.get(url)
         r.raise_for_status()
