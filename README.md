@@ -39,6 +39,13 @@ Once you are done you can proceed to install the module:
 pip install git+https://github.com/ai4eosc/ai4-lib.git
 ```
 
+If you plan to use the module to develop, install instead in editable mode:
+```bash
+git clone https://github.com/ai4eosc/ai4-lib
+cd ai4-lib
+pip install -e .
+```
+
 
 ## Usage
 
