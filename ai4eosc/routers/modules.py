@@ -62,7 +62,7 @@ def get_modules_summary():
     return summary
 
 
-@router.get("metadata/{module_name}")
+@router.get("/metadata/{module_name}")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_module_metadata(
         module_name: str,
@@ -104,7 +104,7 @@ def get_module_metadata(
     return metadata
 
 
-@router.put("metadata/{module_name}")
+@router.put("/metadata/{module_name}")
 def update_module_metadata(
         module_name: str,
 ):
