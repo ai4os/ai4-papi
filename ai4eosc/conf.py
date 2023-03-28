@@ -7,7 +7,7 @@ import nomad
 import yaml
 
 
-Nomad = nomad.Nomad()
+Nomad = nomad.Nomad(port=5656)
 
 CONF_DIR = Path(__file__).parents[1].absolute() / 'etc'
 
