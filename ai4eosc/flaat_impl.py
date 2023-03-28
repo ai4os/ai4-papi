@@ -1,20 +1,23 @@
 from flaat.config import AccessLevel
 from flaat.requirements import CheckResult, HasSubIss, IsTrue
+from flaat.fastapi import Flaat
+
+flaat:Flaat = Flaat()
 
 ADMIN_EMAILS = []
 def is_admin(user_infos):
     return user_infos.user_info["email"] in ADMIN_EMAILS
 
 
-def init_flaat(my_flaat):
-    my_flaat.set_access_levels(
+def init_flaat():
+    flaat.set_access_levels(
         [
             AccessLevel("user", HasSubIss()),
             AccessLevel("admin", IsTrue(is_admin)),
         ]
     )
 
-    my_flaat.set_trusted_OP_list(
+    flaat.set_trusted_OP_list(
         [
             "https://aai-demo.egi.eu/oidc",
             "https://aai-demo.egi.eu/auth/realms/egi",
@@ -41,3 +44,10 @@ def init_flaat(my_flaat):
             "https://proxy.eduteams.org/",
         ]
     )
+
+def get_owner(request):
+    user_infos = flaat.get_user_infos_from_request(request)
+    sub = user_infos.get('sub') #this is subject - the user's ID
+    iss = user_infos.get('iss') #this is the URL of the access token issuer
+    return sub, iss
+
