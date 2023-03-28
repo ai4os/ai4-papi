@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 import requests
 
 from ai4eosc.conf import USER_CONF
+from ..flaat_impl import flaat
 
 
 router = APIRouter(
@@ -18,6 +19,7 @@ router = APIRouter(
 
 
 @router.get("/conf")
+@flaat.is_authenticated()
 def get_default_deployment_conf(
 ):
     """
@@ -29,6 +31,7 @@ def get_default_deployment_conf(
 
 
 @router.get("/conf/{module_name}")
+@flaat.is_authenticated()
 def get_default_deployment_conf(
         module_name: str,
 ):

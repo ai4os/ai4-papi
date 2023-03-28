@@ -49,5 +49,5 @@ def get_owner(request):
     user_infos = flaat.get_user_infos_from_request(request)
     sub = user_infos.get('sub') #this is subject - the user's ID
     iss = user_infos.get('iss') #this is the URL of the access token issuer
-    return sub, iss
+    return sub, iss, "{}@{}".format(sub, iss)
 

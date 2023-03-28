@@ -23,7 +23,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
 import requests
 import yaml
-
+from ..flaat_impl import flaat
 
 router = APIRouter(
     prefix="/modules",
@@ -34,6 +34,7 @@ router = APIRouter(
 
 @router.get("/")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@flaat.is_authenticated()
 def get_modules_list():
     """
     Retrieve a list of all modules.
@@ -47,6 +48,7 @@ def get_modules_list():
 
 @router.get("/summary")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@flaat.is_authenticated()
 def get_modules_summary():
     """
     Retrieve a list of all modules' basic metadata
@@ -64,6 +66,7 @@ def get_modules_summary():
 
 @router.get("/metadata/{module_name}")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@flaat.is_authenticated()
 def get_module_metadata(
         module_name: str,
 ):
@@ -105,6 +108,7 @@ def get_module_metadata(
 
 
 @router.put("/metadata/{module_name}")
+@flaat.is_authenticated()
 def update_module_metadata(
         module_name: str,
 ):

@@ -15,6 +15,8 @@ import nomad
 
 from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
 # from ai4eosc.dependencies import get_token_header
+from ..flaat_impl import flaat, get_owner
+from fastapi import Request
 
 
 router = APIRouter(
@@ -28,9 +30,8 @@ Nomad = nomad.Nomad()
 
 
 @router.get("/")
-def get_deployments(
-        owner: str = None,
-):
+@flaat.is_authenticated()
+def get_deployments(request:Request):
     """
     Retrieve all deployments belonging to a user.
     If no username is provided return all deployments.
@@ -40,6 +41,7 @@ def get_deployments(
     
     Returns a list of deployments.
     """
+    _, _, owner = get_owner(request)
     jobs = Nomad.jobs.get_jobs()  # job summaries
 
     # Filter jobs
@@ -102,19 +104,21 @@ def get_deployments(
 
 
 @router.get("/{deployment_uuid}")
-def get_deployment(
-        deployment_uuid: str,
-        owner: str = None,
+@flaat.is_authenticated()
+def get_deployment(request:Request,
+                   deployment_uuid: str,
 ):
     """
     Retrieve the info of a specific deployment.
     """
+    _, _, owner = get_owner(request)
     raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
 
 
 @router.post("/")
+@flaat.is_authenticated()
 def create_deployment(
-        owner: str = None,
+        request: Request,
         conf: dict = {},
 ):
     """
@@ -129,6 +133,7 @@ def create_deployment(
     Returns a dict with status
     """
     # Enforce job owner
+    _, _, owner = get_owner(request)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
     
@@ -197,9 +202,10 @@ def create_deployment(
 
 
 @router.delete("/{deployment_uuid}")
+@flaat.is_authenticated()
 def delete_deployment(
+        request: Request,
         deployment_uuid: str,
-        owner: str = None,
 ):
     """
     Delete a deployment. Users can only delete their own deployments.
@@ -212,6 +218,7 @@ def delete_deployment(
     """
 
     # Enforce job owner
+    _, _, owner = get_owner(request)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
 
