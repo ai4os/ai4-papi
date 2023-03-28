@@ -33,9 +33,9 @@ init_flaat()
 
 @app.get("/")
 @flaat.is_authenticated()
-async def root(request: Request, a):
+async def root(request: Request):
     sub, iss = get_owner(request)
-    return "This is the AI4EOSC project's API with parameter {} currently used by {}@{}.".format(a, sub, iss)
+    return "This is the AI4EOSC project's API currently used by {}@{}.".format(a, sub, iss)
 
 # -------------------------------------------------------------------
 # Main function -----------------------------------------------------
