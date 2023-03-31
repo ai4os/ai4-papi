@@ -63,7 +63,7 @@ Here follows an overview of the available methods. The :lock: symbol indicates t
 
 Some of the API methods are authenticated (:lock:).
 
-For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](#todo).
+For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](./etc/main_conf.yaml).
 
 Once you are approved, you can make an authenticated request to the API as following:
 
@@ -130,5 +130,6 @@ deployments.create_deployment(
 
 ## Description
 
+* `etc/main_conf.yaml`: Main configuration file of the API.
 * `etc/userconf.yaml`: User customizable configuration to make a deployment in Nomad.
 * `etc/job.nomad`: Additional non-customizable values (eg. ports)
