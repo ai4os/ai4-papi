@@ -4,3 +4,4 @@ requests>=2.25.1
 python-nomad>=1.5.0
 fastapi>=0.89.1
 uvicorn[standard]>=0.20.0
+flaat>=1.1.8
