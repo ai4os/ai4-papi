@@ -7,14 +7,17 @@ import nomad
 import yaml
 
 
-#Nomad = nomad.Nomad(port=5656)
 Nomad = nomad.Nomad()
 
 CONF_DIR = Path(__file__).parents[1].absolute() / 'etc'
 
+# Load main API configuration
+with open(CONF_DIR / 'main_conf.yaml', 'r') as f:
+    MAIN_CONF = yaml.safe_load(f)
+
 # Load default Nomad job configuration
-with open(CONF_DIR / 'job.nomad', 'r') as fh:
-    job_raw_nomad = fh.read()
+with open(CONF_DIR / 'job.nomad', 'r') as f:
+    job_raw_nomad = f.read()
     NOMAD_JOB_CONF = Nomad.jobs.parse(job_raw_nomad)
 
 # Load user customizable parameters
