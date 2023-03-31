@@ -13,9 +13,9 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 import nomad
 
+from ai4eosc.auth import flaat, get_owner
 from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
 # from ai4eosc.dependencies import get_token_header
-from ..flaat_impl import flaat, get_owner
 from fastapi import Request
 
 

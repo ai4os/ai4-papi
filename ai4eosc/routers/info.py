@@ -7,8 +7,8 @@ from copy import deepcopy
 from fastapi import APIRouter, HTTPException
 import requests
 
+from ai4eosc.auth import flaat
 from ai4eosc.conf import USER_CONF
-from ..flaat_impl import flaat
 
 
 router = APIRouter(

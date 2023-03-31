@@ -8,7 +8,7 @@ from ai4eosc.routers import deployments, info, modules
 # from ai4eosc.dependencies import get_query_token, get_token_header
 # from .internal import admin
 from fastapi.security import HTTPBearer
-from flaat_impl import init_flaat, flaat, get_owner
+from ai4eosc.auth import init_flaat, flaat, get_owner
 
 
 

@@ -23,7 +23,9 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
 import requests
 import yaml
-from ..flaat_impl import flaat
+
+from ai4eosc.auth import flaat
+
 
 router = APIRouter(
     prefix="/modules",
