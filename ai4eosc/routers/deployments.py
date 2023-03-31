@@ -43,7 +43,7 @@ def get_deployments(
     
     Returns a list of deployments.
     """
-    _, _, owner = get_owner(request)
+    owner, _ = get_owner(request)
     jobs = Nomad.jobs.get_jobs()  # job summaries
 
     # Filter jobs
@@ -133,7 +133,7 @@ def create_deployment(
     Returns a dict with status
     """
     # Enforce job owner
-    _, _, owner = get_owner(request)
+    owner, _ = get_owner(request)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
     
@@ -218,7 +218,7 @@ def delete_deployment(
     """
 
     # Enforce job owner
-    _, _, owner = get_owner(request)
+    owner, _ = get_owner(request)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
 

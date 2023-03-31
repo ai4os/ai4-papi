@@ -39,7 +39,7 @@ async def root(
     request: Request
     ):
     sub, iss = get_owner(request)
-    return "This is the AI4EOSC project's API currently used by {}@{}.".format(a, sub, iss)
+    return f"This is the AI4EOSC project's API currently used by {sub}@{iss}."
 
 
 if __name__ == "__main__":
