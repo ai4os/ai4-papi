@@ -59,6 +59,18 @@ and go to http://127.0.0.1:8000/docs to check the API methods in the Swagger UI.
 
 Here follows an overview of the available methods. The :lock: symbol indicates the method needs authentication to be accessed and :red_circle: methods that are planned but not implemented yet.
 
+### Authentication
+
+Some of the API methods are authenticated (:lock:).
+
+For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](#todo).
+
+Once you are approved, you can make an authenticated request to the API as following:
+
+<!-- #todo
+* add curl command with appropriate headers
+* add command from Python script for faster debugging (eg. get_deployments(Request(header="...")))
+-->
 
 ### Exchange API
 

@@ -1,10 +1,17 @@
+"""
+Authentication for private methods of the API (mainly managing deployments)
+"""
+
 from flaat.config import AccessLevel
 from flaat.requirements import CheckResult, HasSubIss, IsTrue
 from flaat.fastapi import Flaat
 
+
 flaat:Flaat = Flaat()
 
 ADMIN_EMAILS = []
+
+
 def is_admin(user_infos):
     return user_infos.user_info["email"] in ADMIN_EMAILS
 
@@ -45,9 +52,9 @@ def init_flaat():
         ]
     )
 
+
 def get_owner(request):
     user_infos = flaat.get_user_infos_from_request(request)
-    sub = user_infos.get('sub') #this is subject - the user's ID
-    iss = user_infos.get('iss') #this is the URL of the access token issuer
+    sub = user_infos.get('sub')  # this is subject - the user's ID
+    iss = user_infos.get('iss')  # this is the URL of the access token issuer
     return sub, iss, "{}@{}".format(sub, iss)
-
