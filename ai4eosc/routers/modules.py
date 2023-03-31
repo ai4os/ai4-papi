@@ -24,8 +24,6 @@ from fastapi import APIRouter, HTTPException
 import requests
 import yaml
 
-from ai4eosc.auth import flaat
-
 
 router = APIRouter(
     prefix="/modules",
@@ -36,7 +34,6 @@ router = APIRouter(
 
 @router.get("/")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-@flaat.is_authenticated()
 def get_modules_list():
     """
     Retrieve a list of all modules.
@@ -50,7 +47,6 @@ def get_modules_list():
 
 @router.get("/summary")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-@flaat.is_authenticated()
 def get_modules_summary():
     """
     Retrieve a list of all modules' basic metadata
@@ -68,10 +64,9 @@ def get_modules_summary():
 
 @router.get("/metadata/{module_name}")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-@flaat.is_authenticated()
 def get_module_metadata(
-        module_name: str,
-):
+    module_name: str,
+    ):
     """
     Get the module's full metadata.
     """
@@ -110,10 +105,9 @@ def get_module_metadata(
 
 
 @router.put("/metadata/{module_name}")
-@flaat.is_authenticated()
 def update_module_metadata(
-        module_name: str,
-):
+    module_name: str,
+    ):
     """
     Update the module's metadata.
     TODO: do this when we implement the AI4EOSC Exchange database

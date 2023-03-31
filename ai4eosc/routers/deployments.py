@@ -31,7 +31,9 @@ Nomad = nomad.Nomad()
 
 @router.get("/")
 @flaat.is_authenticated()
-def get_deployments(request:Request):
+def get_deployments(
+    request:Request
+    ):
     """
     Retrieve all deployments belonging to a user.
     If no username is provided return all deployments.
@@ -104,23 +106,21 @@ def get_deployments(request:Request):
 
 
 @router.get("/{deployment_uuid}")
-@flaat.is_authenticated()
-def get_deployment(request:Request,
-                   deployment_uuid: str,
-):
+def get_deployment(
+    deployment_uuid: str,
+    ):
     """
     Retrieve the info of a specific deployment.
     """
-    _, _, owner = get_owner(request)
     raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
 
 
 @router.post("/")
 @flaat.is_authenticated()
 def create_deployment(
-        request: Request,
-        conf: dict = {},
-):
+    request: Request,
+    conf: dict = {},
+    ):
     """
     Submit a deployment to Nomad.
 
@@ -204,9 +204,9 @@ def create_deployment(
 @router.delete("/{deployment_uuid}")
 @flaat.is_authenticated()
 def delete_deployment(
-        request: Request,
-        deployment_uuid: str,
-):
+    request: Request,
+    deployment_uuid: str,
+    ):
     """
     Delete a deployment. Users can only delete their own deployments.
 
