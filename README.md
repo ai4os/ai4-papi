@@ -61,15 +61,40 @@ Here follows an overview of the available methods. The :lock: symbol indicates t
 
 ### Authentication
 
-Some of the API methods are authenticated (:lock:).
+Some of the API methods are authenticated (:lock:) via OIDC tokens.
 
-For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](./etc/main_conf.yaml).
+These are the steps to get a valid user token to access the methods:
 
-Once you are approved, you can make an authenticated request to the API as following:
+1. Get a [DEEP IAM account](https://iam.deep-hybrid-datacloud.eu).
+2. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
+3. Configure the OIDC agent:
+```bash
+eval `oidc-agent-service start`
+oidc-gen deep-iam
+# - [2] https://iam.deep-hybrid-datacloud.eu/
+# - Scopes: openid profile offline_access
+# - login in browser
+# - enter encryption password
+```
+4. Generate OIDC token
+```bash
+oidc-token deep-iam
+# --> this will print your token
+```
+
+Now you are ready!
+
+An authenticated curl call you look like the following:
+
+```bash
+curl --location 'http://localhost:8000' --header 'Authorization: Bearer <your-OIDC-token>'
+
+```
 
 <!-- #todo
-* add curl command with appropriate headers
 * add command from Python script for faster debugging (eg. get_deployments(Request(header="...")))
+* add EGI checkin when ready
+For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](./etc/main_conf.yaml).
 -->
 
 ### Exchange API
