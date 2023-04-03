@@ -84,15 +84,25 @@ oidc-token deep-iam
 
 Now you are ready!
 
-An authenticated curl call you look like the following:
-
+To make authenticated calls:
+* An authenticated CURL call you look like the following:
 ```bash
 curl --location 'http://localhost:8000' --header 'Authorization: Bearer <your-OIDC-token>'
+```
+* From in the Swagger UI (http://localhost:8000/docs), click in the uppper right corner button `Authorize` :unlock: and input your token. From now on you will be authenticated when making API calls from the Swagger UI.
+* From inside a Python script:
+```python
+from types import SimpleNamespace
+from ai4eosc.routers import deployments
 
+deployments.get_deployments(
+    authorization=SimpleNamespace(
+        credentials='your-OIDC-token'
+    )
+)
 ```
 
 <!-- #todo
-* add command from Python script for faster debugging (eg. get_deployments(Request(header="...")))
 * add EGI checkin when ready
 For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](./etc/main_conf.yaml).
 -->

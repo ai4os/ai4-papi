@@ -11,12 +11,16 @@ from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
 import nomad
 
-from ai4eosc.auth import flaat, get_owner
+from ai4eosc.auth import get_owner
 from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
 # from ai4eosc.dependencies import get_token_header
-from fastapi import Request
+
+
+
+security = HTTPBearer()
 
 
 router = APIRouter(
@@ -30,9 +34,8 @@ Nomad = nomad.Nomad()
 
 
 @router.get("/")
-@flaat.is_authenticated()
 def get_deployments(
-    request:Request
+    authorization=Depends(security),
     ):
     """
     Retrieve all deployments belonging to a user.
@@ -43,7 +46,7 @@ def get_deployments(
     
     Returns a list of deployments.
     """
-    owner, _ = get_owner(request)
+    owner, _  = get_owner(token=authorization.credentials)
     jobs = Nomad.jobs.get_jobs()  # job summaries
 
     # Filter jobs
@@ -107,7 +110,7 @@ def get_deployments(
 
 @router.get("/{deployment_uuid}")
 def get_deployment(
-    deployment_uuid: str,
+    authorization=Depends(security),
     ):
     """
     Retrieve the info of a specific deployment.
@@ -116,10 +119,9 @@ def get_deployment(
 
 
 @router.post("/")
-@flaat.is_authenticated()
 def create_deployment(
-    request: Request,
     conf: dict = {},
+    authorization=Depends(security),
     ):
     """
     Submit a deployment to Nomad.
@@ -133,7 +135,7 @@ def create_deployment(
     Returns a dict with status
     """
     # Enforce job owner
-    owner, _ = get_owner(request)
+    owner, _  = get_owner(token=authorization.credentials)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
     
@@ -202,10 +204,9 @@ def create_deployment(
 
 
 @router.delete("/{deployment_uuid}")
-@flaat.is_authenticated()
 def delete_deployment(
-    request: Request,
     deployment_uuid: str,
+    authorization=Depends(security),
     ):
     """
     Delete a deployment. Users can only delete their own deployments.
@@ -218,7 +219,7 @@ def delete_deployment(
     """
 
     # Enforce job owner
-    owner, _ = get_owner(request)
+    owner, _ = get_owner(token=authorization.credentials)
     if not owner:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
 
