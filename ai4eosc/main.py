@@ -34,11 +34,10 @@ init_flaat()
 
 
 @app.get("/")
-@flaat.is_authenticated()
-async def root(
-    request: Request
+def root(
+    authorization=Depends(security),
     ):
-    sub, iss = get_owner(request)
+    sub, iss = get_owner(token=authorization.credentials)
     return f"This is the AI4EOSC project's API currently used by {sub}@{iss}."
 
 
