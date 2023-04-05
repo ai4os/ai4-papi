@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 import nomad
 
-from ai4eosc.auth import get_owner
+from ai4eosc.auth import get_user_info
 from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
 # from ai4eosc.dependencies import get_token_header
 
@@ -46,7 +46,7 @@ def get_deployments(
     
     Returns a list of deployments.
     """
-    owner, _  = get_owner(token=authorization.credentials)
+    user = get_user_info(token=authorization.credentials)
     jobs = Nomad.jobs.get_jobs()  # job summaries
 
     # Filter jobs
@@ -135,8 +135,8 @@ def create_deployment(
     Returns a dict with status
     """
     # Enforce job owner
-    owner, _  = get_owner(token=authorization.credentials)
-    if not owner:
+    user = get_user_info(token=authorization.credentials)
+    if not user:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
     
     # Enforce JupyterLab password minimum number of characters
@@ -219,8 +219,8 @@ def delete_deployment(
     """
 
     # Enforce job owner
-    owner, _ = get_owner(token=authorization.credentials)
-    if not owner:
+    user = get_user_info(token=authorization.credentials)
+    if not user:
         raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
 
     # Check the deployment exists and belongs to the user
