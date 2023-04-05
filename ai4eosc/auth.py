@@ -19,6 +19,8 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
  button where you can copy paste your token. So you will be able to access authenticated methods from the interface.
 """
 
+import re
+
 from fastapi import HTTPException
 from flaat.config import AccessLevel
 from flaat.requirements import CheckResult, HasSubIss, IsTrue
@@ -45,13 +47,32 @@ def init_flaat():
     flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
 
 
-def get_owner(token):
+def get_user_info(token):
 
     try:
+
         user_infos = flaat.get_user_infos_from_access_token(token)
 
-        sub = user_infos.get('sub')  # this is subject - the user's ID
-        iss = user_infos.get('iss')  # this is the URL of the access token issuer
+        # Check scopes
+        if user_infos.get('eduperson_entitlement') is None:
+            raise Exception("Check you enabled the `eduperson_entitlement` scope for your token.")
+
+        # Parse Virtual Organizations manually from URNs
+        # If more complexity is need in the future, check https://github.com/oarepo/urnparse
+        vos = []
+        for i in user_infos.get('eduperson_entitlement'):  # VOs
+            vos.append(
+                re.search(r"group:(.+?):", i).group(1)
+            )
+
+        # Generate user info dict
+        out = {
+            'id': user_infos.get('sub'),  # subject, user-ID
+            'issuer': user_infos.get('iss'),  # URL of the access token issuer
+            'name': user_infos.get('name'),
+            'vo': set(vos), 
+            # 'email': user_infos.get('voperson_verified_email'),
+        }
 
     except Exception as e:
         raise HTTPException(
@@ -59,4 +80,4 @@ def get_owner(token):
             detail=str(e),
             )
 
-    return sub, iss
+    return out
