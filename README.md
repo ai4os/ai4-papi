@@ -83,7 +83,7 @@ oidc-token deep-iam
 ```
 5. Add the following line to your `.bashrc` to start the agent automatically at startup ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
 ```bash
-eval `oidc-agent-service use`
+eval `oidc-agent-service use` > /dev/null
 ```
 
 Now you are ready!
@@ -93,7 +93,7 @@ To make authenticated calls:
 ```bash
 curl --location 'http://localhost:8000' --header 'Authorization: Bearer <your-OIDC-token>'
 ```
-* From in the Swagger UI (http://localhost:8000/docs), click in the uppper right corner button `Authorize` :unlock: and input your token. From now on you will be authenticated when making API calls from the Swagger UI.
+* From in the Swagger UI (http://localhost:8000/docs), click in the upper right corner button `Authorize` :unlock: and input your token. From now on you will be authenticated when making API calls from the Swagger UI.
 * From inside a Python script:
 ```python
 from types import SimpleNamespace
