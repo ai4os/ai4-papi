@@ -17,7 +17,6 @@ Its functionalities can also be accessed via an API (generated with [FastAPI](ht
 This makes it possible for example to automate training launch and effectively decouples the Dashboard code from the underlying services we use (ie. Nomad).
 
 > **TODO list** (in priority order):
-> * (IISAS) implement authentication decorators to the functions (possibly using flaat?) (see [Authentication in FastAPI](https://fastapi.tiangolo.com/tutorial/security/) first)
 > * (CSIC) if needed, create a database for trainings (instead of parsing Nomad) for better performance
 
 
@@ -61,32 +60,54 @@ Here follows an overview of the available methods. The :lock: symbol indicates t
 
 ### Authentication
 
-Some of the API methods are authenticated (:lock:) via OIDC tokens.
+Some of the API methods are authenticated (:lock:) via OIDC tokens, so you will need to perform the following steps to access those methods.
 
-These are the steps to get a valid user token to access the methods:
+#### Configure the OIDC provider
 
-1. Get a [DEEP IAM account](https://iam.deep-hybrid-datacloud.eu).
-2. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
-3. Configure the OIDC agent:
+1. Create an [EGI Check-In](https://aai.egi.eu/registry/) account.
+2. Enroll (`People > Enroll`) in one of the approved Virtual Organizations: 
+    - `vo.ai4eosc.eu`
+    - `vo.imagine-ai.eu`
+    
+You will have to wait until an administrator approves your request before proceeding with the next steps. 
+Supported OIDC providers and Virtual Organizations are described in the [configuration](./etc/main_conf.yaml).
+
+
+#### Generating a valid refresh token
+
+There are two ways of generating a valid refresh user token to access the methods: either via an UI or via the terminal.
+
+##### Generate a token with a UI
+
+If have a EGI Check-In account, you can generate a refresh user token with [EGI token](https://aai.egi.eu/token): click `Authorise` and sign-in with your account. Then use the `Access Token` to authenticate your calls.
+
+##### Generate a token via the terminal
+
+1. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
+2. Configure the OIDC agent:
 ```bash
 eval `oidc-agent-service start`
-oidc-gen deep-iam
-# - [2] https://iam.deep-hybrid-datacloud.eu/
-# - Scopes: openid profile offline_access
+oidc-gen egi-checkin
+# - https://aai.egi.eu/auth/realms/egi
+# - Scopes: openid profile offline_access eduperson_entitlement
 # - login in browser
 # - enter encryption password
 ```
-4. Generate OIDC token
+3. Add the following line to your `.bashrc` to start the agent automatically at startup ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
+```bash
+eval `oidc-agent-service use` > /dev/null
+```
+4. Generate the OIDC token
 ```bash
 oidc-token deep-iam
 # --> this will print your token
 ```
-5. Add the following line to your `.bashrc` to start the agent automatically at startup ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
+5. [Optional] You can validate this token with:
 ```bash
-eval `oidc-agent-service use` > /dev/null
+flaat-userinfo --oidc-agent-account egi-checkin
 ```
 
-Now you are ready!
+#### Making authenticated calls
 
 To make authenticated calls:
 * An authenticated CURL call you look like the following:
@@ -106,10 +127,6 @@ deployments.get_deployments(
 )
 ```
 
-<!-- #todo
-* add EGI checkin when ready
-For this you need to login in [EGI Check-In](https://aai.egi.eu/registry/) and enroll to one of the [supported Virtual Organizations (VO)](./etc/main_conf.yaml).
--->
 
 ### Exchange API
 
