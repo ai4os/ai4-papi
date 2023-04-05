@@ -81,6 +81,10 @@ oidc-gen deep-iam
 oidc-token deep-iam
 # --> this will print your token
 ```
+5. Add the following line to your `.bashrc` to start the agent automatically at startup ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
+```bash
+eval `oidc-agent-service use`
+```
 
 Now you are ready!
 
