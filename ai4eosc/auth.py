@@ -1,6 +1,8 @@
 """
 Authentication for private methods of the API (mainly managing deployments)
 
+Implementation notes:
+====================
 Authentication is implemented using `get_user_infos_from_access_token` instead
 of `get_user_infos_from_request` (as done in the FastAPI example in the flaat docs).
 There are two advantages of this:
@@ -22,62 +24,67 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
 import re
 
 from fastapi import HTTPException
-from flaat.config import AccessLevel
-from flaat.requirements import CheckResult, HasSubIss, IsTrue
 from flaat.fastapi import Flaat
 
 from ai4eosc.conf import MAIN_CONF
 
 
-flaat:Flaat = Flaat()
-
-
-def is_admin(user_infos):
-    return user_infos.user_info["email"] in MAIN_CONF["auth"]["admins"]
-
-
-def init_flaat():
-    flaat.set_access_levels(
-        [
-            AccessLevel("user", HasSubIss()),
-            AccessLevel("admin", IsTrue(is_admin)),
-        ]
-    )
-
-    flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
+# Initialize flaat
+flaat = Flaat()
+flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
 
 
 def get_user_info(token):
 
     try:
-
         user_infos = flaat.get_user_infos_from_access_token(token)
-
-        # Check scopes
-        if user_infos.get('eduperson_entitlement') is None:
-            raise Exception("Check you enabled the `eduperson_entitlement` scope for your token.")
-
-        # Parse Virtual Organizations manually from URNs
-        # If more complexity is need in the future, check https://github.com/oarepo/urnparse
-        vos = []
-        for i in user_infos.get('eduperson_entitlement'):  # VOs
-            vos.append(
-                re.search(r"group:(.+?):", i).group(1)
-            )
-
-        # Generate user info dict
-        out = {
-            'id': user_infos.get('sub'),  # subject, user-ID
-            'issuer': user_infos.get('iss'),  # URL of the access token issuer
-            'name': user_infos.get('name'),
-            'vo': set(vos), 
-            # 'email': user_infos.get('voperson_verified_email'),
-        }
-
     except Exception as e:
         raise HTTPException(
             status_code=403,
             detail=str(e),
             )
+
+    # Check output
+    if user_infos is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid token",
+            )
+    
+    # Check scopes
+    if user_infos.get('eduperson_entitlement') is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Check you enabled the `eduperson_entitlement` scope for your token.",
+            )
+
+    # Parse Virtual Organizations manually from URNs
+    # If more complexity is need in the future, check https://github.com/oarepo/urnparse
+    vos = []
+    for i in user_infos.get('eduperson_entitlement'):
+        vos.append(
+            re.search(r"group:(.+?):", i).group(1)
+        )
+
+    # Filter VOs to keep only the ones relevant to us
+    vos = set(vos).intersection(
+        set(MAIN_CONF['auth']['VO'])
+    )
+    vos = sorted(vos)
+
+    # Check if VOs is empty after filtering
+    if not vos:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
+            )
+
+    # Generate user info dict
+    out = {
+        'id': user_infos.get('sub'),  # subject, user-ID
+        'issuer': user_infos.get('iss'),  # URL of the access token issuer
+        'name': user_infos.get('name'),
+        'vo': vos, 
+    }
 
     return out

@@ -1,6 +1,7 @@
 """
-Manage configurations of the module.
+Manage configurations of the API.
 """
+
 from pathlib import Path
 
 import nomad

@@ -1,11 +1,13 @@
 """
-Manage deployments with Nomad (Training API).
+Manage deployments with Nomad.
+This is the AI4EOSC Training API.
 
-todo: 
-* Once authentication is implemented, the `owner` param in the functions can possibly
- be removed and derived from the token
-* should '/deployments' be renamed to '/trainings'?
+Notes:
+=====
+* Terminology warning: what we call a "deployment" (as in `create_deployment`)
+ is a Nomad "job" (not a Nomad "deployment"!)
 """
+
 from copy import deepcopy
 from datetime import datetime
 import uuid
@@ -13,22 +15,19 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 import nomad
+from nomad.api import exceptions
 
 from ai4eosc.auth import get_user_info
 from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
-# from ai4eosc.dependencies import get_token_header
-
-
-
-security = HTTPBearer()
 
 
 router = APIRouter(
     prefix="/deployments",
     tags=["deployments"],
-    # dependencies=[Depends(get_token_header)],
     responses={404: {"description": "Not found"}},
 )
+
+security = HTTPBearer()
 
 Nomad = nomad.Nomad()
 
@@ -38,32 +37,28 @@ def get_deployments(
     authorization=Depends(security),
     ):
     """
-    Retrieve all deployments belonging to a user.
-    If no username is provided return all deployments.
-
-    Parameters:
-    * **owner**: string with username (will be removed once we implement token authentication)
-    
-    Returns a list of deployments.
+    Returns a list of all deployments belonging to a user.
     """
-    user = get_user_info(token=authorization.credentials)
-    jobs = Nomad.jobs.get_jobs()  # job summaries
+    # Retrieve authenticated user info
+    auth_info = get_user_info(token=authorization.credentials)
+    owner, provider = auth_info['id'], auth_info['vo']
 
     # Filter jobs
+    jobs = Nomad.jobs.get_jobs()  # job summaries
     njobs = []
     for j in jobs:
         # Skip deleted jobs
         if j['Status'] == 'dead':
             continue
 
-        # Get full job description instead
+        # Get full job description
         j = Nomad.job.get_job(j['ID'])
 
         # Remove jobs not belonging to owner
         if j['Meta'] and (owner == j['Meta'].get('owner', '')):
             njobs.append(j)
 
-    # Format to a Nomad-independent format to be used by the Dashboard
+    # Format outputs to a Nomad-independent format to be used by the Dashboard
     fjobs = []
     for j in njobs:
         tmp = {
@@ -94,7 +89,7 @@ def get_deployments(
             ports = a['Resources']['Networks'][0]['DynamicPorts']
             tmp['endpoints'] = {d['Label']: f"{public_ip}:{d['Value']}" for d in ports}
             # todo: We need to connect internal IP (172.XXX) to external IP (193.XXX) (Traefik + Consul Connect)
-            # todo: use service discovery to map internal ip to external IPs???
+            # use service discovery to map internal ip to external IPs???
 
         else:
             # Something happened, job didn't deploy (eg. jobs needs port that's currently being used)
@@ -115,7 +110,7 @@ def get_deployment(
     """
     Retrieve the info of a specific deployment.
     """
-    raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
+    raise HTTPException(status_code=501)  #todo: implement if we finally need it
 
 
 @router.post("/")
@@ -127,17 +122,19 @@ def create_deployment(
     Submit a deployment to Nomad.
 
     Parameters:
-    * **owner**: string with username (will be removed once we implement token authentication)
     * **conf**: configuration dict of the deployment to be submitted. 
     If only a partial configuration is submitted, the remaining will be
-    filled with default args (see GET(`/info/conf`) method).
+    filled with default args.
     
     Returns a dict with status
     """
-    # Enforce job owner
-    user = get_user_info(token=authorization.credentials)
-    if not user:
-        raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
+    # Retrieve authenticated user info
+    auth_info = get_user_info(token=authorization.credentials)
+    owner, provider = auth_info['id'], auth_info['vo']
+
+    # Update default dict with new values
+    job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
+    user_conf.update(conf)    
     
     # Enforce JupyterLab password minimum number of characters
     if (
@@ -149,17 +146,13 @@ def create_deployment(
             detail="JupyterLab password should have at least 9 characters."
             )
 
-    # Update default dict with new values
-    job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
-    user_conf.update(conf)
-
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
-    job_conf['ID'] = 'example2'  # todo: remove when ready
-    # job_conf['ID'] = uuid.uuid1()  # id is generated from (MAC address+timestamp) so it's unique
+    job_conf['ID'] = f'userjob-{uuid.uuid1()}'  # id is generated from (MAC address+timestamp) so it's unique
 
-    job_conf['Meta']['owner'] = owner  # todo: is there a more appropriate field than `meta` for this?
+    # Add owner and extra information to the job metadata
+    job_conf['Meta']['owner'] = owner
     job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
-    job_conf['Meta']['description'] = user_conf['general']['desc']
+    job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
 
     # Replace user conf in Nomad job
     task = job_conf['TaskGroups'][0]['Tasks'][0]
@@ -212,24 +205,29 @@ def delete_deployment(
     Delete a deployment. Users can only delete their own deployments.
 
     Parameters:
-    * **owner**: string with username (will be removed once we implement token authentication)
     * **deployment_uuid**: uuid of deployment to delete
 
     Returns a dict with status
     """
+    # Retrieve authenticated user info
+    auth_info = get_user_info(token=authorization.credentials)
+    owner, provider = auth_info['id'], auth_info['vo']
 
-    # Enforce job owner
-    user = get_user_info(token=authorization.credentials)
-    if not user:
-        raise ValueError("You must provide a owner of the deployment. For testing purposes you can use 'janedoe'.")
-
-    # Check the deployment exists and belongs to the user
-    deployments = get_deployments(owner=owner)
-    if deployment_uuid not in {d['ID'] for d in deployments}:
-        return {
-            'status': 'fail',
-            'error_msg': 'Deployment does not exist, or does not belong to the provided owner.',
-        }
+    # Check the deployment exists
+    try: 
+        job_info = Nomad.job.get_job(deployment_uuid)
+    except exceptions.URLNotFoundNomadException:
+        raise HTTPException(
+            status_code=403,
+            detail="No deployment exists with this uuid.",
+            )
+    
+    # Check it belongs to the user
+    if owner != job_info['Meta']['owner']:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not the owner of that deployment.",
+            )
 
     # Delete deployment
     Nomad.job.deregister_job(deployment_uuid)

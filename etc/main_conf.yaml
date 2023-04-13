@@ -1,10 +1,7 @@
 ---
 # Main configuration file of the API
 
-
 auth:
-
-  admins: []  # admin emails
 
   OP:  # OIDC providers
 
@@ -16,12 +13,12 @@ auth:
 
   VO:  # Virtual Organizations
 
-    - vo.imagine.eu
     - vo.ai4eosc.eu
+    - vo.imagine-ai.eu
 
 nomad:
 
   namespaces:  # map VO to Nomad namespace
 
-    vo.imagine.eu: imagine
     vo.ai4eosc.eu: ai4eosc
+    vo.imagine-ai.eu: imagine

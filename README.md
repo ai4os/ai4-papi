@@ -17,6 +17,8 @@ Its functionalities can also be accessed via an API (generated with [FastAPI](ht
 This makes it possible for example to automate training launch and effectively decouples the Dashboard code from the underlying services we use (ie. Nomad).
 
 > **TODO list** (in priority order):
+> * (CSIC) Deploy on a different namespace depending on VO, once the cluster is ready  
+> * (KIT) Explore the integration of the Exchange API, with a PostgreSQL database
 > * (CSIC) if needed, create a database for trainings (instead of parsing Nomad) for better performance
 
 
@@ -24,12 +26,12 @@ This makes it possible for example to automate training launch and effectively d
 
 **Requirements**
 To use this library you need to have [Nomad](https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install) installed to be able to interact with deployments.
-Once you have Nomad installed you have to export the following variables:
+Once you have Nomad installed you have to export the following variables with the proper local paths and http address:
 ```bash
-export NOMAD_ADDR=https://publicip:4646
-export NOMAD_CACERT=/path/to/tls/client-ca.crt
-export NOMAD_CLIENT_CERT=/path/to/tls/client.crt
-export NOMAD_CLIENT_KEY=/path/to/tls/client.key
+export NOMAD_ADDR=https://some-public-ip:4646
+export NOMAD_CACERT=/path/to/tls/nomad-ca.pem
+export NOMAD_CLIENT_CERT=/path/to/tls/nomad-cli.pem
+export NOMAD_CLIENT_KEY=/path/to/tls/nomad-cli-key.pem
 ```
 For this you will need to ask the administrator of the cluster for the proper certificates.
 
@@ -54,7 +56,7 @@ To deploy the API, run:
 uvicorn main:app --reload
 ```
 
-and go to http://127.0.0.1:8000/docs to check the API methods in the Swagger UI.
+and go to http://127.0.0.1:8080/docs to check the API methods in the Swagger UI.
 
 Here follows an overview of the available methods. The :lock: symbol indicates the method needs authentication to be accessed and :red_circle: methods that are planned but not implemented yet.
 
@@ -72,7 +74,6 @@ Some of the API methods are authenticated (:lock:) via OIDC tokens, so you will 
 You will have to wait until an administrator approves your request before proceeding with the next steps. 
 Supported OIDC providers and Virtual Organizations are described in the [configuration](./etc/main_conf.yaml).
 
-
 #### Generating a valid refresh token
 
 There are two ways of generating a valid refresh user token to access the methods: either via an UI or via the terminal.
@@ -84,37 +85,41 @@ If have a EGI Check-In account, you can generate a refresh user token with [EGI 
 ##### Generate a token via the terminal
 
 1. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
+
 2. Configure the OIDC agent:
 ```bash
 eval `oidc-agent-service start`
-oidc-gen egi-checkin
-# - https://aai.egi.eu/auth/realms/egi
-# - Scopes: openid profile offline_access eduperson_entitlement
-# - login in browser
-# - enter encryption password
+oidc-gen \
+  --issuer https://aai.egi.eu/auth/realms/egi \
+  --scope "open id profile offline_access eduperson_entitlement" \
+  egi-checkin
 ```
+It will open the browser so you can authenticate with your EGI account. Then go back to the terminal and finish by setting and encryption password.
+
 3. Add the following line to your `.bashrc` to start the agent automatically at startup ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
 ```bash
 eval `oidc-agent-service use` > /dev/null
 ```
+
 4. Generate the OIDC token
 ```bash
-oidc-token deep-iam
-# --> this will print your token
+oidc-token egi-checkin
 ```
-5. [Optional] You can validate this token with:
+
+5. `Optional`: You can check you have set everything up correctly by running:
 ```bash
 flaat-userinfo --oidc-agent-account egi-checkin
 ```
+This should print you EGI user information.
 
 #### Making authenticated calls
 
 To make authenticated calls:
-* An authenticated CURL call you look like the following:
+* An authenticated CURL call looks like the following:
 ```bash
-curl --location 'http://localhost:8000' --header 'Authorization: Bearer <your-OIDC-token>'
+curl --location 'http://localhost:8080' --header 'Authorization: Bearer <your-OIDC-token>'
 ```
-* From in the Swagger UI (http://localhost:8000/docs), click in the upper right corner button `Authorize` :unlock: and input your token. From now on you will be authenticated when making API calls from the Swagger UI.
+* From in the Swagger UI (http://localhost:8080/docs), click in the upper right corner button `Authorize` :unlock: and input your token. From now on you will be authenticated when making API calls from the Swagger UI.
 * From inside a Python script:
 ```python
 from types import SimpleNamespace
@@ -123,7 +128,7 @@ from ai4eosc.routers import deployments
 deployments.get_deployments(
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
-    )
+    ),
 )
 ```
 
@@ -148,20 +153,25 @@ Methods:
 * `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a user.
 * `POST(/deployments)`: :lock: create a new deployment belonging to the user. 
 * `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only delete their own deployments.
-* `GET(/info/conf)`: returns default configuration for creating a generic deployment.
 * `GET(/info/conf/{module_name}`: returns the default configuration for creating a deployment for a specific module.
 
 The functionalities can also be accessed without the API:
 
 ```python
+from types import SimpleNamespace
+
 from ai4eosc.routers import deployments
 
-deployments.get_deployments()  # get all deployments
-deployments.get_deployments(username='janedoe')  # get a specific user's deployments
-#  Output example:
+
+# Get all the user's deployments
+deployments.get_deployments(
+    authorization=SimpleNamespace(
+        credentials='your-OIDC-token'
+    ),
+)
 # [{'job_ID': 'example',
 #   'status': 'running',
-#   'owner': 'janedoe',
+#   'owner': '4545898984949741@someprovider',
 #   'submit_time': '2023-01-13 11:36:16',
 #   'alloc_ID': 'e6b24722-e332-185a-a9b6-817ce8d26f48',
 #   'resources': {'cpu_num': 2, 'gpu_num': 0, 'memoryMB': 8000, 'diskMB': 300},
@@ -179,7 +189,9 @@ deployments.create_deployment(
             'gpu': 1,
         }     
     },
-    username='janedoe'
+    authorization=SimpleNamespace(
+        credentials='your-OIDC-token'
+    ),
 )
 ```
 
