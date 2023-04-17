@@ -2,7 +2,7 @@
 <img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
 </div>
 
-# AI4EOSC library
+# AI4EOSC - Platform API
 
 > :warning: The library is under active development, so you might expect some breaking changes to happen. 
 
@@ -11,15 +11,8 @@
 [//]: # ([![PyPI]&#40;https://img.shields.io/pypi/v/ai4eosc.svg&#41;]&#40;https://pypi.python.org/pypi/ai4eosc&#41;)
 [//]: # ([![Python versions]&#40;https://img.shields.io/pypi/pyversions/ai4eosc.svg&#41;]&#40;https://pypi.python.org/pypi/ai4eosc&#41;)
 
-This is a lightweight library for interacting with the AI4EOSC services. It aims at providing a stable UI, regardless of whether the underlying services change or not.
-
-Its functionalities can also be accessed via an API (generated with [FastAPI](https://fastapi.tiangolo.com/)). 
-This makes it possible for example to automate training launch and effectively decouples the Dashboard code from the underlying services we use (ie. Nomad).
-
-> **TODO list** (in priority order):
-> * (CSIC) Deploy on a different namespace depending on VO, once the cluster is ready  
-> * (KIT) Explore the integration of the Exchange API, with a PostgreSQL database
-> * (CSIC) if needed, create a database for trainings (instead of parsing Nomad) for better performance
+This is the Platform API for interacting with the AI4EOSC services, built using [FastAPI](https://fastapi.tiangolo.com/). 
+It aims at providing a stable UI, effectively decoupling the services offered by the project from the underlying tools we use to provide them (ie. Nomad).
 
 
 ## Installation
@@ -37,13 +30,13 @@ For this you will need to ask the administrator of the cluster for the proper ce
 
 Once you are done you can proceed to install the module:
 ```bash
-pip install git+https://github.com/ai4eosc/ai4-lib.git
+pip install git+https://github.com/ai4eosc/ai4-papi.git
 ```
 
 If you plan to use the module to develop, install instead in editable mode:
 ```bash
-git clone https://github.com/ai4eosc/ai4-lib
-cd ai4-lib
+git clone https://github.com/ai4eosc/ai4-papi
+cd ai4-papi
 pip install -e .
 ```
 
