@@ -5,3 +5,4 @@ python-nomad>=1.5.0
 fastapi>=0.89.1
 uvicorn[standard]>=0.20.0
 flaat>=1.1.8
+typer>=0.7.0

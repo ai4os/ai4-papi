@@ -46,10 +46,16 @@ pip install -e .
 To deploy the API, run:
 
 ```bash
-uvicorn main:app --reload
+ai4papi-run --host 0.0.0.0 --port 8080
 ```
 
 and go to http://127.0.0.1:8080/docs to check the API methods in the Swagger UI.
+
+If your are developing the API, you might want to run using uvicorn's auto `reload` feature:
+
+```bash
+uvicorn main:app --reload
+```
 
 Here follows an overview of the available methods. The :lock: symbol indicates the method needs authentication to be accessed and :red_circle: methods that are planned but not implemented yet.
 
