@@ -90,7 +90,7 @@ If have a EGI Check-In account, you can generate a refresh user token with [EGI 
 eval `oidc-agent-service start`
 oidc-gen \
   --issuer https://aai.egi.eu/auth/realms/egi \
-  --scope "open id profile offline_access eduperson_entitlement" \
+  --scope "openid profile offline_access eduperson_entitlement" \
   egi-checkin
 ```
 It will open the browser so you can authenticate with your EGI account. Then go back to the terminal and finish by setting and encryption password.
