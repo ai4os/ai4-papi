@@ -101,7 +101,9 @@ def get_module_metadata(
 
     # Format "description" field nicely
     metadata["description"] = [i if i!="" else "\n" for i in metadata["description"]]  # replace: "" --> "\n"
+    metadata["description"] = ["\n " + i if i.startswith("* ") else i for i in metadata["description"]]  # add linebreaks in bullet points lists
     metadata["description"] = " ".join(metadata["description"])  # single string
+    metadata["description"] = metadata["description"].replace("\n \n", "\n")  # avoid accidental multiple linebreaks
 
     return metadata
 
