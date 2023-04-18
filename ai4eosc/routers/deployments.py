@@ -10,6 +10,7 @@ Notes:
 
 from copy import deepcopy
 from datetime import datetime
+from types import SimpleNamespace
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -58,59 +59,99 @@ def get_deployments(
         if j['Meta'] and (owner == j['Meta'].get('owner', '')):
             njobs.append(j)
 
-    # Format outputs to a Nomad-independent format to be used by the Dashboard
+    # Retrieve info for jobs
     fjobs = []
     for j in njobs:
-        tmp = {
-            'job_ID': j['ID'],
-            'status': j['Status'],
-            'owner': j['Meta']['owner'],
-            'submit_time': datetime.fromtimestamp(
-                j['SubmitTime'] // 1000000000
-            ).strftime('%Y-%m-%d %H:%M:%S'),  # nanoseconds to timestamp
-        }
+        
+        job_info = get_deployment(
+            deployment_uuid=j['ID'],
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials  # token
+            ),
+        )
 
-        allocs = Nomad.job.get_allocations(j['ID'])
-        if allocs:
-            a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
-
-            tmp['alloc_ID'] = a['ID']
-
-            res = a['AllocatedResources']
-            devices = res['Tasks']['usertask']['Devices']
-            tmp['resources'] = {
-                'cpu_num': res['Tasks']['usertask']['Cpu']['CpuShares'],
-                'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,
-                'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
-                'diskMB': res['Shared']['DiskMB'],
-            }
-
-            public_ip = 'https://xxx.xxx.xxx.xxx'  # todo: replace when ready
-            ports = a['Resources']['Networks'][0]['DynamicPorts']
-            tmp['endpoints'] = {d['Label']: f"{public_ip}:{d['Value']}" for d in ports}
-            # todo: We need to connect internal IP (172.XXX) to external IP (193.XXX) (Traefik + Consul Connect)
-            # use service discovery to map internal ip to external IPs???
-
-        else:
-            # Something happened, job didn't deploy (eg. jobs needs port that's currently being used)
-            # We have to return `placement failures message`.
-            evals = Nomad.job.get_evaluations(j['ID'])
-            tmp['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
-            # todo: improve this error message once we start seeing the different modes of failures in typical cases
-
-        fjobs.append(tmp)
+        fjobs.append(job_info)
 
     return fjobs
 
 
 @router.get("/{deployment_uuid}")
 def get_deployment(
+    deployment_uuid: str,
     authorization=Depends(security),
     ):
     """
     Retrieve the info of a specific deployment.
+    Format outputs to a Nomad-independent format to be used by the Dashboard
+
+    Parameters:
+    * **deployment_uuid**: uuid of deployment to gather info about
+
+    Returns a dict with info
     """
-    raise HTTPException(status_code=501)  #todo: implement if we finally need it
+    # Retrieve authenticated user info
+    auth_info = get_user_info(token=authorization.credentials)
+    owner, provider = auth_info['id'], auth_info['vo']
+
+    # Check the deployment exists
+    try:
+        j = Nomad.job.get_job(deployment_uuid)
+    except exceptions.URLNotFoundNomadException:
+        raise HTTPException(
+            status_code=403,
+            detail="No deployment exists with this uuid.",
+            )
+    
+    # Check job does belong to owner
+    if j['Meta'] and owner != j['Meta'].get('owner', ''):
+        raise HTTPException(
+            status_code=403,
+            detail="You are not the owner of that deployment.",
+            )
+    
+    # Create job info dict
+    info = {
+        'job_ID': j['ID'],
+        'status': j['Status'],
+        'owner': j['Meta']['owner'],
+        'submit_time': datetime.fromtimestamp(
+            j['SubmitTime'] // 1000000000
+        ).strftime('%Y-%m-%d %H:%M:%S'),  # nanoseconds to timestamp
+        'resources': {},
+        'endpoints': {},
+        'alloc_ID': None,
+    }
+
+    # Only fill (resources + endpoints) if the job is allocated
+    allocs = Nomad.job.get_allocations(j['ID'])
+    if allocs:
+        a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
+
+        info['alloc_ID'] = a['ID']
+
+        res = a['AllocatedResources']
+        devices = res['Tasks']['usertask']['Devices']
+        info['resources'] = {
+            'cpu_num': res['Tasks']['usertask']['Cpu']['CpuShares'],
+            'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,
+            'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
+            'diskMB': res['Shared']['DiskMB'],
+        }
+
+        public_ip = 'https://xxx.xxx.xxx.xxx'  # todo: replace when ready
+        ports = a['Resources']['Networks'][0]['DynamicPorts']
+        info['endpoints'] = {d['Label']: f"{public_ip}:{d['Value']}" for d in ports}
+        # todo: We need to connect internal IP (172.XXX) to external IP (193.XXX) (Traefik + Consul Connect)
+        # use service discovery to map internal ip to external IPs???
+
+    else:
+        # Something happened, job didn't deploy (eg. jobs needs port that's currently being used)
+        # We have to return `placement failures message`.
+        evals = Nomad.job.get_evaluations(j['ID'])
+        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
+        # todo: improve this error message once we start seeing the different modes of failures in typical cases
+
+    return info
 
 
 @router.post("/")
@@ -215,15 +256,15 @@ def delete_deployment(
 
     # Check the deployment exists
     try: 
-        job_info = Nomad.job.get_job(deployment_uuid)
+        j = Nomad.job.get_job(deployment_uuid)
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
             status_code=403,
             detail="No deployment exists with this uuid.",
             )
     
-    # Check it belongs to the user
-    if owner != job_info['Meta']['owner']:
+    # Check job does belong to owner
+    if j['Meta'] and owner != j['Meta'].get('owner', ''):
         raise HTTPException(
             status_code=403,
             detail="You are not the owner of that deployment.",
