@@ -114,6 +114,9 @@ def get_deployment(
         'job_ID': j['ID'],
         'status': j['Status'],
         'owner': j['Meta']['owner'],
+        'title': j['Meta']['title'],
+        'description': j['Meta']['description'],
+        'docker_image': None,
         'submit_time': datetime.fromtimestamp(
             j['SubmitTime'] // 1000000000
         ).strftime('%Y-%m-%d %H:%M:%S'),  # nanoseconds to timestamp
@@ -121,6 +124,11 @@ def get_deployment(
         'endpoints': {},
         'alloc_ID': None,
     }
+
+    # Retrieve Docker image
+    for t in j['TaskGroups'][0]['Tasks']:
+        if t['Name'] == 'usertask':
+            info['docker_image'] = t['Config']['image']
 
     # Only fill (resources + endpoints) if the job is allocated
     allocs = Nomad.job.get_allocations(j['ID'])
