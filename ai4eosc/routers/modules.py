@@ -20,6 +20,7 @@ Or the caching time be reduced if needed, though 6 hours seems to be a decent co
 
 import configparser
 import json
+import re
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
@@ -99,11 +100,25 @@ def get_module_metadata(
     r = requests.get(metadata_url)
     metadata = json.loads(r.text)
 
-    # Format "description" field nicely
-    metadata["description"] = [i if i!="" else "\n" for i in metadata["description"]]  # replace: "" --> "\n"
-    metadata["description"] = ["\n " + i if i.startswith("* ") else i for i in metadata["description"]]  # add linebreaks in bullet points lists
-    metadata["description"] = " ".join(metadata["description"])  # single string
-    metadata["description"] = metadata["description"].replace("\n \n", "\n")  # avoid accidental multiple linebreaks
+    # Format "description" field nicely for the Dashboards Markdown parser
+    desc = []
+    isbullet = False
+    for l in metadata['description']:
+        l = l if l!="" else "\n"   # replace: "" --> "\n"
+
+        # Bullet point list
+        if l.startswith('* '):
+            # We need a line break after each bullet point
+            isbullet = True
+            l = '\n' + l
+        elif '\n' in l and isbullet:  # list end
+            # At the end of a bullet list, we need two line breaks
+            l = l.replace('\n', '\n \n')
+            isbullet = False
+        
+        desc.append(l)
+
+    metadata["description"] = " ".join(desc)  # single string
 
     return metadata
 
