@@ -9,9 +9,23 @@ import uvicorn
 
 from ai4eosc.auth import get_user_info
 from ai4eosc.routers import deployments, info, modules
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+origins = [
+    "https://dashboard.dev.imagine-ai.eu",
+    "https://dashboard.cloud.imagine-ai.eu",
+    "https://dashboard.dev.ai4eosc.eu",
+    "https://dashboard.cloud.ai4eosc.eu",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(deployments.router)
 app.include_router(info.router)
 app.include_router(modules.router)
