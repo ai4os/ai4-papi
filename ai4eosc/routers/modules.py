@@ -102,23 +102,10 @@ def get_module_metadata(
 
     # Format "description" field nicely for the Dashboards Markdown parser
     desc = []
-    isbullet = False
     for l in metadata['description']:
-        l = l if l!="" else "\n"   # replace: "" --> "\n"
-
-        # Bullet point list
-        if l.startswith('* '):
-            # We need a line break after each bullet point
-            isbullet = True
-            l = '\n' + l
-        elif '\n' in l and isbullet:  # list end
-            # At the end of a bullet list, we need two line breaks
-            l = l.replace('\n', '\n \n')
-            isbullet = False
-        
         desc.append(l)
 
-    metadata["description"] = " ".join(desc)  # single string
+    metadata["description"] = "\n".join(desc)  # single string
 
     return metadata
 
