@@ -52,10 +52,10 @@ clean:
 
 .PHONY: run 
 run: setup $(VIRTUALENV)
-	@echo 'D> Running DEEPaaS inside $(VIRTUALENV)'
+	@echo 'D> Running AI4papi inside $(VIRTUALENV)'
 	. $(VIRTUALENV)/bin/activate; uvicorn ai4papi.main:app
 
 .PHONY: run-dev
 run-dev: develop $(VIRTUALENV)
-	@echo 'D> Running DEEPaaS inside $(VIRTUALENV) in development mode'
+	@echo 'D> Running AI4papi inside $(VIRTUALENV) in development mode'
 	. $(VIRTUALENV)/bin/activate; uvicorn ai4papi.main:app --reload
