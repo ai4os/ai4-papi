@@ -2,15 +2,15 @@
 Create an app with FastAPI
 """
 
-from fastapi import Depends, FastAPI
+import fastapi
 from fastapi.security import HTTPBearer
 import uvicorn
 
 from ai4papi.auth import get_user_info
-from ai4papi.routers import deployments, info, modules
+from ai4papi.routers import v1
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = fastapi.FastAPI()
 origins = [
     "https://dashboard.dev.imagine-ai.eu",
     "https://dashboard.cloud.imagine-ai.eu",
@@ -25,21 +25,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(deployments.router)
-app.include_router(info.router)
-app.include_router(modules.router)
-
 security = HTTPBearer()
+app.include_router(v1.app, prefix="/v1")
 
 
-@app.get("/")
+@app.get(
+    "/",
+    summary="Get AI4EOSC Platform API Information",
+    tags=["API"],
+)
 def root(
-    authorization=Depends(security),
-    ):
+    request: fastapi.Request,
+    # authorization=fastapi.Depends(security),
+):
     # Retrieve authenticated user info
-    auth_info = get_user_info(token=authorization.credentials)
+    # auth_info = get_user_info(token=authorization.credentials)
 
-    return f"This is the AI4EOSC project's API. Current authenticated user: {auth_info}"
+    root = str(request.url_for("root"))
+    versions = [v1.get_version(request)]
+
+    response = {
+        "versions": versions,
+        "links": [
+            {
+                "rel": "help",
+                "type": "text/html",
+                "href": f"{root}" + app.docs_url.strip("/"),
+            },
+            {
+                "rel": "help",
+                "type": "text/html",
+                "href": f"{root}" + app.redoc_url.strip("/"),
+            },
+            {
+                "rel": "describedby",
+                "type": "application/json",
+                "href": f"{root}" + app.openapi_url.strip("/"),
+            },
+        ],
+    }
+    return response
 
 
 def run(
