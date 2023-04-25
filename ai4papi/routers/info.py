@@ -11,8 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 import requests
 
-from ai4eosc.auth import get_user_info
-from ai4eosc.conf import USER_CONF
+from ai4papi.auth import get_user_info
+from ai4papi.conf import USER_CONF
 
 
 router = APIRouter(
@@ -34,7 +34,7 @@ def get_default_deployment_conf(
     for a specific module. It is prefilled with the appropriate
     docker image and the available docker tags.
 
-    We are not checking if module exists in the marketplace because 
+    We are not checking if module exists in the marketplace because
     we are treating each route as independent. In the future, this can
     be done as an API call to the other route.
     """

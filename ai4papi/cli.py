@@ -10,7 +10,7 @@ Just have it in a separate file, clean and easy.
 
 import typer
 
-from ai4eosc import main
+from ai4papi import main
 
 
 def run():

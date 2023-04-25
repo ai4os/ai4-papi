@@ -26,7 +26,7 @@ import re
 from fastapi import HTTPException
 from flaat.fastapi import Flaat
 
-from ai4eosc.conf import MAIN_CONF
+from ai4papi.conf import MAIN_CONF
 
 
 # Initialize flaat

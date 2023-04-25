@@ -18,8 +18,8 @@ from fastapi.security import HTTPBearer
 import nomad
 from nomad.api import exceptions
 
-from ai4eosc.auth import get_user_info
-from ai4eosc.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
+from ai4papi.auth import get_user_info
+from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
 
 
 router = APIRouter(
@@ -62,7 +62,7 @@ def get_deployments(
     # Retrieve info for jobs
     fjobs = []
     for j in njobs:
-        
+
         job_info = get_deployment(
             deployment_uuid=j['ID'],
             authorization=SimpleNamespace(
@@ -101,14 +101,14 @@ def get_deployment(
             status_code=403,
             detail="No deployment exists with this uuid.",
             )
-    
+
     # Check job does belong to owner
     if j['Meta'] and owner != j['Meta'].get('owner', ''):
         raise HTTPException(
             status_code=403,
             detail="You are not the owner of that deployment.",
             )
-    
+
     # Create job info dict
     info = {
         'job_ID': j['ID'],
@@ -171,10 +171,10 @@ def create_deployment(
     Submit a deployment to Nomad.
 
     Parameters:
-    * **conf**: configuration dict of the deployment to be submitted. 
+    * **conf**: configuration dict of the deployment to be submitted.
     If only a partial configuration is submitted, the remaining will be
     filled with default args.
-    
+
     Returns a dict with status
     """
     # Retrieve authenticated user info
@@ -183,8 +183,8 @@ def create_deployment(
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
-    user_conf.update(conf)    
-    
+    user_conf.update(conf)
+
     # Enforce JupyterLab password minimum number of characters
     if (
         user_conf['general']['service'] == 'jupyterlab' and
@@ -263,14 +263,14 @@ def delete_deployment(
     owner, provider = auth_info['id'], auth_info['vo']
 
     # Check the deployment exists
-    try: 
+    try:
         j = Nomad.job.get_job(deployment_uuid)
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
             status_code=403,
             detail="No deployment exists with this uuid.",
             )
-    
+
     # Check job does belong to owner
     if j['Meta'] and owner != j['Meta'].get('owner', ''):
         raise HTTPException(
