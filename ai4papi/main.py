@@ -6,7 +6,6 @@ import fastapi
 from fastapi.security import HTTPBearer
 import uvicorn
 
-from ai4papi.auth import get_user_info
 from ai4papi.routers import v1
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -37,11 +36,7 @@ app.include_router(v1.app, prefix="/v1")
 )
 def root(
     request: fastapi.Request,
-    # authorization=fastapi.Depends(security),
 ):
-    # Retrieve authenticated user info
-    # auth_info = get_user_info(token=authorization.credentials)
-
     root = str(request.url_for("root"))
     versions = [v1.get_version(request)]
 
