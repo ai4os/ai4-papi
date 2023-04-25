@@ -5,7 +5,7 @@ job "userjob" {
   region = "global"
 
   meta {
-    owner = "janedoe"
+    owner = ""  # user-id from OIDC
     title = ""
     description = ""
   }

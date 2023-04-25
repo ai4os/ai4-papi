@@ -1,13 +1,18 @@
 """
-Get information from the API (no authentication needed)
+Misc routes.
+
+Methods returning the conf are authenticated in order to be
+able to fill the `Virtual Organization` field.
 """
 
 from copy import deepcopy
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
 import requests
 
-from ai4eosc.conf import USER_CONF
+from ai4papi.auth import get_user_info
+from ai4papi.conf import USER_CONF
 
 
 router = APIRouter(
@@ -16,30 +21,33 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-
-@router.get("/conf")
-def get_default_deployment_conf(
-):
-    """
-    Returns default configuration for creating a generic deployment.
-
-    Returns a dict.
-    """
-    return USER_CONF
+security = HTTPBearer()
 
 
 @router.get("/conf/{module_name}")
 def get_default_deployment_conf(
-        module_name: str,
+    module_name: str,
+    authorization=Depends(security),
 ):
     """
-    Returns the default configuration for creating a deployment
+    Returns the default configuration (dict) for creating a deployment
     for a specific module. It is prefilled with the appropriate
     docker image and the available docker tags.
 
-    Returns a dict.
+    We are not checking if module exists in the marketplace because
+    we are treating each route as independent. In the future, this can
+    be done as an API call to the other route.
     """
+    # Retrieve authenticated user info
+    auth_info = get_user_info(token=authorization.credentials)
+    vos = auth_info['vo']
+
+    # Generate the conf
     conf = deepcopy(USER_CONF)
+
+    # Fill the Virtual Organization
+    conf["general"]["virtual_organization"]["value"] = vos[0]
+    conf["general"]["virtual_organization"]["options"] = vos
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"deephdc/{module_name.lower()}"

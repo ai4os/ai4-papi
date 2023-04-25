@@ -1,13 +1,14 @@
 """
-Manage module metadata (Exchange API).
+Manage module metadata.
+This is the AI4EOSC Exchange API.
 
-We decide to initially implement this in the same repo/API as deployment management (Training API),
+Implementation notes:
+====================
+* We decide to initially implement this in the same repo/API as deployment management (Training API),
 but on a different API route. 
 This is done to avoid duplicating code (eg. authentication) in the initial development phase.
 We can always move this to another repo/API in the future if needed.
 
-Implementation notes:
-====================
 * Output caching
 We are in a transition time, where users still edit their modules metadata in their Github repos.
 But reading metadata from Github and returning it isn't fast enough for a seamless experience (~0.3s / module).
@@ -16,8 +17,10 @@ We decide to cache the outputs of the functions for up to six hours to enable fa
 This caching can be eventually removed when we move the metadata to the Exchange database.
 Or the caching time be reduced if needed, though 6 hours seems to be a decent compromise, as metadata is not constantly changing.
 """
+
 import configparser
 import json
+import re
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
@@ -65,8 +68,8 @@ def get_modules_summary():
 @router.get("/metadata/{module_name}")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_module_metadata(
-        module_name: str,
-):
+    module_name: str,
+    ):
     """
     Get the module's full metadata.
     """
@@ -97,20 +100,23 @@ def get_module_metadata(
     r = requests.get(metadata_url)
     metadata = json.loads(r.text)
 
-    # Format "description" field nicely
-    metadata["description"] = [i if i!="" else "\n" for i in metadata["description"]]  # replace: "" --> "\n"
-    metadata["description"] = " ".join(metadata["description"])  # single string
+    # Format "description" field nicely for the Dashboards Markdown parser
+    desc = []
+    for l in metadata['description']:
+        desc.append(l)
+
+    metadata["description"] = "\n".join(desc)  # single string
 
     return metadata
 
 
 @router.put("/metadata/{module_name}")
 def update_module_metadata(
-        module_name: str,
-):
+    module_name: str,
+    ):
     """
     Update the module's metadata.
     TODO: do this when we implement the AI4EOSC Exchange database
-    TODO: this function needs authentication, user should only be able to edit their own modules
+    This function needs authentication, users should only be able to edit their own modules
     """
-    raise HTTPException(status_code=501)  # Not implemented #todo: implement if finally needed
+    raise HTTPException(status_code=501)
