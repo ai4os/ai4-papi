@@ -10,6 +10,7 @@ from ai4papi.auth import get_user_info
 from ai4papi.routers import v1
 from fastapi.middleware.cors import CORSMiddleware
 
+
 app = fastapi.FastAPI()
 origins = [
     "https://dashboard.dev.imagine-ai.eu",
@@ -70,11 +71,15 @@ def root(
 def run(
         host:str = "0.0.0.0",
         port:int = 8080,
+        ssl_keyfile:str = None,
+        ssl_certfile:str = None,
     ):
     uvicorn.run(
         app,
         host=host,
         port=port,
+        ssl_keyfile=ssl_keyfile,
+        ssl_certfile=ssl_certfile,
     )
 
 
