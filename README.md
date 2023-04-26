@@ -6,14 +6,15 @@
 
 > :warning: The library is under active development, so you might expect some breaking changes to happen. 
 
-[//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4eosc/ai4eosc.svg&#41;]&#40;https://github.com/ai4eosc/ai4eosc/blob/master/LICENSE&#41;)
-[//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4eosc/ai4eosc.svg&#41;]&#40;https://github.com/ai4eosc/ai4eosc/releases&#41;)
-[//]: # ([![PyPI]&#40;https://img.shields.io/pypi/v/ai4eosc.svg&#41;]&#40;https://pypi.python.org/pypi/ai4eosc&#41;)
-[//]: # ([![Python versions]&#40;https://img.shields.io/pypi/pyversions/ai4eosc.svg&#41;]&#40;https://pypi.python.org/pypi/ai4eosc&#41;)
+[//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
+[//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/releases&#41;)
+[//]: # ([![PyPI]&#40;https://img.shields.io/pypi/v/ai4papi.svg&#41;]&#40;https://pypi.python.org/pypi/ai4papi&#41;)
+[//]: # ([![Python versions]&#40;https://img.shields.io/pypi/pyversions/ai4papi.svg&#41;]&#40;https://pypi.python.org/pypi/ai4papi&#41;)
 
 This is the Platform API for interacting with the AI4EOSC services, built using [FastAPI](https://fastapi.tiangolo.com/). 
 It aims at providing a stable UI, effectively decoupling the services offered by the project from the underlying tools we use to provide them (ie. Nomad).
 
+The API is currently [deployed here](https://api.dev.ai4eosc.eu/docs).
 
 ## Installation
 
@@ -56,6 +57,8 @@ If your are developing the API, you might want to run using uvicorn's auto `relo
 ```bash
 uvicorn main:app --reload
 ```
+
+We also provide a [Dockerfile](./docker/Dockerfile) to run the API with SSL.
 
 Here follows an overview of the available methods. The :lock: symbol indicates the method needs authentication to be accessed and :red_circle: methods that are planned but not implemented yet.
 
@@ -122,7 +125,7 @@ curl --location 'http://localhost:8080' --header 'Authorization: Bearer <your-OI
 * From inside a Python script:
 ```python
 from types import SimpleNamespace
-from ai4eosc.routers import deployments
+from ai4papi.routers.v1 import deployments
 
 deployments.get_deployments(
     authorization=SimpleNamespace(
@@ -142,7 +145,7 @@ Methods:
 * `GET(/modules/metadata/{module_name})`: returns the full metadata of a specific module
 * `PUT(/modules/metadata/{module_name})`: :lock: :red_circle: updates the metadata of a specific module
 
-**Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see [doctring](./ai4eosc/routers/modules.py)).
+**Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see [doctring](./ai4papi/routers/v1/modules.py)).
 
 ### Training API
 
@@ -159,7 +162,7 @@ The functionalities can also be accessed without the API:
 ```python
 from types import SimpleNamespace
 
-from ai4eosc.routers import deployments
+from ai4papi.routers.v1 import deployments
 
 
 # Get all the user's deployments
