@@ -36,35 +36,35 @@ base_org_url = "https://raw.githubusercontent.com/deephdc/"
 
 
 @router.get("/")
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def get_modules_list():
     """Retrieve a list of all modules."""
     modules_url = f"{base_org_url}/deep-oc/master/MODULES.yml"
     r = requests.get(modules_url)
     catalog = yaml.safe_load(r.text)
-    modules = [i['module'].split('/')[-1] for i in catalog]  # remove github prefix
+    modules = [i["module"].split("/")[-1] for i in catalog]  # remove github prefix
     return modules
 
 
 @router.get("/summary")
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def get_modules_summary():
     """Retrieve a list of modules with basic metadata.
 
     This will return a list of (name, title, summary, keywords).
     """
     summary = []
-    keys = ['title', 'summary', 'keywords']
+    keys = ["title", "summary", "keywords"]
     for m in get_modules_list():
         meta1 = get_module_metadata(m)
         meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
-        meta['name'] = m
+        meta["name"] = m
         summary.append(meta)
     return summary
 
 
 @router.get("/metadata/{module_name}")
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def get_module_metadata(module_name: str):
     """Get the module's full metadata."""
     # Check the module is in the modules list
@@ -95,7 +95,7 @@ def get_module_metadata(module_name: str):
 
     # Format "description" field nicely for the Dashboards Markdown parser
     desc = []
-    for aux in metadata['description']:
+    for aux in metadata["description"]:
         desc.append(aux)
 
     metadata["description"] = "\n".join(desc)  # single string

@@ -38,7 +38,7 @@ def get_default_deployment_conf(module_name: str, authorization=security):
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    vos = auth_info['vo']
+    vos = auth_info["vo"]
 
     # Generate the conf
     conf = deepcopy(USER_CONF)

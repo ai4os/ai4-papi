@@ -48,10 +48,10 @@ def get_user_info(token):
         raise HTTPException(
             status_code=403,
             detail="Invalid token",
-            )
+        )
 
     # Check scopes
-    if user_infos.get('eduperson_entitlement') is None:
+    if user_infos.get("eduperson_entitlement") is None:
         raise HTTPException(
             status_code=403,
             detail="Check you enabled the `eduperson_entitlement` scope for the token.",
@@ -60,15 +60,11 @@ def get_user_info(token):
     # Parse Virtual Organizations manually from URNs
     # If more complexity is need in the future, check https://github.com/oarepo/urnparse
     vos = []
-    for i in user_infos.get('eduperson_entitlement'):
-        vos.append(
-            re.search(r"group:(.+?):", i).group(1)
-        )
+    for i in user_infos.get("eduperson_entitlement"):
+        vos.append(re.search(r"group:(.+?):", i).group(1))
 
     # Filter VOs to keep only the ones relevant to us
-    vos = set(vos).intersection(
-        set(MAIN_CONF['auth']['VO'])
-    )
+    vos = set(vos).intersection(set(MAIN_CONF["auth"]["VO"]))
     vos = sorted(vos)
 
     # Check if VOs is empty after filtering
@@ -76,15 +72,15 @@ def get_user_info(token):
         raise HTTPException(
             status_code=403,
             detail="You should belong to at least one of the Virtual Organizations "
-                   f"supported by the project: {vos}.",
-            )
+            f"supported by the project: {vos}.",
+        )
 
     # Generate user info dict
     out = {
-        'id': user_infos.get('sub'),  # subject, user-ID
-        'issuer': user_infos.get('iss'),  # URL of the access token issuer
-        'name': user_infos.get('name'),
-        'vo': vos,
+        "id": user_infos.get("sub"),  # subject, user-ID
+        "issuer": user_infos.get("iss"),  # URL of the access token issuer
+        "name": user_infos.get("name"),
+        "vo": vos,
     }
 
     return out
