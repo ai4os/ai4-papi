@@ -20,16 +20,13 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-security = HTTPBearer()
+security = Depends(HTTPBearer())
 
 base_mod_url = "https://registry.hub.docker.com/v2/repositories/deephdc/"
 
 
 @router.get("/conf/{module_name}")
-def get_default_deployment_conf(
-    module_name: str,
-    authorization=Depends(security),
-):
+def get_default_deployment_conf(module_name: str, authorization=security):
     """
     Return the default configuration to creating a deployment for a module.
 

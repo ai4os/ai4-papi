@@ -24,13 +24,13 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-security = HTTPBearer()
+security = Depends(HTTPBearer())
 
 Nomad = nomad.Nomad()
 
 
 @router.get("/")
-def get_deployments(authorization=Depends(security)):
+def get_deployments(authorization=security):
     """Return a list of all deployments belonging to a user."""
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
@@ -68,7 +68,7 @@ def get_deployments(authorization=Depends(security)):
 
 
 @router.get("/{deployment_uuid}")
-def get_deployment(deployment_uuid: str, authorization=Depends(security)):
+def get_deployment(deployment_uuid: str, authorization=security):
     """
     Retrieve the info of a specific deployment.
 
@@ -158,7 +158,7 @@ def get_deployment(deployment_uuid: str, authorization=Depends(security)):
 
 
 @router.post("/")
-def create_deployment(conf: dict = {}, authorization=Depends(security)):
+def create_deployment(conf: dict = {}, authorization=security):
     """
     Submit a deployment to Nomad.
 
@@ -245,7 +245,7 @@ def create_deployment(conf: dict = {}, authorization=Depends(security)):
 
 
 @router.delete("/{deployment_uuid}")
-def delete_deployment(deployment_uuid: str, authorization=Depends(security)):
+def delete_deployment(deployment_uuid: str, authorization=security):
     """Delete a deployment.
 
     Users can only delete their own deployments.
