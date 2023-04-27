@@ -1,7 +1,11 @@
 """AI4EOSC Plaform API (AI4PAPI) with FastAPI."""
 
+import ipaddress
+import typing
+
 import fastapi
 from fastapi.security import HTTPBearer
+import typer
 import uvicorn
 
 from ai4papi.routers import v1
@@ -64,12 +68,12 @@ def root(
 
 
 def run(
-    host: str = "0.0.0.0",
+    host: ipaddress.IPv4Address = ipaddress.IPv4Address("127.0.0.1"),  # noqa(B008)
     port: int = 8080,
-    ssl_keyfile: str = None,
-    ssl_certfile: str = None,
+    ssl_keyfile: typing.Optional[pathlib.Path] = typer.Option(None),  # noqa(B008)
+    ssl_certfile: typing.Optional[pathlib.Path] = typer.Option(None),  # noqa(B008)
 ):
-    """Run the API using uvicorn."""
+    """Run the API in uvicorn."""
     uvicorn.run(
         app,
         host=host,

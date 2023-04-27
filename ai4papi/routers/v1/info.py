@@ -53,7 +53,7 @@ def get_default_deployment_conf(module_name: str, authorization=security):
     # Add available Docker tags
     url = f"{base_mod_url}/{module_name.lower()}/tags"
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=15)
         r.raise_for_status()
         r = r.json()
     except Exception:

@@ -40,7 +40,7 @@ base_org_url = "https://raw.githubusercontent.com/deephdc/"
 def get_modules_list():
     """Retrieve a list of all modules."""
     modules_url = f"{base_org_url}/deep-oc/master/MODULES.yml"
-    r = requests.get(modules_url)
+    r = requests.get(modules_url, timeout=10)
     catalog = yaml.safe_load(r.text)
     modules = [i["module"].split("/")[-1] for i in catalog]  # remove github prefix
     return modules
@@ -77,7 +77,7 @@ def get_module_metadata(module_name: str):
 
     # Find what is the default branch of the module
     gitmodules_url = f"{base_org_url}/deep-oc/master/.gitmodules"
-    r = requests.get(gitmodules_url)
+    r = requests.get(gitmodules_url, timeout=10)
 
     gitmodules_conf = configparser.ConfigParser()
     gitmodules_conf.read_string(r.text)
@@ -90,7 +90,7 @@ def get_module_metadata(module_name: str):
 
     # Retrieve metadata from that branch
     metadata_url = f"{base_org_url}/{module_name}/{branch}/metadata.json"
-    r = requests.get(metadata_url)
+    r = requests.get(metadata_url, timeout=10)
     metadata = json.loads(r.text)
 
     # Format "description" field nicely for the Dashboards Markdown parser
