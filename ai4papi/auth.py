@@ -14,7 +14,7 @@ There are two advantages of this:
   [1] https://swagger.io/docs/specification/authentication/
   [2] https://fastapi.tiangolo.com/advanced/using-request-directly/?h=request#details-about-the-request-object
 
-* the decorator `flaat.is_authenticated()` around each function is no longer needed, 
+* the decorator `flaat.is_authenticated()` around each function is no longer needed,
   as authentication is checked automatically by `authorization=Depends(security)` without needing extra code.
 
 The curl calls still remain the same, but now in the http://localhost/docs you will see an authorize
@@ -50,41 +50,49 @@ def get_user_info(token):
             status_code=403,
             detail="Invalid token",
             )
-    
-    # Check scopes
-    if user_infos.get('eduperson_entitlement') is None:
-        raise HTTPException(
-            status_code=403,
-            detail="Check you enabled the `eduperson_entitlement` scope for your token.",
-            )
 
-    # Parse Virtual Organizations manually from URNs
-    # If more complexity is need in the future, check https://github.com/oarepo/urnparse
-    vos = []
-    for i in user_infos.get('eduperson_entitlement'):
-        vos.append(
-            re.search(r"group:(.+?):", i).group(1)
-        )
+    # #FIXME: Reenable after the demo
 
-    # Filter VOs to keep only the ones relevant to us
-    vos = set(vos).intersection(
-        set(MAIN_CONF['auth']['VO'])
-    )
-    vos = sorted(vos)
+    # # Check scopes
+    # # Scope can appear if non existent if user doesn't belong to any VO,
+    # # even if scope was requested in token.
+    # if user_infos.get('eduperson_entitlement') is None:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="Check that (1) you enabled the `eduperson_entitlement` scope for " \
+    #                "your token, and (2) you belong to at least one Virtual " \
+    #                "Organization.",
+    #         )
 
-    # Check if VOs is empty after filtering
-    if not vos:
-        raise HTTPException(
-            status_code=403,
-            detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
-            )
+    # # Parse Virtual Organizations manually from URNs
+    # # If more complexity is need in the future, check https://github.com/oarepo/urnparse
+    # vos = []
+    # for i in user_infos.get('eduperson_entitlement'):
+    #     vos.append(
+    #         re.search(r"group:(.+?):", i).group(1)
+    #     )
+
+    # # Filter VOs to keep only the ones relevant to us
+    # vos = set(vos).intersection(
+    #     set(MAIN_CONF['auth']['VO'])
+    # )
+    # vos = sorted(vos)
+
+    # # Check if VOs is empty after filtering
+    # if not vos:
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
+    #         )
+
+    vos = []  # TODO: remove after the demo
 
     # Generate user info dict
     out = {
         'id': user_infos.get('sub'),  # subject, user-ID
         'issuer': user_infos.get('iss'),  # URL of the access token issuer
         'name': user_infos.get('name'),
-        'vo': vos, 
+        'vo': vos,
     }
 
     return out
