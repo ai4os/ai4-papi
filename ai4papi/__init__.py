@@ -14,6 +14,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+"""AI4EOSC Platform API."""
+
 from . import version
 
 __version__ = version.release_string

@@ -1,3 +1,4 @@
+"""V1 routes."""
 
 import fastapi
 
@@ -16,6 +17,7 @@ app.include_router(modules.router)
     tags=["API", "version"],
 )
 def get_version(request: fastapi.Request):
+    """Get V1 version information."""
     root = str(request.url_for("get_version"))
     # root = "/"
     version = {

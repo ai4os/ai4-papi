@@ -1,12 +1,8 @@
-"""
-Manage deployments with Nomad.
-This is the AI4EOSC Training API.
+"""API routest that manage deployments with Nomad."""
 
-Notes:
-=====
-* Terminology warning: what we call a "deployment" (as in `create_deployment`)
- is a Nomad "job" (not a Nomad "deployment"!)
-"""
+# Notes:
+# * Terminology warning: what we call a "deployment" (as in `create_deployment`) is a
+#   Nomad "job" (not a Nomad "deployment"!)
 
 from copy import deepcopy
 from datetime import datetime
@@ -34,15 +30,11 @@ Nomad = nomad.Nomad()
 
 
 @router.get("/")
-def get_deployments(
-    authorization=Depends(security),
-    ):
-    """
-    Returns a list of all deployments belonging to a user.
-    """
+def get_deployments(authorization=Depends(security)):
+    """Return a list of all deployments belonging to a user."""
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+    owner, provider = auth_info['id'], auth_info['vo']  # noqa(F841)
 
     # Filter jobs
     jobs = Nomad.jobs.get_jobs()  # job summaries
@@ -76,12 +68,10 @@ def get_deployments(
 
 
 @router.get("/{deployment_uuid}")
-def get_deployment(
-    deployment_uuid: str,
-    authorization=Depends(security),
-    ):
+def get_deployment(deployment_uuid: str, authorization=Depends(security)):
     """
     Retrieve the info of a specific deployment.
+
     Format outputs to a Nomad-independent format to be used by the Dashboard
 
     Parameters:
@@ -91,7 +81,7 @@ def get_deployment(
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+    owner, provider = auth_info['id'], auth_info['vo']  # noqa(F841)
 
     # Check the deployment exists
     try:
@@ -100,14 +90,14 @@ def get_deployment(
         raise HTTPException(
             status_code=403,
             detail="No deployment exists with this uuid.",
-            )
+        )
 
     # Check job does belong to owner
     if j['Meta'] and owner != j['Meta'].get('owner', ''):
         raise HTTPException(
             status_code=403,
             detail="You are not the owner of that deployment.",
-            )
+        )
 
     # Create job info dict
     info = {
@@ -133,15 +123,17 @@ def get_deployment(
     # Only fill (resources + endpoints) if the job is allocated
     allocs = Nomad.job.get_allocations(j['ID'])
     if allocs:
-        a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
+        # only keep the first allocation per job
+        a = Nomad.allocation.get_allocation(allocs[0]['ID'])
 
         info['alloc_ID'] = a['ID']
 
         res = a['AllocatedResources']
         devices = res['Tasks']['usertask']['Devices']
+        gpu_num = sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0
         info['resources'] = {
             'cpu_num': res['Tasks']['usertask']['Cpu']['CpuShares'],
-            'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,
+            'gpu_num': gpu_num,
             'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
             'diskMB': res['Shared']['DiskMB'],
         }
@@ -149,24 +141,24 @@ def get_deployment(
         public_ip = 'https://xxx.xxx.xxx.xxx'  # todo: replace when ready
         ports = a['Resources']['Networks'][0]['DynamicPorts']
         info['endpoints'] = {d['Label']: f"{public_ip}:{d['Value']}" for d in ports}
-        # todo: We need to connect internal IP (172.XXX) to external IP (193.XXX) (Traefik + Consul Connect)
-        # use service discovery to map internal ip to external IPs???
+        # TODO: We need to connect internal IP (172.XXX) to external IP (193.XXX)
+        # (Traefik + Consul Connect) use service discovery to map internal ip to
+        # external IPs???
 
     else:
-        # Something happened, job didn't deploy (eg. jobs needs port that's currently being used)
+        # Something happened, job didn't deploy (eg. jobs needs port that's currently
+        # being used)
         # We have to return `placement failures message`.
         evals = Nomad.job.get_evaluations(j['ID'])
         info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
-        # todo: improve this error message once we start seeing the different modes of failures in typical cases
+        # TODO: improve this error message once we start seeing the different modes of
+        # failures in typical cases
 
     return info
 
 
 @router.post("/")
-def create_deployment(
-    conf: dict = {},
-    authorization=Depends(security),
-    ):
+def create_deployment(conf: dict = {}, authorization=Depends(security)):
     """
     Submit a deployment to Nomad.
 
@@ -179,7 +171,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+    owner, provider = auth_info['id'], auth_info['vo']  # noqa(F841)
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
@@ -189,24 +181,29 @@ def create_deployment(
     if (
         user_conf['general']['service'] == 'jupyterlab' and
         len(user_conf['general']['jupyter_password']) < 9
-        ):
+    ):
         raise HTTPException(
             status_code=501,
             detail="JupyterLab password should have at least 9 characters."
             )
 
-    # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
-    job_conf['ID'] = f'userjob-{uuid.uuid1()}'  # id is generated from (MAC address+timestamp) so it's unique
+    # Assign unique job ID (if submitting job with existing ID, the existing job gets
+    # replaced)
+    # id is generated from (MAC address+timestamp) so it's unique
+    job_conf['ID'] = f'userjob-{uuid.uuid1()}'
 
     # Add owner and extra information to the job metadata
     job_conf['Meta']['owner'] = owner
-    job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
-    job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
+    # keep only 45 first characters
+    job_conf['Meta']['title'] = user_conf['general']['title'][:45]
+    # limit to 1K characters
+    job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]
 
     # Replace user conf in Nomad job
     task = job_conf['TaskGroups'][0]['Tasks'][0]
 
-    task['Config']['image'] = f"{user_conf['general']['docker_image']}:{user_conf['general']['docker_tag']}"
+    img = f"{user_conf['general']['docker_image']}:{user_conf['geneal']['docker_tag']}"
+    task['Config']['image'] = img
     task['Config']['command'] = "deep-start"
     task['Config']['args'] = [f"--{user_conf['general']['service']}"]
 
@@ -222,7 +219,9 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             del task['Resources']['Devices'][0]['Affinities']
         else:
-            task['Resources']['Devices'][0]['Affinities'][0]['RTarget'] = user_conf['hardware']['gpu_type']
+            task['Resources']['Devices'][0]['Affinities'][0]['RTarget'] = (
+                user_conf['hardware']['gpu_type']
+            )
 
     task['Env']['RCLONE_CONFIG_RSHARE_URL'] = user_conf['storage']['rclone_url']
     task['Env']['RCLONE_CONFIG_RSHARE_VENDOR'] = user_conf['storage']['rclone_vendor']
@@ -233,7 +232,7 @@ def create_deployment(
 
     # Submit job
     try:
-        response = Nomad.jobs.register_job({'Job': job_conf})
+        response = Nomad.jobs.register_job({'Job': job_conf})  # noqa(F841)
         return {
             'status': 'success',
             'job_id': job_conf['ID'],
@@ -246,12 +245,10 @@ def create_deployment(
 
 
 @router.delete("/{deployment_uuid}")
-def delete_deployment(
-    deployment_uuid: str,
-    authorization=Depends(security),
-    ):
-    """
-    Delete a deployment. Users can only delete their own deployments.
+def delete_deployment(deployment_uuid: str, authorization=Depends(security)):
+    """Delete a deployment.
+
+    Users can only delete their own deployments.
 
     Parameters:
     * **deployment_uuid**: uuid of deployment to delete
@@ -260,7 +257,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+    owner, provider = auth_info['id'], auth_info['vo']  # noqa(F841)
 
     # Check the deployment exists
     try:
@@ -276,7 +273,7 @@ def delete_deployment(
         raise HTTPException(
             status_code=403,
             detail="You are not the owner of that deployment.",
-            )
+        )
 
     # Delete deployment
     Nomad.job.deregister_job(deployment_uuid)

@@ -1,6 +1,4 @@
-"""
-Manage configurations of the API.
-"""
+"""Manage configurations of the API."""
 
 from pathlib import Path
 
@@ -33,4 +31,3 @@ for group_name, params in USER_CONF.items():
         assert 'value' in v.keys(), f"Parameter {k} needs to have a value."
 
         USER_CONF_VALUES[group_name][k] = v['value']
-

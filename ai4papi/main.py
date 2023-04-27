@@ -1,6 +1,4 @@
-"""
-Create an app with FastAPI
-"""
+"""AI4EOSC Plaform API (AI4PAPI) with FastAPI."""
 
 import fastapi
 from fastapi.security import HTTPBearer
@@ -38,6 +36,7 @@ app.include_router(v1.app, prefix="/v1")
 def root(
     request: fastapi.Request,
 ):
+    """Get version and documentation endpoints."""
     root = str(request.url_for("root"))
     versions = [v1.get_version(request)]
 
@@ -65,11 +64,12 @@ def root(
 
 
 def run(
-        host:str = "0.0.0.0",
-        port:int = 8080,
-        ssl_keyfile:str = None,
-        ssl_certfile:str = None,
-    ):
+    host: str = "0.0.0.0",
+    port: int = 8080,
+    ssl_keyfile: str = None,
+    ssl_certfile: str = None,
+):
+    """Run the API using uvicorn."""
     uvicorn.run(
         app,
         host=host,
