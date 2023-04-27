@@ -158,7 +158,7 @@ def get_deployment(deployment_uuid: str, authorization=security):
 
 
 @router.post("/")
-def create_deployment(conf: dict = {}, authorization=security):
+def create_deployment(conf: dict | None = None, authorization=security):
     """
     Submit a deployment to Nomad.
 
@@ -175,7 +175,8 @@ def create_deployment(conf: dict = {}, authorization=security):
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
-    user_conf.update(conf)
+    if conf:
+        user_conf.update(conf)
 
     # Enforce JupyterLab password minimum number of characters
     if (
