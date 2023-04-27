@@ -27,7 +27,9 @@ USER_CONF_VALUES = {}
 for group_name, params in USER_CONF.items():
     USER_CONF_VALUES[group_name] = {}
     for k, v in params.items():
-        assert "name" in v.keys(), f"Parameter {k} needs to have a name."
-        assert "value" in v.keys(), f"Parameter {k} needs to have a value."
+        if "name" not in v.keys():
+            raise KeyError(f"Parameter {k} needs to have a name in `userconf.yaml`.")
+        if "value" not in v.keys():
+            raise KeyError(f"Parameter {k} needs to have a value in `userconf.yaml`.")
 
         USER_CONF_VALUES[group_name][k] = v["value"]
