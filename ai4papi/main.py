@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = fastapi.FastAPI()
 origins = [
+    "http://0.0.0.0:8080",
     "https://dashboard.dev.imagine-ai.eu",
     "https://dashboard.dev.imagine-ai.eu:8443",
     "https://dashboard.cloud.imagine-ai.eu",
