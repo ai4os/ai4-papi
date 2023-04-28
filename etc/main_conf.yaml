@@ -3,6 +3,13 @@
 
 auth:
 
+  CORS_origins:  # allows requests to the API from these domains
+
+    - https://dashboard.dev.imagine-ai.eu
+    - https://dashboard.cloud.imagine-ai.eu
+    - https://dashboard.dev.ai4eosc.eu
+    - https://dashboard.cloud.ai4eosc.eu
+
   OP:  # OIDC providers
 
     - https://aai-demo.egi.eu/auth/realms/egi

@@ -6,22 +6,16 @@ import fastapi
 from fastapi.security import HTTPBearer
 import uvicorn
 
+from ai4papi.conf import MAIN_CONF
 from ai4papi.routers import v1
 from fastapi.middleware.cors import CORSMiddleware
 
 
 app = fastapi.FastAPI()
-origins = [
-    "http://0.0.0.0:8080",
-    "https://dashboard.dev.imagine-ai.eu",
-    "https://dashboard.dev.imagine-ai.eu:8443",
-    "https://dashboard.cloud.imagine-ai.eu",
-    "https://dashboard.dev.ai4eosc.eu",
-    "https://dashboard.cloud.ai4eosc.eu",
-]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=MAIN_CONF["auth"]["CORS_origins"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
