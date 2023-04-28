@@ -78,14 +78,14 @@ def get_user_info(token):
     # )
     # vos = sorted(vos)
 
-    # # Check if VOs is empty after filtering
-    # if not vos:
-    #     raise HTTPException(
-    #         status_code=403,
-    #         detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
-    #         )
+    vos = ['vo.ai4eosc.eu']  # TODO: remove after the demo
 
-    vos = []  # TODO: remove after the demo
+    # Check if VOs is empty after filtering
+    if not vos:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
+            )
 
     # Generate user info dict
     out = {
