@@ -5,12 +5,37 @@ Create an app with FastAPI
 import fastapi
 import uvicorn
 
-from ai4papi.conf import MAIN_CONF
+from ai4papi.conf import MAIN_CONF, paths
+from fastapi.responses import FileResponse
 from ai4papi.routers import v1
 from fastapi.middleware.cors import CORSMiddleware
 
 
-app = fastapi.FastAPI()
+description=(
+    "<img"
+    " src='https://ai4eosc.eu/wp-content/uploads/sites/10/2023/01/horizontal-bg-dark.png'"
+    " width=200 alt='' />"
+    "<br><br>"
+
+    "This is the Platform API for interacting with the AI4EOSC services. "
+    "It aims at providing a stable UI, effectively decoupling the services offered by "
+    "the project from the underlying tools we use to provide them (ie. Nomad)."
+    "<br><br>"
+
+    "You can also access the functionalities of the API through our dashboards: <br>"
+    "- [AIEOSC Dashboard](https://dashboard.dev.ai4eosc.eu/) <br>"
+    "- [iMagine Dashboard](https://dashboard.dev.imagine-ai.eu/)"
+    "<br><br>"
+
+    "For more information, please visit: <br>"
+    "- [AI4EOSC Homepage](https://ai4eosc.eu) <br>"
+    "- [API Github repository](https://github.com/AI4EOSC/ai4-papi)"
+)
+
+app = fastapi.FastAPI(
+    title="AI4EOSC Platform API",
+    description=description,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,6 +79,14 @@ def root(
         ],
     }
     return response
+
+
+@app.get(
+    "/favicon.ico",
+    include_in_schema=False,
+)
+async def favicon():
+    return FileResponse(paths["media"] / "cropped-favicon-32x32.png")
 
 
 def run(
