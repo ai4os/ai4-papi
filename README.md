@@ -4,7 +4,7 @@
 
 # AI4EOSC - Platform API
 
-> :warning: The library is under active development, so you might expect some breaking changes to happen. 
+> :warning: The library is under active development, so you might expect some breaking changes to happen.
 
 [//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
 [//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/releases&#41;)
@@ -12,7 +12,7 @@
 [//]: # ([![Python versions]&#40;https://img.shields.io/pypi/pyversions/ai4papi.svg&#41;]&#40;https://pypi.python.org/pypi/ai4papi&#41;)
 
 This is the Platform API for interacting with the AI4EOSC services, built using
-[FastAPI](https://fastapi.tiangolo.com/). 
+[FastAPI](https://fastapi.tiangolo.com/).
 It aims at providing a stable UI, effectively decoupling the services offered by the
 project from the underlying tools we use to provide them (ie. Nomad).
 
@@ -77,12 +77,12 @@ perform the following steps to access those methods.
 #### Configure the OIDC provider
 
 1. Create an [EGI Check-In](https://aai.egi.eu/registry/) account.
-2. Enroll (`People > Enroll`) in one of the approved Virtual Organizations: 
+2. Enroll (`People > Enroll`) in one of the approved Virtual Organizations:
     - `vo.ai4eosc.eu`
     - `vo.imagine-ai.eu`
-    
+
 You will have to wait until an administrator approves your request before proceeding
-with the next steps. 
+with the next steps.
 Supported OIDC providers and Virtual Organizations are described in the
 [configuration](./etc/main_conf.yaml).
 
@@ -181,7 +181,7 @@ the marketplace.
 Methods:
 * `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a
 user.
-* `POST(/deployments)`: :lock: create a new deployment belonging to the user. 
+* `POST(/deployments)`: :lock: create a new deployment belonging to the user.
 * `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only
 delete their own deployments.
 * `GET(/info/conf/{module_name}`: returns the default configuration for creating a
@@ -218,8 +218,8 @@ deployments.create_deployment(
             'service': 'deepaas'
         },
         'hardware': {
-            'gpu': 1,
-        }     
+            'cpu_num': 1,
+        }
     },
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'

@@ -11,6 +11,7 @@ Notes:
 from copy import deepcopy
 from datetime import datetime
 from types import SimpleNamespace
+from typing import Union
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -164,7 +165,7 @@ def get_deployment(
 
 @router.post("/")
 def create_deployment(
-    conf: dict = {},
+    conf: Union[dict, None] = None,
     authorization=Depends(security),
     ):
     """
@@ -172,8 +173,20 @@ def create_deployment(
 
     Parameters:
     * **conf**: configuration dict of the deployment to be submitted.
-    If only a partial configuration is submitted, the remaining will be
-    filled with default args.
+    For example:
+    ```
+    {
+        'general':{
+            'docker_image': 'deephdc/deep-oc-image-classification-tf:cpu',
+            'service': 'deepaas'
+        },
+        'hardware': {
+            'cpu_num': 1,
+        }
+    }
+    ```
+    If only a partial configuration is submitted, the remaining will be filled with
+    [default args](https://github.com/AI4EOSC/ai4-papi/blob/master/etc/userconf.yaml)
 
     Returns a dict with status
     """
@@ -183,7 +196,8 @@ def create_deployment(
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
-    user_conf.update(conf)
+    if conf is not None:
+        user_conf.update(conf)
 
     # Enforce JupyterLab password minimum number of characters
     if (
