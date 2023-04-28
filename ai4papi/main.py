@@ -3,7 +3,6 @@ Create an app with FastAPI
 """
 
 import fastapi
-from fastapi.security import HTTPBearer
 import uvicorn
 
 from ai4papi.conf import MAIN_CONF
@@ -20,8 +19,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-security = HTTPBearer()
 app.include_router(v1.app, prefix="/v1")
 
 
