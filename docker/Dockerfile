@@ -1,8 +1,10 @@
 # Run this Docker file mounting the nomad certs folder in `/home/nomad-certs`
-# and lenstcrypt certs in `/home/letsencrypt`
+# and lenstcrypt certs in `/home/letsencrypt`:
 #
-# docker build --no-cache -t ai4-papi .
-# docker run -ti -v /home/ubuntu/nomad-certs:/home/nomad-certs -v /home/ubuntu/letsencrypt:/home/letsencrypt -p 443:443 ai4-papi
+# docker build -t ai4-papi .
+# docker run -ti -v /home/ubuntu/nomad-certs:/home/nomad-certs -v /home/ubuntu/letsencrypt:/home/letsencrypt -p 443:443 ai4-papi &
+#
+# See `docker_refresh.sh` for more information.
 
 FROM ubuntu:22.04
 
@@ -31,10 +33,13 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # Install API
 #FIXME: installing directly from Github with pip (`pip install git+https://github.com/`)
 # breaks config (does not copy `etc` folder)
+# We use the ADD command to force a cache rebuilt when the repo is updated
+# see: https://stackoverflow.com/a/65762156
 WORKDIR /home
+ADD "https://api.github.com/repos/AI4EOSC/ai4-papi/commits?per_page=1" latest_commit
 RUN git clone -b master https://github.com/AI4EOSC/ai4-papi
 RUN pip3 install -e ai4-papi
- 
+
 # Run the API
 EXPOSE 443
 CMD ai4papi-run \
