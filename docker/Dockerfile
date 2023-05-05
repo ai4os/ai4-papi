@@ -18,6 +18,7 @@ RUN apt-get update && \
     lsb-release \
     python3-pip \
     git \
+    micro \
     && rm -rf /var/lib/apt/lists/*
 RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 RUN echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
@@ -46,4 +47,4 @@ CMD ai4papi-run \
     --host 0.0.0.0 \
     --port 443 \
     --ssl-keyfile /home/letsencrypt/live/api.dev.ai4eosc.eu/privkey.pem \
-    --ssl-certfile /home/letsencrypt/live/api.dev.ai4eosc.eu/cert.pem
+    --ssl-certfile /home/letsencrypt/live/api.dev.ai4eosc.eu/fullchain.pem
