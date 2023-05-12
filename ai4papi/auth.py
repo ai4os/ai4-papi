@@ -51,34 +51,30 @@ def get_user_info(token):
             detail="Invalid token",
             )
 
-    # #FIXME: Reenable after the demo
+    # Check scopes
+    # Scope can appear if non existent if user doesn't belong to any VO,
+    # even if scope was requested in token.
+    if user_infos.get('eduperson_entitlement') is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Check that (1) you enabled the `eduperson_entitlement` scope for " \
+                   "your token, and (2) you belong to at least one Virtual " \
+                   "Organization.",
+            )
 
-    # # Check scopes
-    # # Scope can appear if non existent if user doesn't belong to any VO,
-    # # even if scope was requested in token.
-    # if user_infos.get('eduperson_entitlement') is None:
-    #     raise HTTPException(
-    #         status_code=403,
-    #         detail="Check that (1) you enabled the `eduperson_entitlement` scope for " \
-    #                "your token, and (2) you belong to at least one Virtual " \
-    #                "Organization.",
-    #         )
+    # Parse Virtual Organizations manually from URNs
+    # If more complexity is need in the future, check https://github.com/oarepo/urnparse
+    vos = []
+    for i in user_infos.get('eduperson_entitlement'):
+        vos.append(
+            re.search(r"group:(.+?):", i).group(1)
+        )
 
-    # # Parse Virtual Organizations manually from URNs
-    # # If more complexity is need in the future, check https://github.com/oarepo/urnparse
-    # vos = []
-    # for i in user_infos.get('eduperson_entitlement'):
-    #     vos.append(
-    #         re.search(r"group:(.+?):", i).group(1)
-    #     )
-
-    # # Filter VOs to keep only the ones relevant to us
-    # vos = set(vos).intersection(
-    #     set(MAIN_CONF['auth']['VO'])
-    # )
-    # vos = sorted(vos)
-
-    vos = ['vo.ai4eosc.eu']  # TODO: remove after the demo
+    # Filter VOs to keep only the ones relevant to us
+    vos = set(vos).intersection(
+        set(MAIN_CONF['auth']['VO'])
+    )
+    vos = sorted(vos)
 
     # Check if VOs is empty after filtering
     if not vos:
