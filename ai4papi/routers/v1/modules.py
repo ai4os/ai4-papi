@@ -208,16 +208,34 @@ def get_module_metadata(
         branch = "master"
 
     # Retrieve metadata from that branch
+    # Use try/except to avoid that a single module formatting error could take down
+    # all the Dashboard
     metadata_url = f"https://raw.githubusercontent.com/deephdc/{module_name}/{branch}/metadata.json"
-    r = requests.get(metadata_url)
-    metadata = json.loads(r.text)
+
+    try:
+        r = requests.get(metadata_url)
+        metadata = json.loads(r.text)
+
+    except Exception:
+        metadata = {
+            "title": module_name,
+            "summary": "",
+            "description": [
+                "The metadata of this module could not be retrieved probably due to a ",
+                "JSON formatting error from the module maintainer."
+            ],
+            "keywords": [],
+            "license": "",
+            "date_creation": "",
+            "sources": {
+                "dockerfile_repo": f"https://github.com/deephdc/{module_name}",
+                "docker_registry_repo": f"deephdc/{module_name.lower()}",
+                "code": "",
+            }
+        }
 
     # Format "description" field nicely for the Dashboards Markdown parser
-    desc = []
-    for l in metadata['description']:
-        desc.append(l)
-
-    metadata["description"] = "\n".join(desc)  # single string
+    metadata["description"] = "\n".join(metadata["description"])
 
     return metadata
 
