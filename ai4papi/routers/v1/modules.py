@@ -148,14 +148,36 @@ def get_filtered_modules_list(
 
 @router.get("/summary")
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_modules_summary():
+def get_modules_summary(
+    tags: Union[Tuple, None] = Query(default=None),
+    tags_any: Union[Tuple, None] = Query(default=None),
+    not_tags: Union[Tuple, None] = Query(default=None),
+    not_tags_any: Union[Tuple, None] = Query(default=None),
+    ):
     """
     Retrieve a list of all modules' basic metadata
-    (name, title, summary, keywords).
+    (name, title, summary, keywords), optionally filtering modules by tags.
+
+    The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
+    * `tags`: Modules that contain all of the specified tags
+    * `tags-any`: Modules that contain at least one of the specified tags
+    * `not-tags`: Modules that do not contain exactly all of the specified tags
+    * `not-tags-any`: Modules that do not contain any one of the specified tags
+
+    You can also use wildcards:
+    * `image*` matches all tags _starting_ with "image"
+    * `*image` matches all tags _ending_ with "image"
+    * `*image*` matches all tags _containing_ the substring "image"
     """
     summary = []
     keys = ['title', 'summary', 'keywords']
-    for m in get_modules_list():
+    modules = get_filtered_modules_list(
+        tags=tags,
+        tags_any=tags_any,
+        not_tags=not_tags,
+        not_tags_any=not_tags_any,
+        )
+    for m in modules:
         meta1 = get_module_metadata(m)
         meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
         meta['name'] = m
