@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
+  <img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
 </div>
 
 # AI4EOSC - Platform API
@@ -145,7 +145,7 @@ from types import SimpleNamespace
 from ai4papi.routers.v1 import deployments
 
 deployments.get_deployments(
-    vo='vo.ai4eosc.eu',
+    vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
@@ -198,7 +198,7 @@ from ai4papi.routers.v1 import deployments
 
 # Get all the user's deployments
 deployments.get_deployments(
-    vo='vo.ai4eosc.eu',
+    vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
