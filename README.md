@@ -219,4 +219,5 @@ deployments.get_deployments(
 
 * `etc/main_conf.yaml`: Main configuration file of the API.
 * `etc/userconf.yaml`: User customizable configuration to make a deployment in Nomad.
+Also contains the generic quotas for hardware (see `range` parameter).
 * `etc/job.nomad`: Additional non-customizable values (eg. ports)

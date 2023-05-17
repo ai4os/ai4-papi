@@ -20,6 +20,7 @@ from fastapi.security import HTTPBearer
 import nomad
 from nomad.api import exceptions
 
+from ai4papi import quotas
 from ai4papi.auth import get_user_info
 from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES, MAIN_CONF
 from ai4papi.utils import deregister_job
@@ -225,12 +226,12 @@ def create_deployment(
     For example:
     ```
     {
-        'general':{
-            'docker_image': 'deephdc/deep-oc-image-classification-tf:cpu',
-            'service': 'deepaas'
+        "general":{
+            "docker_image": "deephdc/deep-oc-image-classification-tf:cpu",
+            "service": "deepaas"
         },
-        'hardware': {
-            'cpu_num': 1,
+        "hardware": {
+            "cpu_num": 4
         }
     }
     ```
@@ -252,7 +253,26 @@ def create_deployment(
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
     if conf is not None:
-        user_conf.update(conf)
+        for k in conf.keys():
+
+            # Check level 1 keys
+            if k not in user_conf.keys():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The key `{k}` in not a valid parameter."
+                    )
+
+            # Check level 2 keys
+            s1 = set(conf[k].keys())
+            s2 = set(user_conf[k].keys())
+            subs = s1.difference(s2)
+            if subs:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The keys `{subs}` are not a valid parameters."
+                    )
+
+            user_conf[k].update(conf[k])
 
     # Enforce JupyterLab password minimum number of characters
     if (
@@ -263,6 +283,9 @@ def create_deployment(
             status_code=400,
             detail="JupyterLab password should have at least 9 characters."
             )
+
+    # Check the provided configuring is with the quotas
+    quotas.check(user_conf)
 
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
     job_conf['ID'] = f'userjob-{uuid.uuid1()}'  # id is generated from (MAC address+timestamp) so it's unique
