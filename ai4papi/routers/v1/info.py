@@ -27,7 +27,7 @@ security = HTTPBearer()
 @router.get("/conf/{module_name}")
 def get_default_deployment_conf(
     module_name: str,
-    authorization=Depends(security),
+    authorization=Depends(security),  #TODO: remove?
 ):
     """
     Returns the default configuration (dict) for creating a deployment
@@ -38,16 +38,9 @@ def get_default_deployment_conf(
     we are treating each route as independent. In the future, this can
     be done as an API call to the other route.
     """
-    # Retrieve authenticated user info
-    auth_info = get_user_info(token=authorization.credentials)
-    vos = auth_info['vo']
 
     # Generate the conf
     conf = deepcopy(USER_CONF)
-
-    # Fill the Virtual Organization
-    conf["general"]["virtual_organization"]["value"] = vos[0]
-    conf["general"]["virtual_organization"]["options"] = vos
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"deephdc/{module_name.lower()}"

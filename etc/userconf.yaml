@@ -11,12 +11,6 @@
 
 general:
 
-  virtual_organization:
-    name: Virtual organization
-    value: ''
-    description: Select in which of your Virtual Organizations you want to deploy.
-    options: []
-
   title:
     name: Deployment title
     value: ''
