@@ -61,7 +61,7 @@ def get_deployments(
 
     if not vos:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}."
             )
 
@@ -131,7 +131,7 @@ def get_deployment(
     # Check VO permissions
     if vo not in auth_info['vos']:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
             )
 
@@ -146,14 +146,14 @@ def get_deployment(
             )
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="No deployment exists with this uuid.",
             )
 
     # Check job does belong to owner
     if j['Meta'] and auth_info['id'] != j['Meta'].get('owner', ''):
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="You are not the owner of that deployment.",
             )
 
@@ -245,7 +245,7 @@ def create_deployment(
     # Check VO permissions
     if vo not in auth_info['vos']:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
             )
 
@@ -260,7 +260,7 @@ def create_deployment(
         len(user_conf['general']['jupyter_password']) < 9
         ):
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="JupyterLab password should have at least 9 characters."
             )
 
@@ -338,7 +338,7 @@ def delete_deployment(
     # Check VO permissions
     if vo not in auth_info['vos']:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
             )
 
@@ -353,14 +353,14 @@ def delete_deployment(
             )
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="No deployment exists with this uuid.",
             )
 
     # Check job does belong to owner
     if j['Meta'] and auth_info['id'] != j['Meta'].get('owner', ''):
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="You are not the owner of that deployment.",
             )
 

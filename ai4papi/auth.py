@@ -58,7 +58,7 @@ def get_user_info(token):
     # add the project VOs in the project detail.
     if user_infos.get('eduperson_entitlement') is None:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="Check that (1) you enabled the `eduperson_entitlement` scope for" \
                    "your token, and (2) you belong to at least one Virtual " \
                    f"Organization supported by the project: {MAIN_CONF['auth']['VO']}",
@@ -81,7 +81,7 @@ def get_user_info(token):
     # Check if VOs is empty after filtering
     if not vos:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="You should belong to at least one of the Virtual Organizations " \
                    f"supported by the project: {MAIN_CONF['auth']['VO']}.",
             )
