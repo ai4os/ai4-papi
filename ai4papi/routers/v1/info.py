@@ -27,17 +27,15 @@ security = HTTPBearer()
 @router.get("/conf/{module_name}")
 def get_default_deployment_conf(
     module_name: str,
-    authorization=Depends(security),  #TODO: remove?
 ):
     """
     Returns the default configuration (dict) for creating a deployment
     for a specific module. It is prefilled with the appropriate
     docker image and the available docker tags.
-
-    We are not checking if module exists in the marketplace because
-    we are treating each route as independent. In the future, this can
-    be done as an API call to the other route.
     """
+    #TODO: We are not checking if module exists in the marketplace because
+    # we are treating each route as independent. In the future, this can
+    # be done as an API call to the other route.
 
     # Generate the conf
     conf = deepcopy(USER_CONF)
@@ -54,7 +52,7 @@ def get_default_deployment_conf(
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail="Could not retrieve Docker tags from {module_name}.",
+            detail=f"Could not retrieve Docker tags from {module_name}.",
             )
 
     tags = [i["name"] for i in r["results"]]
