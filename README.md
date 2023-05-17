@@ -145,6 +145,7 @@ from types import SimpleNamespace
 from ai4papi.routers.v1 import deployments
 
 deployments.get_deployments(
+    vo='vo.ai4eosc.eu',
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
@@ -197,6 +198,7 @@ from ai4papi.routers.v1 import deployments
 
 # Get all the user's deployments
 deployments.get_deployments(
+    vo='vo.ai4eosc.eu',
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
@@ -210,21 +212,6 @@ deployments.get_deployments(
 #   'endpoints': {'deepaas': 'https://xxx.xxx.xxx.xxx:23143',
 #    'monitor': 'https://xxx.xxx.xxx.xxx:22365',
 #    'lab': 'https://xxx.xxx.xxx.xxx:20820'}}]
-
-deployments.create_deployment(
-    conf={
-        'general':{
-            'docker_image': 'deephdc/deep-oc-image-classification-tf:cpu',
-            'service': 'deepaas'
-        },
-        'hardware': {
-            'cpu_num': 1,
-        }
-    },
-    authorization=SimpleNamespace(
-        credentials='your-OIDC-token'
-    ),
-)
 ```
 
 
