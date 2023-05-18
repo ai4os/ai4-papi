@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
+  <img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
 </div>
 
 # AI4EOSC - Platform API
@@ -145,6 +145,7 @@ from types import SimpleNamespace
 from ai4papi.routers.v1 import deployments
 
 deployments.get_deployments(
+    vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
@@ -197,6 +198,7 @@ from ai4papi.routers.v1 import deployments
 
 # Get all the user's deployments
 deployments.get_deployments(
+    vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),
@@ -210,21 +212,6 @@ deployments.get_deployments(
 #   'endpoints': {'deepaas': 'https://xxx.xxx.xxx.xxx:23143',
 #    'monitor': 'https://xxx.xxx.xxx.xxx:22365',
 #    'lab': 'https://xxx.xxx.xxx.xxx:20820'}}]
-
-deployments.create_deployment(
-    conf={
-        'general':{
-            'docker_image': 'deephdc/deep-oc-image-classification-tf:cpu',
-            'service': 'deepaas'
-        },
-        'hardware': {
-            'cpu_num': 1,
-        }
-    },
-    authorization=SimpleNamespace(
-        credentials='your-OIDC-token'
-    ),
-)
 ```
 
 
@@ -232,4 +219,5 @@ deployments.create_deployment(
 
 * `etc/main_conf.yaml`: Main configuration file of the API.
 * `etc/userconf.yaml`: User customizable configuration to make a deployment in Nomad.
+Also contains the generic quotas for hardware (see `range` parameter).
 * `etc/job.nomad`: Additional non-customizable values (eg. ports)

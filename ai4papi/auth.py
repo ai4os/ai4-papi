@@ -40,26 +40,28 @@ def get_user_info(token):
         user_infos = flaat.get_user_infos_from_access_token(token)
     except Exception as e:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail=str(e),
             )
 
     # Check output
     if user_infos is None:
         raise HTTPException(
-            status_code=403,
+            status_code=401,
             detail="Invalid token",
             )
 
     # Check scopes
     # Scope can appear if non existent if user doesn't belong to any VO,
     # even if scope was requested in token.
+    # VO do not need to be one of the project's (this is next check), but we can still
+    # add the project VOs in the project detail.
     if user_infos.get('eduperson_entitlement') is None:
         raise HTTPException(
-            status_code=403,
-            detail="Check that (1) you enabled the `eduperson_entitlement` scope for " \
+            status_code=401,
+            detail="Check that (1) you enabled the `eduperson_entitlement` scope for" \
                    "your token, and (2) you belong to at least one Virtual " \
-                   "Organization.",
+                   f"Organization supported by the project: {MAIN_CONF['auth']['VO']}",
             )
 
     # Parse Virtual Organizations manually from URNs
@@ -79,8 +81,9 @@ def get_user_info(token):
     # Check if VOs is empty after filtering
     if not vos:
         raise HTTPException(
-            status_code=403,
-            detail=f"You should belong to at least one of the Virtual Organizations supported by the project: {vos}.",
+            status_code=401,
+            detail="You should belong to at least one of the Virtual Organizations " \
+                   f"supported by the project: {MAIN_CONF['auth']['VO']}.",
             )
 
     # Generate user info dict
@@ -88,7 +91,7 @@ def get_user_info(token):
         'id': user_infos.get('sub'),  # subject, user-ID
         'issuer': user_infos.get('iss'),  # URL of the access token issuer
         'name': user_infos.get('name'),
-        'vo': vos,
+        'vos': vos,
     }
 
     return out

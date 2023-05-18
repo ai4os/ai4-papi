@@ -10,17 +10,20 @@ Notes:
 
 from copy import deepcopy
 from datetime import datetime
-from types import SimpleNamespace
-from typing import Union
+import types
+from typing import Tuple, Union
+
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 import nomad
 from nomad.api import exceptions
 
+from ai4papi import quotas
 from ai4papi.auth import get_user_info
-from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES
+from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES, MAIN_CONF
+from ai4papi.utils import deregister_job
 
 
 router = APIRouter(
@@ -32,52 +35,84 @@ router = APIRouter(
 security = HTTPBearer()
 
 Nomad = nomad.Nomad()
+Nomad.job.deregister_job = types.MethodType(deregister_job, Nomad.job)  # monkey-patch
 
 
 @router.get("/")
 def get_deployments(
+    vos: Union[Tuple, None] = Query(default=None),
     authorization=Depends(security),
     ):
     """
     Returns a list of all deployments belonging to a user.
+
+    Parameters:
+    * **vo**: Virtual Organizations from where you want to retrieve your deployments.
+      If no vo is provided, it will retrieve the deployments of all VOs.
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
 
-    # Filter jobs
-    jobs = Nomad.jobs.get_jobs()  # job summaries
-    njobs = []
-    for j in jobs:
-        # Skip deleted jobs
-        if j['Status'] == 'dead':
-            continue
+    # If no VOs, then retrieve jobs from all user VOs
+    # Else only retrieve from allowed VOs
+    if not vos:
+        vos = auth_info['vos']
+    else:
+        vos = set(vos).intersection(auth_info['vos'])
 
-        # Get full job description
-        j = Nomad.job.get_job(j['ID'])
+    if not vos:
+        raise HTTPException(
+            status_code=401,
+            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}."
+            )
 
-        # Remove jobs not belonging to owner
-        if j['Meta'] and (owner == j['Meta'].get('owner', '')):
-            njobs.append(j)
+    user_jobs = []
+    for vo in vos:
 
-    # Retrieve info for jobs
-    fjobs = []
-    for j in njobs:
+        # Retrieve the associated namespace to that VO
+        namespace = MAIN_CONF['nomad']['namespaces'][vo]
 
-        job_info = get_deployment(
-            deployment_uuid=j['ID'],
-            authorization=SimpleNamespace(
-                credentials=authorization.credentials  # token
-            ),
-        )
+        # Filter jobs
+        jobs = Nomad.jobs.get_jobs(namespace=namespace)  # job summaries
+        njobs = []
 
-        fjobs.append(job_info)
+        for j in jobs:
+            # Skip deleted jobs
+            if j['Status'] == 'dead':
+                continue
 
-    return fjobs
+            # Get full job description
+            j = Nomad.job.get_job(
+                id=j['ID'],
+                namespace=namespace,
+                )
+
+            # Remove jobs not belonging to owner
+            if j['Meta'] and (auth_info['id'] == j['Meta'].get('owner', '')):
+                njobs.append(j)
+
+        # Retrieve info for jobs
+        fjobs = []
+        for j in njobs:
+
+            job_info = get_deployment(
+                vo=vo,
+                deployment_uuid=j['ID'],
+                authorization=types.SimpleNamespace(
+                    credentials=authorization.credentials  # token
+                ),
+            )
+
+            fjobs.append(job_info)
+
+        user_jobs += fjobs
+
+    return user_jobs
 
 
 @router.get("/{deployment_uuid}")
 def get_deployment(
+    vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
     ):
@@ -86,27 +121,40 @@ def get_deployment(
     Format outputs to a Nomad-independent format to be used by the Dashboard
 
     Parameters:
+    * **vo**: Virtual Organization from where you want to retrieve your deployment
     * **deployment_uuid**: uuid of deployment to gather info about
 
     Returns a dict with info
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+
+    # Check VO permissions
+    if vo not in auth_info['vos']:
+        raise HTTPException(
+            status_code=401,
+            detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
+            )
+
+    # Retrieve the associated namespace to that VO
+    namespace = MAIN_CONF['nomad']['namespaces'][vo]
 
     # Check the deployment exists
     try:
-        j = Nomad.job.get_job(deployment_uuid)
+        j = Nomad.job.get_job(
+            id=deployment_uuid,
+            namespace=namespace,
+            )
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="No deployment exists with this uuid.",
             )
 
     # Check job does belong to owner
-    if j['Meta'] and owner != j['Meta'].get('owner', ''):
+    if j['Meta'] and auth_info['id'] != j['Meta'].get('owner', ''):
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="You are not the owner of that deployment.",
             )
 
@@ -165,6 +213,7 @@ def get_deployment(
 
 @router.post("/")
 def create_deployment(
+    vo: str,
     conf: Union[dict, None] = None,
     authorization=Depends(security),
     ):
@@ -172,16 +221,17 @@ def create_deployment(
     Submit a deployment to Nomad.
 
     Parameters:
+    * **vo**: Virtual Organization where you want to create your deployment
     * **conf**: configuration dict of the deployment to be submitted.
     For example:
     ```
     {
-        'general':{
-            'docker_image': 'deephdc/deep-oc-image-classification-tf:cpu',
-            'service': 'deepaas'
+        "general":{
+            "docker_image": "deephdc/deep-oc-image-classification-tf:cpu",
+            "service": "deepaas"
         },
-        'hardware': {
-            'cpu_num': 1,
+        "hardware": {
+            "cpu_num": 4
         }
     }
     ```
@@ -192,12 +242,37 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+
+    # Check VO permissions
+    if vo not in auth_info['vos']:
+        raise HTTPException(
+            status_code=401,
+            detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
+            )
 
     # Update default dict with new values
     job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
     if conf is not None:
-        user_conf.update(conf)
+        for k in conf.keys():
+
+            # Check level 1 keys
+            if k not in user_conf.keys():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The key `{k}` in not a valid parameter."
+                    )
+
+            # Check level 2 keys
+            s1 = set(conf[k].keys())
+            s2 = set(user_conf[k].keys())
+            subs = s1.difference(s2)
+            if subs:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The keys `{subs}` are not a valid parameters."
+                    )
+
+            user_conf[k].update(conf[k])
 
     # Enforce JupyterLab password minimum number of characters
     if (
@@ -205,15 +280,21 @@ def create_deployment(
         len(user_conf['general']['jupyter_password']) < 9
         ):
         raise HTTPException(
-            status_code=501,
+            status_code=400,
             detail="JupyterLab password should have at least 9 characters."
             )
+
+    # Check the provided configuring is with the quotas
+    quotas.check(user_conf)
 
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
     job_conf['ID'] = f'userjob-{uuid.uuid1()}'  # id is generated from (MAC address+timestamp) so it's unique
 
+    # Retrieve the associated namespace to that VO
+    job_conf['namespace'] = MAIN_CONF['nomad']['namespaces'][vo]
+
     # Add owner and extra information to the job metadata
-    job_conf['Meta']['owner'] = owner
+    job_conf['Meta']['owner'] = auth_info['id']
     job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
     job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
 
@@ -261,6 +342,7 @@ def create_deployment(
 
 @router.delete("/{deployment_uuid}")
 def delete_deployment(
+    vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
     ):
@@ -268,31 +350,49 @@ def delete_deployment(
     Delete a deployment. Users can only delete their own deployments.
 
     Parameters:
+    * **vo**: Virtual Organization where your deployment is located
     * **deployment_uuid**: uuid of deployment to delete
 
     Returns a dict with status
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    owner, provider = auth_info['id'], auth_info['vo']
+
+    # Check VO permissions
+    if vo not in auth_info['vos']:
+        raise HTTPException(
+            status_code=401,
+            detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
+            )
+
+    # Retrieve the associated namespace to that VO
+    namespace = MAIN_CONF['nomad']['namespaces'][vo]
 
     # Check the deployment exists
     try:
-        j = Nomad.job.get_job(deployment_uuid)
+        j = Nomad.job.get_job(
+            id=deployment_uuid,
+            namespace=namespace,
+            )
     except exceptions.URLNotFoundNomadException:
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="No deployment exists with this uuid.",
             )
 
     # Check job does belong to owner
-    if j['Meta'] and owner != j['Meta'].get('owner', ''):
+    if j['Meta'] and auth_info['id'] != j['Meta'].get('owner', ''):
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="You are not the owner of that deployment.",
             )
 
     # Delete deployment
-    Nomad.job.deregister_job(deployment_uuid)
+    # Nomad.job.deregister_job(id=deployment_uuid)
+    #TODO: test that this works without providing a namespace, with more than two namespaces
+    Nomad.job.deregister_job(
+        id=deployment_uuid,
+        namespace=namespace,
+        )
 
     return {'status': 'success'}

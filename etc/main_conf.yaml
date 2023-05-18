@@ -25,5 +25,9 @@ nomad:
 
   namespaces:  # map VO to Nomad namespace
 
-    vo.ai4eosc.eu: ai4eosc
-    vo.imagine-ai.eu: imagine
+    vo.ai4eosc.eu: default
+    vo.imagine-ai.eu: default
+
+    #TODO: implement back when ready
+    # vo.ai4eosc.eu: ai4eosc
+    # vo.imagine-ai.eu: imagine

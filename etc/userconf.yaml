@@ -11,12 +11,6 @@
 
 general:
 
-  virtual_organization:
-    name: Virtual organization
-    value: ''
-    description: Select in which of your Virtual Organizations you want to deploy.
-    options: []
-
   title:
     name: Deployment title
     value: ''
@@ -53,11 +47,13 @@ hardware:
 
   cpu_num:
     name: Number of CPUs
-    value: 1
+    value: 2
+    range: [2, 20]
 
   gpu_num:
     name: Number of GPUs
     value: 0
+    range: [0, 2]
 
   gpu_type:
     name: GPU model
@@ -68,10 +64,12 @@ hardware:
   ram:
     name: RAM memory (in MB)
     value: 8000
+    range: [4000, 20000]
 
   disk:
     name: Disk memory (in MB)
     value: 20000
+    range: [5000, 40000]
 
 storage:
 
