@@ -25,9 +25,12 @@ nomad:
 
   namespaces:  # map VO to Nomad namespace
 
-    vo.ai4eosc.eu: default
-    vo.imagine-ai.eu: default
+    vo.ai4eosc.eu: AI4EOSC
+    vo.imagine-ai.eu: imagine
 
-    #TODO: implement back when ready
-    # vo.ai4eosc.eu: ai4eosc
-    # vo.imagine-ai.eu: imagine
+lb:  # load balancer, Traefik
+
+  domain:  # each VO accesses deployments through their domain
+
+    vo.ai4eosc.eu: deployments.dev.ai4eosc.eu
+    vo.imagine-ai.eu: deployments.dev.imagine-ai.eu

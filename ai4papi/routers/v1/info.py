@@ -7,11 +7,10 @@ able to fill the `Virtual Organization` field.
 
 from copy import deepcopy
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 import requests
 
-from ai4papi.auth import get_user_info
 from ai4papi.conf import USER_CONF
 
 
@@ -58,5 +57,17 @@ def get_default_deployment_conf(
     tags = [i["name"] for i in r["results"]]
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
+
+    #TODO: enable VS Code if we have clearance from legal department (see License)
+    # --> adapt/modify description in `userconf.yaml` in `service`
+    # and `jupyter_password`
+
+    # # Use VS Code in the development container
+    # if module_name == 'DEEP-OC-generic-dev':
+    #     conf["general"]["service"]["options"].insert(0, 'vscode')
+    #     conf["general"]["service"]["value"] = 'vscode'
+
+    # Available GPU models
+    # TODO: add automated discovery of GPU models reading the Clients metadata tags
 
     return conf
