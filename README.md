@@ -208,10 +208,18 @@ deployments.get_deployments(
 #   'owner': '4545898984949741@someprovider',
 #   'submit_time': '2023-01-13 11:36:16',
 #   'alloc_ID': 'e6b24722-e332-185a-a9b6-817ce8d26f48',
-#   'resources': {'cpu_num': 2, 'gpu_num': 0, 'memoryMB': 8000, 'diskMB': 300},
-#   'endpoints': {'deepaas': 'https://xxx.xxx.xxx.xxx:23143',
-#    'monitor': 'https://xxx.xxx.xxx.xxx:22365',
-#    'lab': 'https://xxx.xxx.xxx.xxx:20820'}}]
+#   'resources': {
+#       'cpu_num': 2,
+#       'gpu_num': 0,
+#       'memoryMB': 8000,
+#       'diskMB': 300
+#   },
+#   'endpoints': {
+#       'deepaas': 'https://deepaas.xxx.xxx.xxx.xxx',
+#       'monitor': 'https://monitor.xxx.xxx.xxx.xxx',
+#       'ide': 'https://ide.xxx.xxx.xxx'
+#   }
+# }]
 ```
 
 

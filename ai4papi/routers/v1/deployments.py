@@ -10,9 +10,10 @@ Notes:
 
 from copy import deepcopy
 from datetime import datetime
+import re
 import types
 from typing import Tuple, Union
-
+import urllib
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,10 +21,9 @@ from fastapi.security import HTTPBearer
 import nomad
 from nomad.api import exceptions
 
-from ai4papi import quotas
+from ai4papi import quotas, utils
 from ai4papi.auth import get_user_info
 from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES, MAIN_CONF
-from ai4papi.utils import deregister_job
 
 
 router = APIRouter(
@@ -31,12 +31,22 @@ router = APIRouter(
     tags=["deployments"],
     responses={404: {"description": "Not found"}},
 )
-
 security = HTTPBearer()
 
 Nomad = nomad.Nomad()
-Nomad.job.deregister_job = types.MethodType(deregister_job, Nomad.job)  # monkey-patch
-
+# TODO: Remove monkey-patches when the code is merged to python-nomad Pypi package
+Nomad.job.deregister_job = types.MethodType(
+    utils.deregister_job,
+    Nomad.job
+    )
+Nomad.job.get_allocations = types.MethodType(
+    utils.get_allocations,
+    Nomad.job
+    )
+Nomad.job.get_evaluations = types.MethodType(
+    utils.get_allocations,
+    Nomad.job
+    )
 
 @router.get("/")
 def get_deployments(
@@ -79,6 +89,11 @@ def get_deployments(
         for j in jobs:
             # Skip deleted jobs
             if j['Status'] == 'dead':
+                continue
+
+            # Skip jobs that do not start with userjob
+            # (useful for admins who might have deployed other jobs eg. Traefik)
+            if not j['Name'].startswith('userjob'):
                 continue
 
             # Get full job description
@@ -179,13 +194,25 @@ def get_deployment(
         if t['Name'] == 'usertask':
             info['docker_image'] = t['Config']['image']
 
+    # Add endpoints
+    info['endpoints'] = {}
+    for s in j['TaskGroups'][0]['Services']:
+        label = s['PortLabel']
+        try:
+            url = re.search('Host\(`(.+?)`', s['Tags'][1]).group(1)
+        except Exception:
+            url = "missing-endpoint"
+        info['endpoints'][label] = f"http://{url}"
+
     # Only fill (resources + endpoints) if the job is allocated
-    allocs = Nomad.job.get_allocations(j['ID'])
+    allocs = Nomad.job.get_allocations(j['ID'], namespace=namespace)
+    evals = Nomad.job.get_evaluations(j['ID'], namespace=namespace)
     if allocs:
         a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
 
         info['alloc_ID'] = a['ID']
 
+        # Add resources
         res = a['AllocatedResources']
         devices = res['Tasks']['usertask']['Devices']
         info['resources'] = {
@@ -195,18 +222,13 @@ def get_deployment(
             'diskMB': res['Shared']['DiskMB'],
         }
 
-        public_ip = 'https://xxx.xxx.xxx.xxx'  # todo: replace when ready
-        ports = a['Resources']['Networks'][0]['DynamicPorts']
-        info['endpoints'] = {d['Label']: f"{public_ip}:{d['Value']}" for d in ports}
-        # todo: We need to connect internal IP (172.XXX) to external IP (193.XXX) (Traefik + Consul Connect)
-        # use service discovery to map internal ip to external IPs???
+    elif evals:
+        # Something happened, job didn't deploy (eg. job needs port that's currently being used)
+        # We have to return `placement failures message`.
+        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
 
     else:
-        # Something happened, job didn't deploy (eg. jobs needs port that's currently being used)
-        # We have to return `placement failures message`.
-        evals = Nomad.job.get_evaluations(j['ID'])
-        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
-        # todo: improve this error message once we start seeing the different modes of failures in typical cases
+        info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
 
     return info
 
@@ -276,7 +298,7 @@ def create_deployment(
 
     # Enforce JupyterLab password minimum number of characters
     if (
-        user_conf['general']['service'] == 'jupyterlab' and
+        user_conf['general']['service'] in ['jupyter', 'vscode'] and
         len(user_conf['general']['jupyter_password']) < 9
         ):
         raise HTTPException(
@@ -288,7 +310,9 @@ def create_deployment(
     quotas.check(user_conf)
 
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
-    job_conf['ID'] = f'userjob-{uuid.uuid1()}'  # id is generated from (MAC address+timestamp) so it's unique
+    job_uuid = uuid.uuid1()  # generated from (MAC address+timestamp) so it's unique
+    job_conf['ID'] = f"{job_uuid}"
+    job_conf['Name'] = f'userjob-{job_uuid}'
 
     # Retrieve the associated namespace to that VO
     job_conf['namespace'] = MAIN_CONF['nomad']['namespaces'][vo]
@@ -297,6 +321,34 @@ def create_deployment(
     job_conf['Meta']['owner'] = auth_info['id']
     job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
     job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
+
+    # Create the Traefik endpoints where the deployment is going to be accessible
+    hname = user_conf['general']['hostname']
+    domain = MAIN_CONF['lb']['domain'][vo]
+    if hname:
+        if '.' in hname:  # user provide full domain
+            if not hname.startswith('http'):
+                hname = f'http://{hname}'
+            base_domain = urllib.parse.urlparse(hname).hostname
+        else:  # user provides custom subdomain
+            if hname in ['www']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Forbidden hostname: {hname}."
+                    )
+            base_domain = f"{hname}.{domain}"
+    else:  # we use job_id as default subdomain
+        base_domain = f"{job_conf['ID']}.{domain}"
+
+    utils.check_domain(f"http://{base_domain}")  # check nothing is running there
+
+    for service in job_conf['TaskGroups'][0]['Services']:
+        sname = service['PortLabel']  # either ['deepaas', 'monitor', 'ide']
+        service['Name'] = f"{job_conf['Name']}-{sname}"
+        domain = f"{sname}.{base_domain}"
+        service['Tags'].append(
+            f"traefik.http.routers.{service['Name']}.rule=Host(`{domain}`, `www.{domain}`)"
+        )
 
     # Replace user conf in Nomad job
     task = job_conf['TaskGroups'][0]['Tasks'][0]
@@ -313,6 +365,13 @@ def create_deployment(
     if user_conf['hardware']['gpu_num'] <= 0:
         del task['Resources']['Devices']
     else:
+
+        # TODO: remove when Traefik issue if fixed (see job.nomad)
+        raise HTTPException(
+            status_code=500,
+            detail="GPU deployments are temporarily disabled.",
+            )
+
         task['Resources']['Devices'][0]['Count'] = user_conf['hardware']['gpu_num']
         if not user_conf['hardware']['gpu_type']:
             del task['Resources']['Devices'][0]['Affinities']
@@ -388,11 +447,10 @@ def delete_deployment(
             )
 
     # Delete deployment
-    # Nomad.job.deregister_job(id=deployment_uuid)
-    #TODO: test that this works without providing a namespace, with more than two namespaces
     Nomad.job.deregister_job(
-        id=deployment_uuid,
+        id_=deployment_uuid,
         namespace=namespace,
+        purge=False,
         )
 
     return {'status': 'success'}

@@ -21,6 +21,11 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+  hostname:
+    name: Hostname
+    value: ''
+    description: Host where your application will be deployed (eg. `myapp`). It will automatically default to your `job-uuid`. If the domain has dots in it, we will interpret it as a full domain instead (eg. `myapp.mycompany.com`), which you will need to configure with your DNS provider.
+
   docker_image:
     name: Docker image
     value: 'deephdc/deep-oc-image-classification-tf'
@@ -36,12 +41,12 @@ general:
     name: Service to run
     value: 'deepaas'
     description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`.
-    options: ['deepaas', 'jupyterlab']
+    options: ['deepaas', 'jupyter']
 
   jupyter_password:
-    name: Jupyter password
+    name: JupyterLab password
     value: ''
-    description: Select a password for JupyterLab. It should have at least 9 characters.
+    description: Select a password for your JupyterLab. It should have at least 9 characters.
 
 hardware:
 
@@ -53,12 +58,15 @@ hardware:
   gpu_num:
     name: Number of GPUs
     value: 0
-    range: [0, 2]
+    #range: [0, 2]
+    # TODO: remove when Traefik issue if fixed (see `job.nomad`)
+    range: [0, 0]
+    description: GPU deployments are temporarily disabled.
 
   gpu_type:
     name: GPU model
     value: ''
-    options: ['', 'Tesla K80']
+    options: ['', 'NVIDIA Tesla T4']
     description: Fill this field if you have preference for a certain kind of GPU model.
 
   ram:
