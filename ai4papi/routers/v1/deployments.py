@@ -176,7 +176,7 @@ def get_deployment(
     # Create job info dict
     info = {
         'job_ID': j['ID'],
-        'status': j['Status'],
+        'status': '',  # do not use j['Status'] as misleading
         'owner': j['Meta']['owner'],
         'title': j['Meta']['title'],
         'description': j['Meta']['description'],
@@ -208,9 +208,18 @@ def get_deployment(
     allocs = Nomad.job.get_allocations(j['ID'], namespace=namespace)
     evals = Nomad.job.get_evaluations(j['ID'], namespace=namespace)
     if allocs:
-        a = Nomad.allocation.get_allocation(allocs[0]['ID'])  # only keep the first allocation per job
 
+        # Keep only the most recent allocation per job
+        dates = [a['CreateTime'] for a in allocs]
+        idx = dates.index(max(dates))
+        a = Nomad.allocation.get_allocation(allocs[idx]['ID'])
+
+        # Add ID and status
         info['alloc_ID'] = a['ID']
+        if a['ClientStatus'] == 'pending':
+            info['status'] = 'starting'  # starting is clearer than pending, like done in the UI
+        else:
+            info['status'] = a['ClientStatus']
 
         # Add resources
         res = a['AllocatedResources']
@@ -225,10 +234,12 @@ def get_deployment(
     elif evals:
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
+        info['status'] = 'error'
         info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
 
     else:
-        info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
+        # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
+        info['status'] = 'queued'
 
     return info
 
