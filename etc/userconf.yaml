@@ -58,10 +58,7 @@ hardware:
   gpu_num:
     name: Number of GPUs
     value: 0
-    #range: [0, 2]
-    # TODO: remove when Traefik issue if fixed (see `job.nomad`)
-    range: [0, 0]
-    description: GPU deployments are temporarily disabled.
+    range: [0, 1]
 
   gpu_type:
     name: GPU model

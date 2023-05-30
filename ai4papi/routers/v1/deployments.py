@@ -376,13 +376,6 @@ def create_deployment(
     if user_conf['hardware']['gpu_num'] <= 0:
         del task['Resources']['Devices']
     else:
-
-        # TODO: remove when Traefik issue if fixed (see job.nomad)
-        raise HTTPException(
-            status_code=500,
-            detail="GPU deployments are temporarily disabled.",
-            )
-
         task['Resources']['Devices'][0]['Count'] = user_conf['hardware']['gpu_num']
         if not user_conf['hardware']['gpu_type']:
             del task['Resources']['Devices'][0]['Affinities']
