@@ -11,19 +11,6 @@ job "userjob" {
     description = ""
   }
 
-  # TODO: remove when ready
-  # We are temporarily deploying only to the "host-ifca-4" client because Traefik,
-  # which is deployed in that client, seems only able to redirect only to services
-  # which are deployed in the same client (although it is able to _list_ services
-  # from other clients).
-  # And because this is a CPU client, we have disable temporarily the creation of
-  # GPU deployments (see `deployments.create_deployment()` and `user_conf.yaml`)
-  constraint {
-    attribute = "${node.unique.name}"
-    operator  = "="
-    value     = "host-ifca-4"
-  }
-
   group "usergroup" {
 
     network {
