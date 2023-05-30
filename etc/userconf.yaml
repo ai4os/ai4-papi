@@ -40,13 +40,13 @@ general:
   service:
     name: Service to run
     value: 'deepaas'
-    description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`.
+    description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`. In some container, you will also be able to deploy VS Code.
     options: ['deepaas', 'jupyter']
 
   jupyter_password:
-    name: JupyterLab password
+    name: IDE password
     value: ''
-    description: Select a password for your JupyterLab. It should have at least 9 characters.
+    description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
 
 hardware:
 

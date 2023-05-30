@@ -58,14 +58,10 @@ def get_default_deployment_conf(
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
-    #TODO: enable VS Code if we have clearance from legal department (see License)
-    # --> adapt/modify description in `userconf.yaml` in `service`
-    # and `jupyter_password`
-
-    # # Use VS Code in the development container
-    # if module_name == 'DEEP-OC-generic-dev':
-    #     conf["general"]["service"]["options"].insert(0, 'vscode')
-    #     conf["general"]["service"]["value"] = 'vscode'
+    # Use VS Code (Coder OSS) in the development container
+    if module_name == 'DEEP-OC-generic-dev':
+        conf["general"]["service"]["options"].insert(0, 'vscode')
+        conf["general"]["service"]["value"] = 'vscode'
 
     # Available GPU models
     # TODO: add automated discovery of GPU models reading the Clients metadata tags

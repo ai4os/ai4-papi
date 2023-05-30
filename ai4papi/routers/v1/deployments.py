@@ -314,7 +314,7 @@ def create_deployment(
         ):
         raise HTTPException(
             status_code=400,
-            detail="JupyterLab password should have at least 9 characters."
+            detail="Your IDE password should have at least 9 characters."
             )
 
     # Check the provided configuring is with the quotas
