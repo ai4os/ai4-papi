@@ -345,7 +345,7 @@ def create_deployment(
             if hname in ['www']:
                 raise HTTPException(
                     status_code=400,
-                    detail="Forbidden hostname: {hname}."
+                    detail=f"Forbidden hostname: {hname}."
                     )
             base_domain = f"{hname}.{domain}"
     else:  # we use job_id as default subdomain
