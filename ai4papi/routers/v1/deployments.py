@@ -181,6 +181,7 @@ def get_deployment(
         'title': j['Meta']['title'],
         'description': j['Meta']['description'],
         'docker_image': None,
+        'docker_command': None,
         'submit_time': datetime.fromtimestamp(
             j['SubmitTime'] // 1000000000
         ).strftime('%Y-%m-%d %H:%M:%S'),  # nanoseconds to timestamp
@@ -193,6 +194,7 @@ def get_deployment(
     for t in j['TaskGroups'][0]['Tasks']:
         if t['Name'] == 'usertask':
             info['docker_image'] = t['Config']['image']
+            info['docker_command'] = f"{t['Config']['command']} {' '.join(t['Config']['args'])}"
 
     # Add endpoints
     info['endpoints'] = {}
@@ -216,8 +218,19 @@ def get_deployment(
 
         # Add ID and status
         info['alloc_ID'] = a['ID']
+
         if a['ClientStatus'] == 'pending':
             info['status'] = 'starting'  # starting is clearer than pending, like done in the UI
+
+        elif a['ClientStatus'] == 'failed':
+            info['error_msg'] = a['TaskStates']['usertask']['Events'][0]['Message']
+            if info['error_msg'] == 'Docker container exited with non-zero exit code: 1':
+                info['error_msg'] += "\n" \
+                    "An error seems to appear when running this Docker container. " \
+                    "Try to run this Docker locally with the command \n" \
+                    f"    {info['docker_command']} \n" \
+                    "to find what is the error or contact the module maintainer."
+
         else:
             info['status'] = a['ClientStatus']
 
