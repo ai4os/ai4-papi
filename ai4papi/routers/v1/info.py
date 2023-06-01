@@ -60,8 +60,9 @@ def get_default_deployment_conf(
 
     # Use VS Code (Coder OSS) in the development container
     if module_name == 'DEEP-OC-generic-dev':
-        conf["general"]["service"]["options"].insert(0, 'vscode')
         conf["general"]["service"]["value"] = 'vscode'
+        conf["general"]["service"]["options"].insert(0, 'vscode')
+        conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
 
     # Available GPU models
     # TODO: add automated discovery of GPU models reading the Clients metadata tags
