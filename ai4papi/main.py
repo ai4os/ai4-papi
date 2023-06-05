@@ -23,8 +23,8 @@ description=(
     "<br><br>"
 
     "You can also access the functionalities of the API through our dashboards: <br>"
-    "- [AIEOSC Dashboard](https://dashboard.dev.ai4eosc.eu/) <br>"
-    "- [iMagine Dashboard](https://dashboard.dev.imagine-ai.eu/)"
+    "- [AIEOSC Dashboard](https://dashboard.cloud.ai4eosc.eu/) <br>"
+    "- [iMagine Dashboard](https://dashboard.cloud.imagine-ai.eu/)"
     "<br><br>"
 
     "For more information, please visit: <br>"

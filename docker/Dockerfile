@@ -46,5 +46,5 @@ EXPOSE 443
 CMD ai4papi-run \
     --host 0.0.0.0 \
     --port 443 \
-    --ssl-keyfile /home/letsencrypt/live/api.dev.ai4eosc.eu/privkey.pem \
-    --ssl-certfile /home/letsencrypt/live/api.dev.ai4eosc.eu/fullchain.pem
+    --ssl-keyfile /home/letsencrypt/live/api.cloud.ai4eosc.eu/privkey.pem \
+    --ssl-certfile /home/letsencrypt/live/api.cloud.ai4eosc.eu/fullchain.pem

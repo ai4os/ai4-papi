@@ -16,7 +16,7 @@ This is the Platform API for interacting with the AI4EOSC services, built using
 It aims at providing a stable UI, effectively decoupling the services offered by the
 project from the underlying tools we use to provide them (ie. Nomad).
 
-The API is currently [deployed here](https://api.dev.ai4eosc.eu/docs).
+The API is currently [deployed here](https://api.cloud.ai4eosc.eu/docs).
 
 ## Installation
 
