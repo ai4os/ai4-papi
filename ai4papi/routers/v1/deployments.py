@@ -331,7 +331,7 @@ def create_deployment(
             detail="Your IDE password should have at least 9 characters."
             )
 
-    # Check the provided configuring is with the quotas
+    # Check if the provided configuration is within the quotas
     quotas.check(user_conf, vo)
 
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
@@ -342,12 +342,14 @@ def create_deployment(
     # Retrieve the associated namespace to that VO
     job_conf['namespace'] = MAIN_CONF['nomad']['namespaces'][vo]
 
+    # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
+    if vo == 'training.egi.eu':
+        job_conf['Priority'] = 25
+
     # Add owner and extra information to the job metadata
     job_conf['Meta']['owner'] = auth_info['id']
     job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
     job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
-
-    # TODO: add low job priority for `tutorial` userjobs
 
     # Create the Traefik endpoints where the deployment is going to be accessible
     hname = user_conf['general']['hostname']
