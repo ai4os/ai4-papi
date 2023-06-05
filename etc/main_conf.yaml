@@ -25,7 +25,7 @@ nomad:
 
   namespaces:  # map VO to Nomad namespace
 
-    vo.ai4eosc.eu: AI4EOSC
+    vo.ai4eosc.eu: ai4eosc
     vo.imagine-ai.eu: imagine
 
 lb:  # load balancer, Traefik
