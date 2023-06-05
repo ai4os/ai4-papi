@@ -348,8 +348,6 @@ def create_deployment(
     job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
 
     # TODO: add low job priority for `tutorial` userjobs
-    # TODO: add client affinity; CPU-only jobs should deploy preferably in CPU only
-    # clients to avoid overloading GPU clients with CPU jobs
 
     # Create the Traefik endpoints where the deployment is going to be accessible
     hname = user_conf['general']['hostname']

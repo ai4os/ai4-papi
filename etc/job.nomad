@@ -17,6 +17,15 @@ job "userjob" {
     description = ""
   }
 
+  # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
+  # overloading GPU clients with CPU-only jobs.
+  affinity {
+    attribute = "${node.unique.name}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -50  # anti-affinity for GPU clients
+  }
+
   group "usergroup" {
 
     network {
