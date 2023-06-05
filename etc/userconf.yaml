@@ -63,7 +63,7 @@ hardware:
   gpu_type:
     name: GPU model
     value: ''
-    options: ['', 'NVIDIA Tesla T4']
+    options: ['', 'NVIDIA Tesla V100']
     description: Fill this field if you have preference for a certain kind of GPU model.
 
   ram:
