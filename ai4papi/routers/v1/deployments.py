@@ -332,7 +332,7 @@ def create_deployment(
             )
 
     # Check the provided configuring is with the quotas
-    quotas.check(user_conf)
+    quotas.check(user_conf, vo)
 
     # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
     job_uuid = uuid.uuid1()  # generated from (MAC address+timestamp) so it's unique
@@ -346,6 +346,10 @@ def create_deployment(
     job_conf['Meta']['owner'] = auth_info['id']
     job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
     job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
+
+    # TODO: add low job priority for `tutorial` userjobs
+    # TODO: add client affinity; CPU-only jobs should deploy preferably in CPU only
+    # clients to avoid overloading GPU clients with CPU jobs
 
     # Create the Traefik endpoints where the deployment is going to be accessible
     hname = user_conf['general']['hostname']

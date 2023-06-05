@@ -20,6 +20,7 @@ auth:
 
     - vo.ai4eosc.eu
     - vo.imagine-ai.eu
+    - training.egi.eu  # this membership lasts only 1 month
 
 nomad:
 
@@ -27,6 +28,7 @@ nomad:
 
     vo.ai4eosc.eu: ai4eosc
     vo.imagine-ai.eu: imagine
+    training.egi.eu: tutorials
 
 lb:  # load balancer, Traefik
 
@@ -34,3 +36,4 @@ lb:  # load balancer, Traefik
 
     vo.ai4eosc.eu: deployments.dev.ai4eosc.eu
     vo.imagine-ai.eu: deployments.dev.imagine-ai.eu
+    training.egi.eu: deployments.dev.ai4eosc.eu

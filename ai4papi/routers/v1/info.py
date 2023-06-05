@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 import requests
 
+from ai4papi import quotas
 from ai4papi.conf import USER_CONF
 
 
@@ -26,6 +27,7 @@ security = HTTPBearer()
 @router.get("/conf/{module_name}")
 def get_default_deployment_conf(
     module_name: str,
+    vo: str,
 ):
     """
     Returns the default configuration (dict) for creating a deployment
@@ -66,5 +68,8 @@ def get_default_deployment_conf(
 
     # Available GPU models
     # TODO: add automated discovery of GPU models reading the Clients metadata tags
+
+    # Modify the resources limits for a given user or VO
+    conf['hardware'] = quotas.limit_resources(vo)
 
     return conf
