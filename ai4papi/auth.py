@@ -68,9 +68,9 @@ def get_user_info(token):
     # If more complexity is need in the future, check https://github.com/oarepo/urnparse
     vos = []
     for i in user_infos.get('eduperson_entitlement'):
-        vos.append(
-            re.search(r"group:(.+?):", i).group(1)
-        )
+        ent_i = re.search(r"group:(.+?):", i)
+        if ent_i:  # your entitlement has indeed a group `tag`
+            vos.append(ent_i.group(1))
 
     # Filter VOs to keep only the ones relevant to us
     vos = set(vos).intersection(
