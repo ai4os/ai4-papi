@@ -16,7 +16,20 @@ This is the Platform API for interacting with the AI4EOSC services, built using
 It aims at providing a stable UI, effectively decoupling the services offered by the
 project from the underlying tools we use to provide them (ie. Nomad).
 
-The API is currently [deployed here](https://api.cloud.ai4eosc.eu/docs).
+The API is currently deployed here:
+
+* [production API](https://api.cloud.ai4eosc.eu/docs) (`master` branch)
+* [development API](https://api.dev.ai4eosc.eu/docs) (`dev` branch)
+
+Images of both API are accessible in [Dockerhub](https://hub.docker.com/repositories/ignacioheredia).
+<!---
+TODO: replace with AI4EOSC Dockerhub account
+-->
+
+The Dashboards pointing to those APIs are respectively:
+
+* [production Dashboard](https://dashboard.cloud.ai4eosc.eu)
+* [development Dashboard](https://dashboard.dev.ai4eosc.eu)
 
 ## Installation
 
@@ -63,7 +76,18 @@ uvicorn ai4papi.main:app --reload
 
 3. Using our [Makefile](./Makefile)
 
-4. Using our [Dockerfile](./docker/Dockerfile) (with SSL).
+4. From Dockerhub
+
+```bash
+docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ignacioheredia/ai4-papi:prod
+```
+
+5. Building from our [Dockerfile](./docker/Dockerfile).
+
+```bash
+docker build -t ai4-papi:prod --build-arg papi_branch=master .
+docker run -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ai4-papi:prod
+```
 
 Once the API is running, go to http://127.0.0.1:8080/docs to check the API methods in the
 Swagger UI.

@@ -1,4 +1,5 @@
 # Refresh Docker container running ai4-papi ([!] run with `sudo`)
+# This script was what we ran before deploying with Docker Compose
 
 cd /home/ubuntu/ai4-papi
 

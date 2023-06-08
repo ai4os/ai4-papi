@@ -8,6 +8,8 @@
 
 FROM ubuntu:22.04
 
+ARG papi_branch=master
+
 # Install Nomad
 # Updated commands: https://developer.hashicorp.com/nomad/tutorials/get-started/gs-install
 RUN apt-get update && \
@@ -37,14 +39,12 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # We use the ADD command to force a cache rebuilt when the repo is updated
 # see: https://stackoverflow.com/a/65762156
 WORKDIR /home
-ADD "https://api.github.com/repos/AI4EOSC/ai4-papi/commits?per_page=1" latest_commit
-RUN git clone -b master https://github.com/AI4EOSC/ai4-papi
+ADD "https://api.github.com/repos/AI4EOSC/ai4-papi/commits/${papi_branch}?per_page=1" latest_commit
+RUN git clone -b ${papi_branch} https://github.com/AI4EOSC/ai4-papi
 RUN pip3 install -e ai4-papi
 
 # Run the API
-EXPOSE 443
+EXPOSE 80
 CMD ai4papi-run \
     --host 0.0.0.0 \
-    --port 443 \
-    --ssl-keyfile /home/letsencrypt/live/api.cloud.ai4eosc.eu/privkey.pem \
-    --ssl-certfile /home/letsencrypt/live/api.cloud.ai4eosc.eu/fullchain.pem
+    --port 80
