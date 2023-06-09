@@ -205,6 +205,8 @@ def get_deployment(
         except Exception:
             url = "missing-endpoint"
         info['endpoints'][label] = f"http://{url}"
+        if label == 'deepaas':
+            info['endpoints'][label] += '/ui'
 
     # Only fill (resources + endpoints) if the job is allocated
     allocs = Nomad.job.get_allocations(j['ID'], namespace=namespace)
