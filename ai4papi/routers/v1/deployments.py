@@ -122,7 +122,12 @@ def get_deployments(
 
         user_jobs += fjobs
 
-    return user_jobs
+    # Sort deployments by creation date
+    seq = [j['submit_time'] for j in user_jobs]
+    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
+    sorted_jobs = [user_jobs[i] for i in args]
+
+    return sorted_jobs
 
 
 @router.get("/{deployment_uuid}")
