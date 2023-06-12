@@ -21,7 +21,7 @@ from fastapi.security import HTTPBearer
 import nomad
 from nomad.api import exceptions
 
-from ai4papi import quotas, utils
+from ai4papi import module_patches, quotas, utils
 from ai4papi.auth import get_user_info
 from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES, MAIN_CONF
 
@@ -413,6 +413,12 @@ def create_deployment(
     task['Env']['RCLONE_CONFIG_RSHARE_PASS'] = user_conf['storage']['rclone_password']
     task['Env']['RCLONE_CONFIG'] = user_conf['storage']['rclone_conf']
     task['Env']['jupyterPASSWORD'] = user_conf['general']['jupyter_password']
+
+    # Apply patches if needed
+    task = module_patches.patch_nextcloud_mount(
+        user_conf['general']['docker_image'],
+        task
+    )
 
     # Submit job
     try:
