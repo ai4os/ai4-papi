@@ -9,6 +9,7 @@ auth:
     - https://dashboard.cloud.imagine-ai.eu
     - https://dashboard.dev.ai4eosc.eu
     - https://dashboard.cloud.ai4eosc.eu
+    - https://tutorials.cloud.ai4eosc.eu
 
   OP:  # OIDC providers
 
