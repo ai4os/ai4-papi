@@ -30,6 +30,13 @@ description=(
     "For more information, please visit: <br>"
     "- [AI4EOSC Homepage](https://ai4eosc.eu) <br>"
     "- [API Github repository](https://github.com/AI4EOSC/ai4-papi)"
+    "<br><br>"
+
+    "**Acknowledgements** <br>"
+    "This work is co-funded by [AI4EOSC](https://ai4eosc.eu/) project that has "
+    "received funding from the European Union's Horizon Europe 2022 research and "
+    "innovation programme under agreement No 101058593"
+
 )
 
 app = fastapi.FastAPI(
