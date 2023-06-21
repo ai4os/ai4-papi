@@ -43,11 +43,13 @@ def limit_resources(
 
     # Limit resources for tutorial users
     if vo == 'training.egi.eu':
+        conf["cpu_num"]["value"] = 2
         conf["cpu_num"]["range"] = [2, 4]
         conf["gpu_num"]["range"] = [0, 0]
         conf["gpu_num"]["description"] = "Tutorial users are not allowed to deploy on GPUs."
-        conf["ram"]["range"] = [4000, 12000]
-        conf["disk"]["value"] = 10000
-        conf["disk"]["range"] = [5000, 10000]
+        conf["ram"]["value"] = 2000
+        conf["ram"]["range"] = [2000, 4000]
+        conf["disk"]["value"] = 500
+        conf["disk"]["range"] = [300, 1000]
 
     return conf
