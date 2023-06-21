@@ -397,7 +397,6 @@ def create_deployment(
 
     task['Resources']['CPU'] = user_conf['hardware']['cpu_num']
     task['Resources']['MemoryMB'] = user_conf['hardware']['ram']
-    task['Resources']['DiskMB'] = user_conf['hardware']['disk']
     if user_conf['hardware']['gpu_num'] <= 0:
         del task['Resources']['Devices']
     else:
@@ -413,6 +412,11 @@ def create_deployment(
     task['Env']['RCLONE_CONFIG_RSHARE_PASS'] = user_conf['storage']['rclone_password']
     task['Env']['RCLONE_CONFIG'] = user_conf['storage']['rclone_conf']
     task['Env']['jupyterPASSWORD'] = user_conf['general']['jupyter_password']
+
+    # Set Disk resources for the group
+    job_conf['TaskGroups'][0]['EphemeralDisk'] = {
+        'SizeMB': user_conf['hardware']['disk'],
+    }
 
     # Apply patches if needed
     task = module_patches.patch_nextcloud_mount(
