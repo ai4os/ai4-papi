@@ -260,15 +260,3 @@ def get_module_metadata(
     metadata["description"] = "\n".join(metadata["description"])
 
     return metadata
-
-
-@router.put("/metadata/{module_name}")
-def update_module_metadata(
-    module_name: str,
-    ):
-    """
-    Update the module's metadata.
-    TODO: do this when we implement the AI4EOSC Exchange database
-    This function needs authentication, users should only be able to edit their own modules
-    """
-    raise HTTPException(status_code=501)
