@@ -213,6 +213,14 @@ def get_deployment(
         if label == 'deepaas':
             info['endpoints'][label] += '/ui'
 
+    service2endpoint = {
+        'deepaas': 'deepaas',
+        'jupyter': 'ide',
+        'vscode': 'ide',
+    }
+    service = t['Config']['args'][0][2:]
+    info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
+
     # Only fill (resources + endpoints) if the job is allocated
     allocs = Nomad.job.get_allocations(j['ID'], namespace=namespace)
     evals = Nomad.job.get_evaluations(j['ID'], namespace=namespace)
