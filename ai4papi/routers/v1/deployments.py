@@ -98,7 +98,7 @@ def get_deployments(
 
             # Get full job description
             j = Nomad.job.get_job(
-                id=j['ID'],
+                id_=j['ID'],
                 namespace=namespace,
                 )
 
@@ -162,7 +162,7 @@ def get_deployment(
     # Check the deployment exists
     try:
         j = Nomad.job.get_job(
-            id=deployment_uuid,
+            id_=deployment_uuid,
             namespace=namespace,
             )
     except exceptions.URLNotFoundNomadException:
@@ -222,8 +222,14 @@ def get_deployment(
     info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
 
     # Only fill (resources + endpoints) if the job is allocated
-    allocs = Nomad.job.get_allocations(j['ID'], namespace=namespace)
-    evals = Nomad.job.get_evaluations(j['ID'], namespace=namespace)
+    allocs = Nomad.job.get_allocations(
+        id_=j['ID'],
+        namespace=namespace,
+        )
+    evals = Nomad.job.get_evaluations(
+        id_=j['ID'],
+        namespace=namespace,
+        )
     if allocs:
 
         # Keep only the most recent allocation per job
@@ -477,7 +483,7 @@ def delete_deployment(
     # Check the deployment exists
     try:
         j = Nomad.job.get_job(
-            id=deployment_uuid,
+            id_=deployment_uuid,
             namespace=namespace,
             )
     except exceptions.URLNotFoundNomadException:
