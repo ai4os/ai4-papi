@@ -2,22 +2,27 @@
 Accounting of resources.
 """
 from copy import deepcopy
+import re
 
 from fastapi import HTTPException
 
-from ai4papi.conf import USER_CONF
+import ai4papi.conf as papiconf
 
 
 def check(
-    user_conf:dict,
+    conf: dict,
     vo: str,
     ):
     """
     Check the job configuration does not overflow the generic hardware limits.
     """
-    user_conf = user_conf['hardware']  # user options
-    ref = limit_resources(vo)  # generic quotas (vo-dependent)
 
+    module_name = conf['general']['docker_image'].split('/')[-1]
+    ref = limit_resources(  # generic quotas (vo-dependent)
+        module_name=module_name,
+        vo=vo,
+    )
+    user_conf = conf['hardware']  # user options
     for k in ref.keys():
         if 'range' in ref[k].keys():
             if user_conf[k] < ref[k]['range'][0]:
@@ -33,23 +38,33 @@ def check(
 
 
 def limit_resources(
+    module_name: str,
     vo: str,
     ):
     """
-    Implement resource limits for specific users or VOs.
+    Implement hardware limits for specific users or VOs.
     """
+    module_name = module_name.lower()
+
     # Generate the conf
-    conf = deepcopy(USER_CONF)['hardware']
+    if module_name == 'deep-oc-federated-server':
+        conf = deepcopy(papiconf.USER_FED_CONF)['hardware']
+    else:
+        conf = deepcopy(papiconf.USER_MODULE_CONF)['hardware']
 
     # Limit resources for tutorial users
     if vo == 'training.egi.eu':
-        conf["cpu_num"]["value"] = 2
-        conf["cpu_num"]["range"] = [2, 4]
-        conf["gpu_num"]["range"] = [0, 0]
-        conf["gpu_num"]["description"] = "Tutorial users are not allowed to deploy on GPUs."
-        conf["ram"]["value"] = 2000
-        conf["ram"]["range"] = [2000, 4000]
-        conf["disk"]["value"] = 500
-        conf["disk"]["range"] = [300, 1000]
+        if 'cpu_num' in conf.keys():
+            conf["cpu_num"]["value"] = 2
+            conf["cpu_num"]["range"] = [2, 4]
+        if 'gpu_num' in conf.keys():
+            conf["gpu_num"]["range"] = [0, 0]
+            conf["gpu_num"]["description"] = "Tutorial users are not allowed to deploy on GPUs."
+        if 'ram' in conf.keys():
+            conf["ram"]["value"] = 2000
+            conf["ram"]["range"] = [2000, 4000]
+        if 'disk' in conf.keys():
+            conf["disk"]["value"] = 500
+            conf["disk"]["range"] = [300, 1000]
 
     return conf

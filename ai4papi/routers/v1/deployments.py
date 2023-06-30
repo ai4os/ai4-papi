@@ -23,7 +23,7 @@ from nomad.api import exceptions
 
 from ai4papi import module_patches, quotas, utils
 from ai4papi.auth import get_user_info
-from ai4papi.conf import NOMAD_JOB_CONF, USER_CONF_VALUES, MAIN_CONF
+import ai4papi.conf as papiconf
 
 
 router = APIRouter(
@@ -80,7 +80,7 @@ def get_deployments(
     for vo in vos:
 
         # Retrieve the associated namespace to that VO
-        namespace = MAIN_CONF['nomad']['namespaces'][vo]
+        namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
         # Filter jobs
         jobs = Nomad.jobs.get_jobs(namespace=namespace)  # job summaries
@@ -157,7 +157,7 @@ def get_deployment(
             )
 
     # Retrieve the associated namespace to that VO
-    namespace = MAIN_CONF['nomad']['namespaces'][vo]
+    namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
     # Check the deployment exists
     try:
@@ -199,7 +199,9 @@ def get_deployment(
     for t in j['TaskGroups'][0]['Tasks']:
         if t['Name'] == 'usertask':
             info['docker_image'] = t['Config']['image']
-            info['docker_command'] = f"{t['Config']['command']} {' '.join(t['Config']['args'])}"
+            command = t['Config'].get('command', '')
+            args = t['Config'].get('args', [])
+            info['docker_command'] = f"{command} {' '.join(args)}"
 
     # Add endpoints
     info['endpoints'] = {}
@@ -213,13 +215,17 @@ def get_deployment(
         if label == 'deepaas':
             info['endpoints'][label] += '/ui'
 
-    service2endpoint = {
-        'deepaas': 'deepaas',
-        'jupyter': 'ide',
-        'vscode': 'ide',
-    }
-    service = t['Config']['args'][0][2:]
-    info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
+    # Add quick-access (main endpoint)
+    try:  # deep-start compatible service
+        service2endpoint = {
+            'deepaas': 'deepaas',
+            'jupyter': 'ide',
+            'vscode': 'ide',
+        }
+        service = t['Config']['args'][0][2:]
+        info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
+    except Exception:  # return first endpoint (eg. fedserver)
+        info['main_endpoint'] = list(info['endpoints'].values())[0]
 
     # Only fill (resources + endpoints) if the job is allocated
     allocs = Nomad.job.get_allocations(
@@ -295,7 +301,7 @@ def create_deployment(
     ```
     {
         "general":{
-            "docker_image": "deephdc/deep-oc-image-classification-tf:cpu",
+            "docker_image": "deephdc/deep-oc-image-classification-tf",
             "service": "deepaas"
         },
         "hardware": {
@@ -318,8 +324,20 @@ def create_deployment(
             detail=f"The provided Virtual Organization does not match with any of your available VOs: {auth_info['vos']}."
             )
 
+    # Standard modules will require different tuning than tools (eg. federated server)
+    if conf:
+        module_name = conf['general']['docker_image'].split('/')[-1]
+    else:
+        module_name = None
+
     # Update default dict with new values
-    job_conf, user_conf = deepcopy(NOMAD_JOB_CONF), deepcopy(USER_CONF_VALUES)
+    if module_name == 'deep-oc-federated-server':
+        job_conf = deepcopy(papiconf.NOMAD_FED_CONF)
+        user_conf = deepcopy(papiconf.USER_FED_VALUES)
+    else:
+        job_conf = deepcopy(papiconf.NOMAD_MODULE_CONF)
+        user_conf = deepcopy(papiconf.USER_MODULE_VALUES)
+
     if conf is not None:
         for k in conf.keys():
 
@@ -361,7 +379,7 @@ def create_deployment(
     job_conf['Name'] = f'userjob-{job_uuid}'
 
     # Retrieve the associated namespace to that VO
-    job_conf['namespace'] = MAIN_CONF['nomad']['namespaces'][vo]
+    job_conf['namespace'] = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
     if vo == 'training.egi.eu':
@@ -374,7 +392,7 @@ def create_deployment(
 
     # Create the Traefik endpoints where the deployment is going to be accessible
     hname = user_conf['general']['hostname']
-    domain = MAIN_CONF['lb']['domain'][vo]
+    domain = papiconf.MAIN_CONF['lb']['domain'][vo]
     if hname:
         if '.' in hname:  # user provide full domain
             if not hname.startswith('http'):
@@ -400,37 +418,54 @@ def create_deployment(
             f"traefik.http.routers.{service['Name']}.rule=Host(`{domain}`, `www.{domain}`)"
         )
 
+        # Add grpc support for federated learning
+        if sname == 'fedserver':
+            service['Tags'].append(
+                f"traefik.http.services.{service['Name']}.loadbalancer.server.scheme=h2c"
+            )
+            # TODO: add Federated server authentication (via Traefik Basic Auth)
+
     # Replace user conf in Nomad job
     task = job_conf['TaskGroups'][0]['Tasks'][0]
 
     task['Config']['image'] = f"{user_conf['general']['docker_image']}:{user_conf['general']['docker_tag']}"
-    task['Config']['command'] = "deep-start"
-    task['Config']['args'] = [f"--{user_conf['general']['service']}"]
+    if user_conf['general']['service'] in ['deepaas', 'jupyter', 'vscode']:
+        task['Config']['command'] = "deep-start"
+        task['Config']['args'] = [f"--{user_conf['general']['service']}"]
 
-    # TODO: add `docker_privileged` arg if we still need it
-
+    # Set CPU and RAM
     task['Resources']['CPU'] = user_conf['hardware']['cpu_num']
     task['Resources']['MemoryMB'] = user_conf['hardware']['ram']
-    if user_conf['hardware']['gpu_num'] <= 0:
-        del task['Resources']['Devices']
-    else:
-        task['Resources']['Devices'][0]['Count'] = user_conf['hardware']['gpu_num']
-        if not user_conf['hardware']['gpu_type']:
-            del task['Resources']['Devices'][0]['Affinities']
-        else:
-            task['Resources']['Devices'][0]['Affinities'][0]['RTarget'] = user_conf['hardware']['gpu_type']
-
-    task['Env']['RCLONE_CONFIG_RSHARE_URL'] = user_conf['storage']['rclone_url']
-    task['Env']['RCLONE_CONFIG_RSHARE_VENDOR'] = user_conf['storage']['rclone_vendor']
-    task['Env']['RCLONE_CONFIG_RSHARE_USER'] = user_conf['storage']['rclone_user']
-    task['Env']['RCLONE_CONFIG_RSHARE_PASS'] = user_conf['storage']['rclone_password']
-    task['Env']['RCLONE_CONFIG'] = user_conf['storage']['rclone_conf']
-    task['Env']['jupyterPASSWORD'] = user_conf['general']['jupyter_password']
 
     # Set Disk resources for the group
     job_conf['TaskGroups'][0]['EphemeralDisk'] = {
         'SizeMB': user_conf['hardware']['disk'],
     }
+
+    if module_name != 'deep-oc-federated-server':
+        # Set GPUs
+        if user_conf['hardware']['gpu_num'] <= 0:
+            del task['Resources']['Devices']
+        else:
+            task['Resources']['Devices'][0]['Count'] = user_conf['hardware']['gpu_num']
+            if not user_conf['hardware']['gpu_type']:
+                del task['Resources']['Devices'][0]['Affinities']
+            else:
+                task['Resources']['Devices'][0]['Affinities'][0]['RTarget'] = user_conf['hardware']['gpu_type']
+
+    # Set Env variables
+    task['Env']['jupyterPASSWORD'] = user_conf['general']['jupyter_password']
+    if module_name == 'deep-oc-federated-server':
+        task['Env']['FEDERATED_ROUNDS'] = str(user_conf['configuration']['rounds'])
+        task['Env']['FEDERATED_METRIC'] = user_conf['configuration']['metric']
+        task['Env']['FEDERATED_MIN_CLIENTS'] = str(user_conf['configuration']['min_clients'])
+        task['Env']['FEDERATED_STRATEGY'] = user_conf['configuration']['strategy']
+    else:
+        task['Env']['RCLONE_CONFIG_RSHARE_URL'] = user_conf['storage']['rclone_url']
+        task['Env']['RCLONE_CONFIG_RSHARE_VENDOR'] = user_conf['storage']['rclone_vendor']
+        task['Env']['RCLONE_CONFIG_RSHARE_USER'] = user_conf['storage']['rclone_user']
+        task['Env']['RCLONE_CONFIG_RSHARE_PASS'] = user_conf['storage']['rclone_password']
+        task['Env']['RCLONE_CONFIG'] = user_conf['storage']['rclone_conf']
 
     # Apply patches if needed
     task = module_patches.patch_nextcloud_mount(
@@ -440,7 +475,7 @@ def create_deployment(
 
     # Submit job
     try:
-        response = Nomad.jobs.register_job({'Job': job_conf})
+        _ = Nomad.jobs.register_job({'Job': job_conf})
         return {
             'status': 'success',
             'job_id': job_conf['ID'],
@@ -478,7 +513,7 @@ def delete_deployment(
             )
 
     # Retrieve the associated namespace to that VO
-    namespace = MAIN_CONF['nomad']['namespaces'][vo]
+    namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
     # Check the deployment exists
     try:

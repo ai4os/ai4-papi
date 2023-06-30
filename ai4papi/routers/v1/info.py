@@ -10,9 +10,10 @@ from copy import deepcopy
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 import requests
+import secrets
 
 from ai4papi import quotas
-from ai4papi.conf import USER_CONF
+import ai4papi.conf as papiconf
 
 
 router = APIRouter(
@@ -39,7 +40,10 @@ def get_default_deployment_conf(
     # be done as an API call to the other route.
 
     # Generate the conf
-    conf = deepcopy(USER_CONF)
+    if module_name == 'DEEP-OC-federated-server':
+        conf = deepcopy(papiconf.USER_FED_CONF)
+    else:
+        conf = deepcopy(papiconf.USER_MODULE_CONF)
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"deephdc/{module_name.lower()}"
@@ -50,7 +54,7 @@ def get_default_deployment_conf(
         r = requests.get(url)
         r.raise_for_status()
         r = r.json()
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=400,
             detail=f"Could not retrieve Docker tags from {module_name}.",
@@ -66,10 +70,16 @@ def get_default_deployment_conf(
         conf["general"]["service"]["options"].insert(0, 'vscode')
         conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
 
+    if module_name == 'DEEP-OC-federated-server':
+        conf["general"]["federated_secret"]["value"] = secrets.token_hex()
+
     # Available GPU models
     # TODO: add automated discovery of GPU models reading the Clients metadata tags
 
     # Modify the resources limits for a given user or VO
-    conf['hardware'] = quotas.limit_resources(vo)
+    conf['hardware'] = quotas.limit_resources(
+        module_name=module_name,
+        vo=vo,
+    )
 
     return conf
