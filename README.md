@@ -182,18 +182,21 @@ Here follows an overview of the available methods. The :lock: symbol indicates t
 method needs authentication to be accessed and :red_circle: methods that are planned
 but not implemented yet.
 
+Same methods are also valid for `tools` instead of `modules`.
+
 #### Exchange API
 
 The Exchange API offers the possibility to interact with the metadata of the modules in
 the marketplace.
 
 Methods:
-* `GET(/modules)`: returns a list of all modules in the Marketplace
-* `GET(/modules/summary)`: returns a list of all modules' basic metadata (name, title,
+* `GET(/v1/catalog/modules)`: returns a list of all modules in the Marketplace
+* `GET(/v1/catalog/modules/detail)`: returns a list of all modules' basic metadata (name, title,
 summary, keywords)
-* `GET(/modules/metadata/{module_name})`: returns the full metadata of a specific module
-* `PUT(/modules/metadata/{module_name})`: :lock: :red_circle: updates the metadata of a
-specific module
+ `GET(/v1/catalog/modules/tags)`: returns a list of all modules' tags
+* `GET(/v1/catalog/modules/{item_name}/config)`: returns the default configuration for creating a
+deployment for a specific module
+* `GET(/v1/catalog/modules/{item_name}/metadata)`: returns the full metadata of a specific module
 
 **Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see
 [doctring](./ai4papi/routers/v1/modules.py)).
@@ -204,13 +207,13 @@ The Training API offers the possibility to interact with the metadata of the mod
 the marketplace.
 
 Methods:
-* `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a
+* `GET(/v1/deployments/modules)`: :lock: retrieve all deployments (with information) belonging to a
 user.
-* `POST(/deployments)`: :lock: create a new deployment belonging to the user.
-* `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only
+* `POST(/v1/deployments/modules)`: :lock: create a new deployment belonging to the user.
+* `GET(/v1/deployments/modules/{deployment_uuid})`: :lock: retrieve info of a single deployment belonging to a user
+* `DELETE(/v1/deployments/modules/{deployment_uuid})`: :lock: delete a deployment, users can only
 delete their own deployments.
-* `GET(/info/conf/{module_name}`: returns the default configuration for creating a
-deployment for a specific module.
+
 
 The functionalities can also be accessed without the API:
 
@@ -221,7 +224,7 @@ from ai4papi.routers.v1 import deployments
 
 
 # Get all the user's deployments
-deployments.get_deployments(
+deployments.modules.get_deployments(
     vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
@@ -251,9 +254,10 @@ deployments.get_deployments(
 
 * `etc/main_conf.yaml`: main configuration file of the API
 * `etc/modules`: configuration files for standard modules
-* `etc/federated`: configuration files for federated server
+* `etc/tools`: configuration files for tools
+  - `deep-oc-federated-server`: federated server
 
-The pattern for subfolder follows:
-  - `.yaml`: user customizable configuration to make a deployment in Nomad.
+The pattern for the subfolders follows:
+  - `user.yaml`: user customizable configuration to make a deployment in Nomad.
     Also contains the generic quotas for hardware (see `range` parameter).
-  - `.nomad`: additional non-customizable values (eg. ports)
+  - `job.nomad`: additional non-customizable values (eg. ports)

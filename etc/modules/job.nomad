@@ -5,12 +5,6 @@ job "userjob" {
   type      = "service"
   region    = "global"
 
-  # TODO: remove when ready
-  # Issue: Traefik is not listing jobs that are deployed on a datacenter different than
-  # the one Traefik is deployed in. So for the time being we have to force the
-  # datacenter until this is resolved.
-  # datacenters = ["AI4EOSC-IFCA"]
-
   meta {
     owner       = ""  # user-id from OIDC
     title       = ""

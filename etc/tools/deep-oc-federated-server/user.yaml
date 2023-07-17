@@ -28,7 +28,7 @@ general:
 
   docker_image:
     name: Docker image
-    value: 'deephdc/deep-oc-image-classification-tf'
+    value: 'deephdc/deep-oc-federated-server'
     description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
 
   docker_tag:

@@ -1,13 +1,10 @@
-
 import fastapi
 
-from . import deployments, info, modules
-
+from . import catalog, deployments
 
 app = fastapi.APIRouter()
-app.include_router(deployments.router)
-app.include_router(info.router)
-app.include_router(modules.router)
+app.include_router(catalog.app)
+app.include_router(deployments.app)
 
 
 @app.get(

@@ -2,7 +2,6 @@
 Accounting of resources.
 """
 from copy import deepcopy
-import re
 
 from fastapi import HTTPException
 
@@ -16,13 +15,15 @@ def check(
     """
     Check the job configuration does not overflow the generic hardware limits.
     """
-
-    module_name = conf['general']['docker_image'].split('/')[-1]
-    ref = limit_resources(  # generic quotas (vo-dependent)
-        module_name=module_name,
+    # Retrieve generic quotas (vo-dependent)
+    item_name = conf['general']['docker_image'].split('/')[-1]
+    ref = limit_resources(
+        item_name=item_name,
         vo=vo,
     )
-    user_conf = conf['hardware']  # user options
+
+    # Compare with user options
+    user_conf = conf['hardware']
     for k in ref.keys():
         if 'range' in ref[k].keys():
             if user_conf[k] < ref[k]['range'][0]:
@@ -38,19 +39,18 @@ def check(
 
 
 def limit_resources(
-    module_name: str,
+    item_name: str,
     vo: str,
     ):
     """
     Implement hardware limits for specific users or VOs.
     """
-    module_name = module_name.lower()
-
-    # Generate the conf
-    if module_name == 'deep-oc-federated-server':
-        conf = deepcopy(papiconf.USER_FED_CONF)['hardware']
+    # Select appropriate conf
+    if item_name in papiconf.TOOLS.keys():
+        conf = deepcopy(papiconf.TOOLS[item_name]['user']['full'])
     else:
-        conf = deepcopy(papiconf.USER_MODULE_CONF)['hardware']
+        conf = deepcopy(papiconf.MODULES['user']['full'])
+    conf = conf['hardware']
 
     # Limit resources for tutorial users
     if vo == 'training.egi.eu':
