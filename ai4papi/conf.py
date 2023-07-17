@@ -21,46 +21,63 @@ paths = {
 with open(paths['conf'] / 'main.yaml', 'r') as f:
     MAIN_CONF = yaml.safe_load(f)
 
-####################
-# Standard modules #
-####################
 
-# Load default Nomad job configuration
-with open(paths['conf'] / 'module' / 'module.nomad', 'r') as f:
-    raw_job = f.read()
-    NOMAD_MODULE_CONF = Nomad.jobs.parse(raw_job)
+def load_nomad_job(fpath):
+    """
+    Load default Nomad job configuration
+    """
+    with open(fpath, 'r') as f:
+        raw_job = f.read()
+        job_conf = Nomad.jobs.parse(raw_job)
+    return job_conf
 
-# Load user customizable parameters
-with open(paths['conf'] / 'module' / 'module.yaml', 'r') as f:
-    USER_MODULE_CONF = yaml.safe_load(f)
 
-USER_MODULE_VALUES = {}
-for group_name, params in USER_MODULE_CONF.items():
-    USER_MODULE_VALUES[group_name] = {}
-    for k, v in params.items():
-        assert 'name' in v.keys(), f"Parameter {k} needs to have a name."
-        assert 'value' in v.keys(), f"Parameter {k} needs to have a value."
+def load_yaml_conf(fpath):
+    """
+    Load user customizable parameters
+    """
+    with open(fpath, 'r') as f:
+        conf_full = yaml.safe_load(f)
 
-        USER_MODULE_VALUES[group_name][k] = v['value']
+    conf_values = {}
+    for group_name, params in conf_full.items():
+        conf_values[group_name] = {}
+        for k, v in params.items():
+            if 'name' not in v.keys():
+                raise Exception(
+                    f"Parameter {k} needs to have a name."
+                )
+            if 'value' not in v.keys():
+                raise Exception(
+                    f"Parameter {k} needs to have a value."
+                )
+            conf_values[group_name][k] = v['value']
 
-####################
-# Federated server #
-####################
+    return conf_full, conf_values
 
-# Load default Nomad job configuration
-with open(paths['conf'] / 'federated' / 'federated.nomad', 'r') as f:
-    raw_job = f.read()
-    NOMAD_FED_CONF = Nomad.jobs.parse(raw_job)
 
-# Load user customizable parameters
-with open(paths['conf'] / 'federated' / 'federated.yaml', 'r') as f:
-    USER_FED_CONF = yaml.safe_load(f)
+# Standard modules
+nmd = load_nomad_job(paths['conf'] / 'modules' / 'job.nomad')
+yml = load_yaml_conf(paths['conf'] / 'modules' / 'user.yaml')
+MODULES = {
+    'nomad': nmd,
+    'user': {
+        'full': yml[0],
+        'values': yml[1],
+    }
+}
 
-USER_FED_VALUES = {}
-for group_name, params in USER_FED_CONF.items():
-    USER_FED_VALUES[group_name] = {}
-    for k, v in params.items():
-        assert 'name' in v.keys(), f"Parameter {k} needs to have a name."
-        assert 'value' in v.keys(), f"Parameter {k} needs to have a value."
-
-        USER_FED_VALUES[group_name][k] = v['value']
+# Tools
+tool_dir = paths['conf'] / 'tools'
+tool_list = [f for f in tool_dir.iterdir() if f.is_dir()]
+TOOLS = {}
+for tool_path in tool_list:
+    nmd = load_nomad_job(tool_path / 'job.nomad')
+    yml = load_yaml_conf(tool_path / 'user.yaml')
+    TOOLS[tool_path.name] = {
+        'nomad': nmd,
+        'user': {
+            'full': yml[0],
+            'values': yml[1],
+        }
+    }

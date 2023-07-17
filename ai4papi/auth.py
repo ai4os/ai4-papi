@@ -95,3 +95,17 @@ def get_user_info(token):
     }
 
     return out
+
+
+def check_vo_membership(
+    requested_vo,
+    user_vos,
+):
+    """
+    Check that the user has access to the VO he is asking for.
+    """
+    if requested_vo not in user_vos:
+        raise HTTPException(
+            status_code=401,
+            detail=f"The provided Virtual Organization does not match with any of your available VOs: {user_vos}."
+            )
