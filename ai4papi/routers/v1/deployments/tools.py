@@ -13,7 +13,7 @@ import ai4papi.nomad.common as nomad
 
 router = APIRouter(
     prefix="/tools",
-    tags=["tools"],
+    tags=["Tools deployments"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
