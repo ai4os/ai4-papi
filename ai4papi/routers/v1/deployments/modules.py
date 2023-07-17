@@ -12,7 +12,7 @@ import ai4papi.nomad.common as nomad
 
 router = APIRouter(
     prefix="/modules",
-    tags=["modules"],
+    tags=["Modules deployments"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
