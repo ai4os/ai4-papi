@@ -260,4 +260,4 @@ deployments.modules.get_deployments(
 The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.
     Also contains the generic quotas for hardware (see `range` parameter).
-  - `job.nomad`: additional non-customizable values (eg. ports)
+  - `nomad.hcl`: additional non-customizable values (eg. ports)

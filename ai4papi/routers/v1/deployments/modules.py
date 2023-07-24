@@ -1,6 +1,7 @@
 from copy import deepcopy
 import types
 from typing import Tuple, Union
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -169,46 +170,71 @@ def create_deployment(
         vo=vo,
     )
 
-    # Update common parts (modules and tools) of nomad job conf
-    nomad_conf = nomad.fill_job_conf(
-        job_conf=nomad_conf,
-        user_conf=user_conf,
-        namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-        owner=auth_info['id'],
-        domain=papiconf.MAIN_CONF['lb']['domain'][vo],
+    # Generate UUID from (MAC address+timestamp) so it's unique
+    job_uuid = uuid.uuid1()
+
+    # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
+    if vo == 'training.egi.eu':
+        priority = 25
+    else:
+        priority = 50
+
+    # Generate a domain for user-app and check nothing is running there
+    domain = utils.generate_domain(
+        hostname=user_conf['general']['hostname'],
+        base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
+        job_uuid=job_uuid,
+    )
+    utils.check_domain(f"http://{domain}")
+
+    # Replace the Nomad job template
+    nomad_conf = nomad_conf.safe_substitute(
+        {
+            'JOB_UUID': job_uuid,
+            'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+            'PRIORITY': priority,
+            'OWNER': auth_info['id'],
+            'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+            'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+            'DOMAIN': domain,
+            'DOCKER_IMAGE': user_conf['general']['docker_image'],
+            'DOCKER_TAG': user_conf['general']['docker_tag'],
+            'SERVICE': user_conf['general']['service'],
+            'CPU_NUM': user_conf['hardware']['cpu_num'],
+            'RAM': user_conf['hardware']['ram'],
+            'DISK': user_conf['hardware']['disk'],
+            'GPU_NUM': user_conf['hardware']['gpu_num'],
+            'GPU_MODELNAME': user_conf['hardware']['gpu_type'],
+            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
+            'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
+            'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
+            'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
+            'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
+            'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+        }
     )
 
-    # Update module-specific parts in nomad conf
+    # Convert template to Nomad conf
+    nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    # Replace task conf in Nomad job
-    task = nomad_conf['TaskGroups'][0]['Tasks'][0]
-
-    # Set GPUs
-    if user_conf['hardware']['gpu_num'] <= 0:
-        del task['Resources']['Devices']
-    else:
-        task['Resources']['Devices'][0]['Count'] = user_conf['hardware']['gpu_num']
-        if not user_conf['hardware']['gpu_type']:
-            del task['Resources']['Devices'][0]['Affinities']
-        else:
-            task['Resources']['Devices'][0]['Affinities'][0]['RTarget'] = user_conf['hardware']['gpu_type']
-
-    # Set Env variables
-    task['Env']['RCLONE_CONFIG_RSHARE_URL'] = user_conf['storage']['rclone_url']
-    task['Env']['RCLONE_CONFIG_RSHARE_VENDOR'] = user_conf['storage']['rclone_vendor']
-    task['Env']['RCLONE_CONFIG_RSHARE_USER'] = user_conf['storage']['rclone_user']
-    task['Env']['RCLONE_CONFIG_RSHARE_PASS'] = user_conf['storage']['rclone_password']
-    task['Env']['RCLONE_CONFIG'] = user_conf['storage']['rclone_conf']
+    tasks = nomad_conf['TaskGroups'][0]['Tasks']
+    usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
     # Apply patches if needed
-    task = module_patches.patch_nextcloud_mount(
+    usertask = module_patches.patch_nextcloud_mount(
         user_conf['general']['docker_image'],
-        task
+        usertask
     )
+
+    # Delete GPU section if not needed
+    if user_conf['hardware']['gpu_num'] <= 0:
+        del usertask['Resources']['Devices']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
+
     return r
+
 
 @router.delete("/{deployment_uuid}")
 def delete_deployment(

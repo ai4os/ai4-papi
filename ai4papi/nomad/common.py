@@ -200,7 +200,7 @@ def get_deployment(
         devices = res['Tasks']['usertask']['Devices']
         info['resources'] = {
             'cpu_num': res['Tasks']['usertask']['Cpu']['CpuShares'],
-            'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,
+            'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,  #TODO: this misses multi-GPU deployments
             'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
             'diskMB': res['Shared']['DiskMB'],
         }
@@ -218,81 +218,13 @@ def get_deployment(
     return info
 
 
-def fill_job_conf(
-    job_conf: dict,
-    user_conf: dict,
-    namespace: str,
-    owner: str,
-    domain: str,
+def load_job_conf(
+    raw_str: str,
     ):
     """
-    Fill common configuration to all deployments (modules and tools).
+    Transform raw hcl string to Nomad dict object
     """
-    # Assign unique job ID (if submitting job with existing ID, the existing job gets replaced)
-    job_uuid = uuid.uuid1()  # generated from (MAC address+timestamp) so it's unique
-    job_conf['ID'] = f"{job_uuid}"
-    job_conf['Name'] = f'userjob-{job_uuid}'
-
-    # Retrieve the associated namespace to that VO
-    job_conf['namespace'] = namespace
-
-    # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    if namespace == 'training.egi.eu':
-        job_conf['Priority'] = 25
-
-    # Add owner and extra information to the job metadata
-    job_conf['Meta']['owner'] = owner
-    job_conf['Meta']['title'] = user_conf['general']['title'][:45]  # keep only 45 first characters
-    job_conf['Meta']['description'] = user_conf['general']['desc'][:1000]  # limit to 1K characters
-
-    # Create the Traefik endpoints where the deployment is going to be accessible
-    hname = user_conf['general']['hostname']
-    if hname:
-        if '.' in hname:  # user provide full domain
-            if not hname.startswith('http'):
-                hname = f'http://{hname}'
-            base_domain = urllib.parse.urlparse(hname).hostname
-        else:  # user provides custom subdomain
-            if hname in ['www']:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Forbidden hostname: {hname}."
-                    )
-            base_domain = f"{hname}.{domain}"
-    else:  # we use job_ID as default subdomain
-        base_domain = f"{job_conf['ID']}.{domain}"
-
-    utils.check_domain(f"http://{base_domain}")  # check nothing is running there
-
-    for service in job_conf['TaskGroups'][0]['Services']:
-        sname = service['PortLabel']  # either ['deepaas', 'monitor', 'ide', 'fedserver']
-        service['Name'] = f"{job_conf['Name']}-{sname}"
-        domain = f"{sname}.{base_domain}"
-        service['Tags'].append(
-            f"traefik.http.routers.{service['Name']}.rule=Host(`{domain}`, `www.{domain}`)"
-        )
-
-    # Replace task conf in Nomad job
-    task = job_conf['TaskGroups'][0]['Tasks'][0]
-
-    task['Config']['image'] = f"{user_conf['general']['docker_image']}:{user_conf['general']['docker_tag']}"
-    if user_conf['general']['service'] in ['deepaas', 'jupyter', 'vscode']:
-        task['Config']['command'] = "deep-start"
-        task['Config']['args'] = [f"--{user_conf['general']['service']}"]
-
-    # Set CPU and RAM
-    task['Resources']['CPU'] = user_conf['hardware']['cpu_num']
-    task['Resources']['MemoryMB'] = user_conf['hardware']['ram']
-
-    # Set Disk resources for the group
-    job_conf['TaskGroups'][0]['EphemeralDisk'] = {
-        'SizeMB': user_conf['hardware']['disk'],
-    }
-
-    # Set Env variables
-    task['Env']['jupyterPASSWORD'] = user_conf['general']['jupyter_password']
-
-    return job_conf
+    return Nomad.jobs.parse(raw_str)
 
 
 def create_deployment(
