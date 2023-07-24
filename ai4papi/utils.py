@@ -1,9 +1,32 @@
 """
 Miscellaneous utils
 """
+import urllib
+
 from fastapi import HTTPException
 import requests
 
+
+def generate_domain(
+    hostname: str,
+    base_domain: str,
+    job_uuid: str,
+    ):
+    if hostname:
+        if '.' in hostname:  # user provide full domain
+            if not hostname.startswith('http'):
+                hname = f'http://{hostname}'
+            domain = urllib.parse.urlparse(hname).hostname
+        else:  # user provides custom subdomain
+            if hname in ['www']:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Forbidden hostname: {hname}."
+                    )
+            domain = f"{hname}.{base_domain}"
+    else:  # we use job_ID as default subdomain
+        domain = f"{job_uuid}.{base_domain}"
+    return domain
 
 
 def check_domain(url):

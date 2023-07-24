@@ -2,6 +2,7 @@ from copy import deepcopy
 import re
 import types
 from typing import Tuple, Union
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -176,40 +177,63 @@ def create_deployment(
         vo=vo,
     )
 
-    # Update common parts (modules and tools) of nomad job conf
-    nomad_conf = nomad.fill_job_conf(
-        job_conf=nomad_conf,
-        user_conf=user_conf,
-        namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-        owner=auth_info['id'],
-        domain=papiconf.MAIN_CONF['lb']['domain'][vo],
+    # Generate UUID from (MAC address+timestamp) so it's unique
+    job_uuid = uuid.uuid1()
+
+    # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
+    if vo == 'training.egi.eu':
+        priority = 25
+    else:
+        priority = 50
+
+    # Generate a domain for user-app and check nothing is running there
+    domain = utils.generate_domain(
+        hostname=user_conf['general']['hostname'],
+        base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
+        job_uuid=job_uuid,
+    )
+    utils.check_domain(f"http://{domain}")
+
+    # Replace the Nomad job template
+    nomad_conf = nomad_conf.safe_substitute(
+        {
+            'JOB_UUID': job_uuid,
+            'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+            'PRIORITY': priority,
+            'OWNER': auth_info['id'],
+            'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+            'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+            'DOMAIN': domain,
+            'DOCKER_IMAGE': user_conf['general']['docker_image'],
+            'DOCKER_TAG': user_conf['general']['docker_tag'],
+            'CPU_NUM': user_conf['hardware']['cpu_num'],
+            'RAM': user_conf['hardware']['ram'],
+            'DISK': user_conf['hardware']['disk'],
+            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
+            'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
+            'FEDERATED_METRIC': user_conf['configuration']['metric'],
+            'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
+            'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+        }
     )
 
-    # Update tool-specific parts in nomad conf
-    if tool_name == 'deep-oc-federated-server':
+    # Convert template to Nomad conf
+    nomad_conf = nomad.load_job_conf(nomad_conf)
 
-        # Add grpc support for federated learning
-        for service in nomad_conf['TaskGroups'][0]['Services']:
-            sname = service['PortLabel']
-            if sname == 'fedserver':
-                service['Name'] = f"{nomad_conf['Name']}-{sname}"
-                service['Tags'].append(
-                    f"traefik.http.services.{service['Name']}.loadbalancer.server.scheme=h2c"
-                )
-                # TODO: add Federated server authentication (via Traefik Basic Auth)
+    tasks = nomad_conf['TaskGroups'][0]['Tasks']
+    usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
-        # Replace task conf in Nomad job
-        task = nomad_conf['TaskGroups'][0]['Tasks'][0]
-
-        # Set Env variables
-        task['Env']['FEDERATED_ROUNDS'] = str(user_conf['configuration']['rounds'])
-        task['Env']['FEDERATED_METRIC'] = user_conf['configuration']['metric']
-        task['Env']['FEDERATED_MIN_CLIENTS'] = str(user_conf['configuration']['min_clients'])
-        task['Env']['FEDERATED_STRATEGY'] = user_conf['configuration']['strategy']
+    # Launch `deep-start` compatible service if needed
+    service = user_conf['general']['service']
+    if service in ['deepaas', 'jupyter', 'vscode']:
+        usertask['Config']['command'] = 'deep-start'
+        usertask['Config']['args'] = [f'--{service}']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
+
     return r
+
 
 @router.delete("/{deployment_uuid}")
 def delete_deployment(

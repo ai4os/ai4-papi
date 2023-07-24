@@ -40,8 +40,8 @@ general:
   service:
     name: Service to run
     value: 'fedserver'
-    description: When selecting FedServer you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run FedServer yourself typing `python3 -m fedserver.server`.
-    options: ['fedserver', 'jupyter']
+    description: When selecting FedServer you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab/Vscode, then open a terminal window and run FedServer yourself typing `python3 -m fedserver.server`.
+    options: ['fedserver', 'jupyter', 'vscode']
 
   jupyter_password:
     name: IDE password
