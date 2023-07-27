@@ -77,7 +77,40 @@ job "userjob-${JOB_UUID}" {
       size = ${DISK}
     }
 
+    task "storagetask" {
+      // Running task in charge of mounting storage
+
+      driver = "docker"
+
+      config {
+        image   = "ignacioheredia/ai4-docker-storage"
+        privileged = true
+        volumes = [
+          "/nomad-storage/${JOB_UUID}:/storage:shared",
+        ]
+      }
+
+      env {
+        RCLONE_CONFIG               = "${RCLONE_CONFIG}"
+        RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
+        RCLONE_CONFIG_RSHARE_URL    = "${RCLONE_CONFIG_RSHARE_URL}"
+        RCLONE_CONFIG_RSHARE_VENDOR = "${RCLONE_CONFIG_RSHARE_VENDOR}"
+        RCLONE_CONFIG_RSHARE_USER   = "${RCLONE_CONFIG_RSHARE_USER}"
+        RCLONE_CONFIG_RSHARE_PASS   = "${RCLONE_CONFIG_RSHARE_PASS}"
+        REMOTE_PATH                 = "rshare:/"
+        LOCAL_PATH                  = "/storage"
+      }
+
+      resources {
+        cpu    = 2         # Minimum number of CPUs is 2
+        memory = 2000
+        // disk   = 1000   # TODO: CHECK THIS
+      }
+    }
+
     task "usertask" {
+      // Task configured by the user (deepaas, jupyter, vscode)
+
       driver = "docker"
 
       config {
@@ -85,6 +118,9 @@ job "userjob-${JOB_UUID}" {
         command = "deep-start"
         args    = ["--${SERVICE}"]
         ports   = ["deepaas", "monitor", "ide"]
+        volumes = [
+          "/nomad-storage/${JOB_UUID}:/storage:shared",
+        ]
       }
 
       env {
@@ -113,6 +149,22 @@ job "userjob-${JOB_UUID}" {
             weight    = 50
           }
         }
+      }
+    }
+
+    task "storagecleanup" {
+      // Unmount empty storage folder and delete it from host
+
+      lifecycle {
+        hook = "poststop"
+      }
+
+      driver = "raw_exec"
+
+      config {
+        command = "/bin/bash"
+        args = ["-c", "sudo umount /nomad-storage/${JOB_UUID} && sudo rmdir /nomad-storage/${JOB_UUID}" ]
+
       }
     }
   }
