@@ -1,5 +1,5 @@
 pbr >= 5.3.0, < 6.0
-pyyaml >= 5.4.1, < 6.0
+pyyaml >= 6.0.1, < 7.0  # https://github.com/yaml/pyyaml/issues/724
 cachetools >= 5.3.0, < 6.0
 requests >= 2.25.1, < 3.0
 python-nomad == 2.0.0
