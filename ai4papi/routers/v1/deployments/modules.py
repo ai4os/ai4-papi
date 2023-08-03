@@ -185,7 +185,7 @@ def create_deployment(
         base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
         job_uuid=job_uuid,
     )
-    utils.check_domain(f"http://{domain}")
+    utils.check_domain(domain)
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
