@@ -201,6 +201,8 @@ def create_deployment(
             'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             'PRIORITY': priority,
             'OWNER': auth_info['id'],
+            'OWNER_NAME': auth_info['name'],
+            'OWNER_EMAIL': auth_info['email'],
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
             'DOMAIN': domain,

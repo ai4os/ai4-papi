@@ -18,6 +18,8 @@ job "userjob-${JOB_UUID}" {
 
   meta {
     owner       = "${OWNER}"  # user-id from OIDC
+    owner_name  = "${OWNER_NAME}"
+    owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
   }
