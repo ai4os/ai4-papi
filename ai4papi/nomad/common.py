@@ -139,10 +139,15 @@ def get_deployment(
     info['endpoints'] = {}
     for s in j['TaskGroups'][0]['Services']:
         label = s['PortLabel']
-        try:
-            url = re.search('Host\(`(.+?)`', s['Tags'][1]).group(1)
-        except Exception:
-            url = "missing-endpoint"
+
+        # Iterate through tags to find `Host` tag
+        for t in s['Tags']:
+            try:
+                url = re.search('Host\(`(.+?)`', t).group(1)
+                break
+            except Exception:
+                url = "missing-endpoint"
+
         info['endpoints'][label] = f"http://{url}"
 
     # Add quick-access (main endpoint)
