@@ -86,11 +86,20 @@ def get_user_info(token):
                    f"supported by the project: {MAIN_CONF['auth']['VO']}.",
             )
 
+    #TODO: uncomment when dashboard is ready (ie. sends email scope) and remove **default=''**
+    # for k in ['sub', 'iss', 'name', 'email']:
+    #     if user_infos.get(k) is None:
+    #         raise HTTPException(
+    #             status_code=401,
+    #             detail=f"You token should have scopes for {k}.",
+    #             )
+
     # Generate user info dict
     out = {
         'id': user_infos.get('sub'),  # subject, user-ID
         'issuer': user_infos.get('iss'),  # URL of the access token issuer
-        'name': user_infos.get('name'),
+        'name': user_infos.get('name', default=''),
+        'email': user_infos.get('email', default=''),
         'vos': vos,
     }
 

@@ -130,7 +130,7 @@ Then use the `Access Token` to authenticate your calls.
 eval `oidc-agent-service start`
 oidc-gen \
   --issuer https://aai.egi.eu/auth/realms/egi \
-  --scope "openid profile offline_access eduperson_entitlement" \
+  --scope "openid profile offline_access eduperson_entitlement email" \
   egi-checkin
 ```
 It will open the browser so you can authenticate with your EGI account. Then go back to
