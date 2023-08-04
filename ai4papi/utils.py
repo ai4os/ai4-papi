@@ -67,7 +67,7 @@ def check_domain(base_url):
         'monitor',
         'fedserver',
         ]
-    s_urls = [f"http://{name}.{base_url}" for name in s_names]  # TODO: change when SSL
+    s_urls = [f"http://{name}-{base_url}" for name in s_names]
 
     for url in s_urls:
         # First check if the URL is reachable

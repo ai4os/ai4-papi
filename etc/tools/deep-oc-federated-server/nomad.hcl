@@ -50,9 +50,9 @@ job "userjob-${JOB_UUID}" {
       port = "fedserver"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver.${DOMAIN}`, `www.fedserver.${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-fedserver.tls=true",
+        "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver-${DOMAIN}`, `www.fedserver-${DOMAIN}`)",
         "traefik.http.services.${JOB_UUID}-fedserver.loadbalancer.server.scheme=h2c",  # grpc support
-        # TODO: add Federated server authentication (via Traefik Basic Auth)
       ]
     }
 
@@ -61,7 +61,8 @@ job "userjob-${JOB_UUID}" {
       port = "ide"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide.${DOMAIN}`, `www.ide.${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ide.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${DOMAIN}`, `www.ide-${DOMAIN}`)",
       ]
     }
 

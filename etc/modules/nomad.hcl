@@ -53,7 +53,8 @@ job "userjob-${JOB_UUID}" {
       port = "deepaas"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-deepaas.rule=Host(`deepaas.${DOMAIN}`, `www.deepaas.${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-deepaas.tls=true",
+        "traefik.http.routers.${JOB_UUID}-deepaas.rule=Host(`deepaas-${DOMAIN}`, `www.deepaas-${DOMAIN}`)",
       ]
     }
 
@@ -62,7 +63,8 @@ job "userjob-${JOB_UUID}" {
       port = "monitor"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor.${DOMAIN}`, `www.monitor.${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
+        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${DOMAIN}`, `www.monitor-${DOMAIN}`)",
       ]
     }
 
@@ -71,7 +73,8 @@ job "userjob-${JOB_UUID}" {
       port = "ide"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide.${DOMAIN}`, `www.ide.${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ide.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${DOMAIN}`, `www.ide-${DOMAIN}`)",
       ]
     }
 
