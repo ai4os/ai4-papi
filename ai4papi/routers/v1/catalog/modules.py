@@ -52,7 +52,7 @@ def get_config(
     conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Use VS Code (Coder OSS) in the development container
-    if item_name == 'DEEP-OC-generic-dev':
+    if item_name == 'deep-oc-generic-dev':
         conf["general"]["service"]["value"] = 'vscode'
         conf["general"]["service"]["options"].insert(0, 'vscode')
         conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
