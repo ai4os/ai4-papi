@@ -232,6 +232,10 @@ def create_deployment(
     if user_conf['hardware']['gpu_num'] <= 0:
         del usertask['Resources']['Devices']
 
+    # If storage credentials not provided, remove storage-related tasks
+    if not all(user_conf['storage'].values()):
+        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
+
     # Submit job
     r = nomad.create_deployment(nomad_conf)
 
