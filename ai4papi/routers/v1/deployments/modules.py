@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 import types
 from typing import Tuple, Union
 import uuid
@@ -64,8 +65,11 @@ def get_deployments(
                         credentials=authorization.credentials  # token
                     ),
                 )
-            except Exception:  # not a module
+            except HTTPException:  # not a module
                 continue
+            except Exception as e:  # unexpected error
+                raise(e)
+
             user_jobs.append(job_info)
 
     # Sort deployments by creation date
@@ -107,8 +111,11 @@ def get_deployment(
 
     # Check the deployment is indeed a module
     tool_list = papiconf.TOOLS.keys()
-    module_name = job['docker_image'].split('/')[1]  # deephdc/*
-    if  module_name in tool_list:
+    module_name = re.search(
+            '/(.*):',  # remove dockerhub account and tag
+            job['docker_image'],
+            ).group(1)
+    if module_name in tool_list:
         raise HTTPException(
             status_code=400,
             detail="This deployment is a tool, not a module.",
