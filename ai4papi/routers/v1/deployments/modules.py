@@ -121,9 +121,6 @@ def get_deployment(
             detail="This deployment is a tool, not a module.",
             )
 
-    # Customize deepaas endpoint
-    job['endpoints']['deepaas'] += '/ui'
-
     return job
 
 

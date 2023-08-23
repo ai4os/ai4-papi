@@ -148,11 +148,17 @@ def get_deployment(
             except Exception:
                 url = "missing-endpoint"
 
+        # Old deployments had network ports with names [deepaas, ide, monitor]
+        # instead of [api, ide, monitor] so we have to manually replace them
+        # see: https://github.com/AI4EOSC/ai4-papi/issues/22
+        if label == 'deepaas':
+            label = 'api'
+
         info['endpoints'][label] = f"http://{url}"
 
-    # Add quick-access (main endpoint)
+    # Add quick-access (main endpoint) + customize endpoints
     service2endpoint = {
-        'deepaas': 'deepaas',
+        'deepaas': 'api',
         'jupyter': 'ide',
         'vscode': 'ide',
     }
@@ -161,7 +167,13 @@ def get_deployment(
             'deep-start --(.*)$',
             info['docker_command'],
             ).group(1)
+
+        # Customize deepaas endpoint
+        if service == 'deepaas':
+            info['endpoints']['api'] += '/ui'
+
         info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
+
     except Exception:  # return first endpoint
         info['main_endpoint'] = list(info['endpoints'].values())[0]
 
