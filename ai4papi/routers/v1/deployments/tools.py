@@ -65,8 +65,11 @@ def get_deployments(
                         credentials=authorization.credentials  # token
                     ),
                 )
-            except Exception:  # not a tool
+            except HTTPException:  # not a tool
                 continue
+            except Exception as e:  # unexpected error
+                raise(e)
+
             user_jobs.append(job_info)
 
     # Sort deployments by creation date
