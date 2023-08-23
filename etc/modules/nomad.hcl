@@ -37,7 +37,7 @@ job "userjob-${JOB_UUID}" {
 
     network {
 
-      port "deepaas" {
+      port "api" {
         to = 5000  # -1 will assign random port
       }
       port "monitor" {
@@ -49,12 +49,12 @@ job "userjob-${JOB_UUID}" {
     }
 
     service {
-      name = "${JOB_UUID}-deepaas"
-      port = "deepaas"
+      name = "${JOB_UUID}-api"
+      port = "api"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-deepaas.tls=true",
-        "traefik.http.routers.${JOB_UUID}-deepaas.rule=Host(`deepaas-${DOMAIN}`, `www.deepaas-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-api.tls=true",
+        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${DOMAIN}`, `www.api-${DOMAIN}`)",
       ]
     }
 
@@ -122,7 +122,7 @@ job "userjob-${JOB_UUID}" {
         image   = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         command = "deep-start"
         args    = ["--${SERVICE}"]
-        ports   = ["deepaas", "monitor", "ide"]
+        ports   = ["api", "monitor", "ide"]
         volumes = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
