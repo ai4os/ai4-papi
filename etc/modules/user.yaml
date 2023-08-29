@@ -50,10 +50,10 @@ general:
 
 hardware:
 
-  cpu_num:  # 2 CPUs is the absolute minimum for Nomad to work with Docker
+  cpu_num:
     name: Number of CPUs
     value: 4
-    range: [2, 12]
+    range: [1, 10]
 
   gpu_num:
     name: Number of GPUs
@@ -69,12 +69,12 @@ hardware:
   ram:
     name: RAM memory (in MB)
     value: 8000
-    range: [4000, 25000]
+    range: [2000, 25000]
 
   disk:
     name: Disk memory (in MB)
     value: 10000
-    range: [1000, 30000]
+    range: [1000, 20000]
 
 storage:
 

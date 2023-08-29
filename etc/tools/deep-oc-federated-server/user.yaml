@@ -55,10 +55,10 @@ general:
 
 hardware:
 
-  cpu_num:  # 2 CPUs is the absolute minimum for Nomad to work with Docker
+  cpu_num:
     name: Number of CPUs
-    value: 2
-    range: [2, 2]
+    value: 1
+    range: [1, 2]
 
   ram:
     name: RAM memory (in MB)
