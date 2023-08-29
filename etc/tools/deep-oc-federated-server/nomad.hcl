@@ -88,8 +88,7 @@ job "userjob-${JOB_UUID}" {
       }
 
       resources {
-        # Minimum number of CPUs is 2
-        cpu    = ${CPU_NUM}
+        cores  = ${CPU_NUM}
         memory = ${RAM}
         // disk   = ${DISK}  # TODO: CHECK THIS
       }
