@@ -109,7 +109,6 @@ job "userjob-${JOB_UUID}" {
       resources {
         cpu    = 50        # minimum number of CPU MHz is 2
         memory = 2000
-        // disk   = 1000   # TODO: CHECK THIS
       }
     }
 
@@ -141,7 +140,6 @@ job "userjob-${JOB_UUID}" {
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}
-        // disk   = ${DISK}  # TODO: CHECK THIS
 
         device "gpu" {
           count = ${GPU_NUM}

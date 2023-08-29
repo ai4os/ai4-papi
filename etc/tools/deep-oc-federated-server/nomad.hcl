@@ -90,7 +90,6 @@ job "userjob-${JOB_UUID}" {
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}
-        // disk   = ${DISK}  # TODO: CHECK THIS
       }
     }
   }
