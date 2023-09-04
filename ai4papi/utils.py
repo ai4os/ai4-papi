@@ -7,6 +7,10 @@ from fastapi import HTTPException
 import requests
 
 
+# Persistent requests session for faster requests
+session = requests.Session()
+
+
 def generate_domain(
     hostname: str,
     base_domain: str,
@@ -72,7 +76,7 @@ def check_domain(base_url):
     for url in s_urls:
         # First check if the URL is reachable
         try:
-            r = requests.get(url)
+            r = session.get(url, timeout=5)
         except requests.exceptions.ConnectionError:
             # URL was not reachable therefore assumed empty
             continue
