@@ -23,6 +23,7 @@ security = HTTPBearer()
 @router.get("/")
 def get_deployments(
     vos: Union[Tuple, None] = Query(default=None),
+    full_info: bool = Query(default=False),
     authorization=Depends(security),
     ):
     """
@@ -31,6 +32,9 @@ def get_deployments(
     Parameters:
     * **vo**: Virtual Organizations from where you want to retrieve your deployments.
       If no vo is provided, it will retrieve the deployments of all VOs.
+    * **full_info**: retrieve the full information of each deployment.
+      Disabled by default, as it will increase latency too much if there are many
+      deployments.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -61,6 +65,7 @@ def get_deployments(
                 job_info = get_deployment(
                     vo=vo,
                     deployment_uuid=j['ID'],
+                    full_info=full_info,
                     authorization=types.SimpleNamespace(
                         credentials=authorization.credentials  # token
                     ),
@@ -84,6 +89,7 @@ def get_deployments(
 def get_deployment(
     vo: str,
     deployment_uuid: str,
+    full_info: bool = Query(default=True),
     authorization=Depends(security),
     ):
     """
@@ -93,6 +99,8 @@ def get_deployment(
     Parameters:
     * **vo**: Virtual Organization from where you want to retrieve your deployment
     * **deployment_uuid**: uuid of deployment to gather info about
+    * **full_info**: retrieve the full information of that deployment (may increase
+      latency)
 
     Returns a dict with info
     """
@@ -107,6 +115,7 @@ def get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info['id'],
+        full_info=full_info,
     )
 
     # Check the deployment is indeed a module

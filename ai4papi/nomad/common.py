@@ -10,14 +10,12 @@ Notes:
 from datetime import datetime
 import re
 import types
-import urllib
-import uuid
 
 from fastapi import HTTPException
 import nomad
 from nomad.api import exceptions
+import requests
 
-from ai4papi import utils
 import ai4papi.nomad.patches as nomad_patches
 
 
@@ -35,6 +33,9 @@ Nomad.job.get_evaluations = types.MethodType(
     nomad_patches.get_allocations,
     Nomad.job
     )
+
+# Persistent requests session for faster requests
+session = requests.Session()
 
 
 def get_deployments(
@@ -79,6 +80,7 @@ def get_deployment(
     deployment_uuid: str,
     namespace: str,
     owner: str,
+    full_info: True,
     ):
     """
     Retrieve the info of a specific deployment.
@@ -87,6 +89,8 @@ def get_deployment(
     Parameters:
     * **vo**: Virtual Organization from where you want to retrieve your deployment
     * **deployment_uuid**: uuid of deployment to gather info about
+    * **full_info**: retrieve the full information of that deployment (may increase
+      latency)
 
     Returns a dict with info
     """
@@ -177,7 +181,18 @@ def get_deployment(
     except Exception:  # return first endpoint
         info['main_endpoint'] = list(info['endpoints'].values())[0]
 
-    # Only fill (resources + endpoints) if the job is allocated
+    # Add active endpoints
+    if full_info:
+        info['active_endpoints'] = []
+        for k, v in info['endpoints'].items():
+            try:
+                r = session.get(v, timeout=2)
+                if r.status_code == 200:
+                    info['active_endpoints'].append(k)
+            except requests.exceptions.Timeout:
+                continue
+
+    # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
         id_=j['ID'],
         namespace=namespace,
