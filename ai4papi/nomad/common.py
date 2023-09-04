@@ -176,7 +176,7 @@ def get_deployment(
         if service == 'deepaas':
             info['endpoints']['api'] += '/ui'
 
-        info['main_endpoint'] = info['endpoints'][service2endpoint[service]]
+        info['main_endpoint'] = service2endpoint[service]
 
     except Exception:  # return first endpoint
         info['main_endpoint'] = list(info['endpoints'].values())[0]
