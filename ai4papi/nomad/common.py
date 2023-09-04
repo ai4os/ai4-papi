@@ -220,8 +220,8 @@ def get_deployment(
             'cpu_num': len(cpu_cores) if cpu_cores else 0,
             'cpu_MHz': res['Tasks']['usertask']['Cpu']['CpuShares'],
             'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,  #TODO: this misses multi-GPU deployments
-            'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
-            'diskMB': res['Shared']['DiskMB'],
+            'memory_MB': res['Tasks']['usertask']['Memory']['MemoryMB'],
+            'disk_MB': res['Shared']['DiskMB'],
         }
 
     elif evals:
