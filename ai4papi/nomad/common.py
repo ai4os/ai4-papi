@@ -218,7 +218,7 @@ def get_deployment(
         cpu_cores = res['Tasks']['usertask']['Cpu']['ReservedCores']
         info['resources'] = {
             'cpu_num': len(cpu_cores) if cpu_cores else 0,
-            # 'cpu_MHz': res['Tasks']['usertask']['Cpu']['CpuShares'],  #TODO: uncomment when Dashboard is prepared
+            'cpu_MHz': res['Tasks']['usertask']['Cpu']['CpuShares'],
             'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,  #TODO: this misses multi-GPU deployments
             'memoryMB': res['Tasks']['usertask']['Memory']['MemoryMB'],
             'diskMB': res['Shared']['DiskMB'],
