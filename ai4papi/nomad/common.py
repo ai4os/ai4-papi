@@ -230,15 +230,15 @@ def get_deployment(
                     "or contact the module owner."
 
         # Add resources
-        res = a['AllocatedResources']
-        devices = res['Tasks']['usertask']['Devices']
-        cpu_cores = res['Tasks']['usertask']['Cpu']['ReservedCores']
+        res = a['AllocatedResources']['Tasks']['usertask']
+        gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0] if res['Devices'] else None
+        cpu_cores = res['Cpu']['ReservedCores']
         info['resources'] = {
             'cpu_num': len(cpu_cores) if cpu_cores else 0,
-            'cpu_MHz': res['Tasks']['usertask']['Cpu']['CpuShares'],
-            'gpu_num': sum([1 for d in devices if d['Type'] == 'gpu']) if devices else 0,  #TODO: this misses multi-GPU deployments
-            'memory_MB': res['Tasks']['usertask']['Memory']['MemoryMB'],
-            'disk_MB': res['Shared']['DiskMB'],
+            'cpu_MHz': res['Cpu']['CpuShares'],
+            'gpu_num': len(gpu['DeviceIDs']) if gpu else 0,
+            'memory_MB': res['Memory']['MemoryMB'],
+            'disk_MB': a['AllocatedResources']['Shared']['DiskMB'],
         }
 
     elif evals:
