@@ -131,13 +131,15 @@ def get_deployment(
         'alloc_ID': None,
     }
 
+    # Retrieve tasks
+    tasks = j['TaskGroups'][0]['Tasks']
+    usertask = [t for t in tasks if t['Name'] == 'usertask'][0]
+
     # Retrieve Docker image
-    for t in j['TaskGroups'][0]['Tasks']:
-        if t['Name'] == 'usertask':
-            info['docker_image'] = t['Config']['image']
-            command = t['Config'].get('command', '')
-            args = t['Config'].get('args', [])
-            info['docker_command'] = f"{command} {' '.join(args)}".strip()
+    info['docker_image'] = usertask['Config']['image']
+    command = usertask['Config'].get('command', '')
+    args = usertask['Config'].get('args', [])
+    info['docker_command'] = f"{command} {' '.join(args)}".strip()
 
     # Add endpoints
     info['endpoints'] = {}
@@ -248,6 +250,17 @@ def get_deployment(
     else:
         # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
         info['status'] = 'queued'
+
+        # Fill info with _requested_ resources instead
+        res = usertask['Resources']
+        gpu = [d for d in res['Devices'] if d['Name'] == 'gpu'][0] if res['Devices'] else None
+        info['resources'] = {
+            'cpu_num': res['Cores'],
+            'cpu_MHz': 0,  # not known before allocation
+            'gpu_num': gpu['Count'] if gpu else 0,
+            'memory_MB': res['MemoryMB'],
+            'disk_MB': j['TaskGroups'][0]['EphemeralDisk']['SizeMB'],
+        }
 
     return info
 
