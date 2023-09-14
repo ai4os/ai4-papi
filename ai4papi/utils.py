@@ -7,7 +7,6 @@ from fastapi import HTTPException
 import nomad
 import requests
 
-
 Nomad = nomad.Nomad()
 
 
@@ -165,3 +164,17 @@ def check_domain(url):
         status_code=401,
         detail=f"The domain {url} seems to be taken. Please try again with a new domain or leave the field empty."
         )
+
+def get_service_base_definition():
+    """
+    Base parameters of an OSCAR service
+
+    """
+    return {
+    "log_level": "CRITICAL",
+    "alpine": False,
+    "script": "#!/bin/bash \nFILE_NAME=`basename $INPUT_FILE_PATH` \
+                \nOUTPUT_FILE=\"$TMP_OUTPUT_DIR/$FILE_NAME\"\
+                \necho \"SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\" \
+                \deepaas-predict -i $INPUT_FILE_PATH -o $OUTPUT_FILE"
+    }
