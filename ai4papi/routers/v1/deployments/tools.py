@@ -223,6 +223,8 @@ def create_deployment(
             'CPU_NUM': user_conf['hardware']['cpu_num'],
             'RAM': user_conf['hardware']['ram'],
             'DISK': user_conf['hardware']['disk'],
+            'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
+            # Limit at 50% of RAM memory, in bytes
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],

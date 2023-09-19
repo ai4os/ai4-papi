@@ -224,6 +224,8 @@ def create_deployment(
             'CPU_NUM': user_conf['hardware']['cpu_num'],
             'RAM': user_conf['hardware']['ram'],
             'DISK': user_conf['hardware']['disk'],
+            'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
+            # Limit at 50% of RAM memory, in bytes
             'GPU_NUM': user_conf['hardware']['gpu_num'],
             'GPU_MODELNAME': user_conf['hardware']['gpu_type'],
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
