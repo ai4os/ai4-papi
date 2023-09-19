@@ -162,6 +162,11 @@ def get_deployment(
 
         info['endpoints'][label] = f"http://{url}"
 
+    # Add '/ui' to deepaas endpoint
+    # If in the future we support other APIs, this will have to be removed.
+    if 'api' in info['endpoints'].keys():
+        info['endpoints']['api'] += '/ui'
+
     # Add quick-access (main endpoint) + customize endpoints
     service2endpoint = {
         'deepaas': 'api',
@@ -173,10 +178,6 @@ def get_deployment(
             'deep-start --(.*)$',
             info['docker_command'],
             ).group(1)
-
-        # Customize deepaas endpoint
-        if service == 'deepaas':
-            info['endpoints']['api'] += '/ui'
 
         info['main_endpoint'] = service2endpoint[service]
 
