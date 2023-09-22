@@ -82,6 +82,7 @@ job "userjob-${JOB_UUID}" {
 
       env {
         jupyterPASSWORD       = "${JUPYTER_PASSWORD}"
+        FEDERATED_SECRET      = "${FEDERATED_SECRET}"
         FEDERATED_ROUNDS      = "${FEDERATED_ROUNDS}"
         FEDERATED_METRIC      = "${FEDERATED_METRIC}"
         FEDERATED_MIN_CLIENTS = "${FEDERATED_MIN_CLIENTS}"
