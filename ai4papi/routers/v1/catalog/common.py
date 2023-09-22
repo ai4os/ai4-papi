@@ -23,11 +23,11 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 
 import configparser
 import json
+import re
 from typing import Tuple, Union
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
-import re
 import requests
 
 
@@ -174,7 +174,12 @@ class Catalog:
             not_tags_any=not_tags_any,
             )
         for m in modules:
-            meta1 = self.get_metadata(m)
+            try:
+                meta1 = self.get_metadata(m)
+            except Exception:
+                # Avoid breaking the whole method if failing to retrieve a module
+                print(f'Error retrieving metadata: {m}')
+                continue
             meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
             meta['name'] = m
             summary.append(meta)
@@ -238,8 +243,8 @@ class Catalog:
         try:
             r = requests.get(metadata_url)
             metadata = json.loads(r.text)
-
         except Exception:
+            print(f'Error parsing metadata: {item_name}')
             metadata = {
                 "title": item_name,
                 "summary": "",
