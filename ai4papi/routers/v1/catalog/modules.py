@@ -1,9 +1,10 @@
+import configparser
 from copy import deepcopy
+import re
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter
 import requests
-import yaml
 
 from ai4papi import quotas
 import ai4papi.conf as papiconf
@@ -20,10 +21,17 @@ def get_list(
     This is implemented in a separate function as many functions from this router
     are using this function, so we need to avoid infinite recursions.
     """
-    modules_url = "https://raw.githubusercontent.com/deephdc/deep-oc/master/MODULES.yml"
-    r = requests.get(modules_url)
-    catalog = yaml.safe_load(r.text)
-    modules = [i['module'].split('/')[-1].lower() for i in catalog]  # remove github prefix and lowercase
+
+    gitmodules_url = "https://raw.githubusercontent.com/deephdc/deep-oc/master/.gitmodules"
+    r = requests.get(gitmodules_url)
+
+    cfg = configparser.ConfigParser()
+    cfg.read_string(r.text)
+
+    # Convert 'submodule "DEEP-OC-..."' --> 'deep-oc-...'
+    modules = [
+        re.search(r'submodule "(.*)"', s).group(1).lower() for s in cfg.sections()
+        ]
 
     return modules
 
