@@ -33,7 +33,21 @@ job "userjob-${JOB_UUID}" {
     weight    = -50  # anti-affinity for GPU clients
   }
 
+  # Avoid rescheduling the job on **other** nodes during a network cut
+  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
+  reschedule {
+    attempts  = 0
+    unlimited = false
+  }
+
   group "usergroup" {
+
+    # Recover the job in the **original** node when the network comes back
+    # (after a network cut).
+    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
+    # Do not increase too much this limit because we want to still be able to notice
+    # when nodes are truly removed from the cluster (not just temporarily lost).
+    max_client_disconnect = "240h"
 
     network {
 
