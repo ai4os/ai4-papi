@@ -42,8 +42,10 @@ services:
             - VIRTUAL_HOST=api.cloud.ai4eosc.eu
             - LETSENCRYPT_HOST=api.cloud.ai4eosc.eu
             - NOMAD_ADDR=https://193.146.75.221:4646
+            - ACCOUNTING_PTH=/home/ai4-accounting
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
+            - /home/ubuntu/ai4-accounting:/home/ai4-accounting
         network_mode: bridge
         # ports:
         #     - 80:80
@@ -57,6 +59,8 @@ services:
             - VIRTUAL_HOST=api.dev.ai4eosc.eu
             - LETSENCRYPT_HOST=api.dev.ai4eosc.eu
             - NOMAD_ADDR=https://193.146.75.221:4646
+            - ACCOUNTING_PTH=/home/ai4-accounting
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
+            - /home/ubuntu/ai4-accounting:/home/ai4-accounting
         network_mode: bridge
