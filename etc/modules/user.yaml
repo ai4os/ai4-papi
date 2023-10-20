@@ -22,9 +22,9 @@ general:
     description: Provide some additional extended information about this deployment.
 
   hostname:
-    name: Hostname
+    name: Custom domain
     value: ''
-    description: Host where your application will be deployed (eg. `myapp`). It will automatically default to your `job-uuid`. If the domain has dots in it, we will interpret it as a full domain instead (eg. `myapp.mycompany.com`), which you will need to configure with your DNS provider.
+    description: Host domain where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
   docker_image:
     name: Docker image
@@ -50,10 +50,10 @@ general:
 
 hardware:
 
-  cpu_num:  # 2 CPUs is the absolute minimum for Nomad to work with Docker
+  cpu_num:
     name: Number of CPUs
     value: 4
-    range: [2, 12]
+    range: [1, 10]
 
   gpu_num:
     name: Number of GPUs
@@ -63,18 +63,18 @@ hardware:
   gpu_type:
     name: GPU model
     value: ''
-    options: ['', 'NVIDIA Tesla V100', 'NVIDIA Tesla T4']
+    options: ['', 'Tesla V100-PCIE-32GB', 'Tesla T4']
     description: Fill this field if you have preference for a certain kind of GPU model.
 
   ram:
     name: RAM memory (in MB)
     value: 8000
-    range: [4000, 25000]
+    range: [2000, 25000]
 
   disk:
     name: Disk memory (in MB)
     value: 10000
-    range: [1000, 30000]
+    range: [1000, 20000]
 
 storage:
 

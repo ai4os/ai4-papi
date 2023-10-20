@@ -1,169 +1,117 @@
 """
 Miscellaneous utils
 """
-from typing import Union
+import re
 
 from fastapi import HTTPException
-import nomad
 import requests
 
-Nomad = nomad.Nomad()
+
+# Persistent requests session for faster requests
+session = requests.Session()
 
 
-def deregister_job(
-    self,
-    id_: str,
-    eval_priority: Union[int, None] = None,
-    global_: Union[bool, None] = None,
-    namespace: Union[str, None] = None,
-    purge: Union[bool, None] = None,
+def generate_domain(
+    hostname: str,
+    base_domain: str,
+    job_uuid: str,
     ):
-    """ ================================================================================
-        This is a monkey-patch of the default function in the python-nomad module,
-        that did not support `namespace` as a parameter of the function.
 
-        Remove when PR is merged:
-            https://github.com/jrxFive/python-nomad/pull/153
+    if hostname:  # user provided a hostname
 
-        ================================================================================
+        # Forbid some hostnames to avoid confusions
+        if hostname.startswith('www') or hostname.startswith('http'):
+            raise HTTPException(
+                status_code=400,
+                detail="Hostname should not start with `www` or `http`."
+                )
 
-        Deregisters a job, and stops all allocations part of it.
+        # Replace all non-alphanumerical characters from hostname with hyphens
+        # to make it url safe
+        hostname = re.sub('[^0-9a-zA-Z]', '-', hostname)
 
-        https://www.nomadproject.io/docs/http/job.html
+        # Check url safety
+        if hostname.startswith('-'):
+            raise HTTPException(
+                status_code=400,
+                detail="Hostname should start with alphanumerical character."
+                )
+        if hostname.endswith('-'):
+            raise HTTPException(
+                status_code=400,
+                detail="Hostname should end with alphanumerical character."
+                )
+        if len(hostname) > 40:
+            raise HTTPException(
+                status_code=400,
+                detail="Hostname should be shorter than 40 characters."
+                )
 
-        arguments:
-            - id
-            - eval_priority (int) optional.
-            Override the priority of the evaluations produced as a result
-            of this job deregistration. By default, this is set to the
-            priority of the job.
-            - global (bool) optional.
-            Stop a multi-region job in all its regions. By default, job
-            stop will stop only a single region at a time. Ignored for
-            single-region jobs.
-            - purge (bool) optional.
-            Specifies that the job should be stopped and purged immediately.
-            This means the job will not be queryable after being stopped.
-            If not set, the job will be purged by the garbage collector.
-            - namespace (str) optional.
-            Specifies the target namespace. If ACL is enabled, this value
-            must match a namespace that the token is allowed to access.
-            This is specified as a query string parameter.
+        domain = f"{hostname}.{base_domain}"
 
-        returns: dict
-        raises:
-            - nomad.api.exceptions.BaseNomadException
-            - nomad.api.exceptions.URLNotFoundNomadException
-            - nomad.api.exceptions.InvalidParameters
-    """
-    params = {
-        "eval_priority": eval_priority,
-        "global": global_,
-        "namespace": namespace,
-        "purge": purge,
-    }
-    return self.request(id_, params=params, method="delete").json()
+    else:  # we use job_ID as default subdomain
+        domain = f"{job_uuid}.{base_domain}"
+
+    return domain
 
 
-def get_allocations(
-    self,
-    id_: str,
-    all_: Union[bool, None] = None,
-    namespace: Union[str, None] = None,
-    ):
-    """Query the allocations belonging to a single job.
-
-    https://www.nomadproject.io/docs/http/job.html
-
-    arguments:
-        - id_
-        - all (bool optional)
-        - namespace (str) optional.
-        Specifies the target namespace. If ACL is enabled, this value
-        must match a namespace that the token is allowed to access.
-        This is specified as a query string parameter.
-    returns: list
-    raises:
-        - nomad.api.exceptions.BaseNomadException
-        - nomad.api.exceptions.URLNotFoundNomadException
-    """
-    params = {
-        "all": all_,
-        "namespace": namespace,
-    }
-    return self.request(id_, "allocations", params=params, method="get").json()
-
-
-def get_evaluations(
-    self,
-    id_: str,
-    namespace: Union[str, None] = None,
-    ):
-    """Query the evaluations belonging to a single job.
-
-    https://www.nomadproject.io/docs/http/job.html
-
-    arguments:
-        - id_
-        - namespace (str) optional.
-        Specifies the target namespace. If ACL is enabled, this value
-        must match a namespace that the token is allowed to access.
-        This is specified as a query string parameter.
-    returns: dict
-    raises:
-        - nomad.api.exceptions.BaseNomadException
-        - nomad.api.exceptions.URLNotFoundNomadException
-    """
-    params = {
-        "namespace": namespace,
-    }
-    return self.request(id_, "evaluations", params=params, method="get").json()
-
-
-def check_domain(url):
+def check_domain(base_url):
     """
     Check if the domain is free so that we let user deploy to it.
+    We have to check all possible services that could be hosted in that domain.
 
     Parameters:
-    * **url**
+    * **base_url**
 
     Returns None if the checks pass, otherwise raises an Exception.
     """
+    s_names = [  # all possible services
+        'deepaas',
+        'ide',
+        'monitor',
+        'fedserver',
+        ]
+    s_urls = [f"http://{name}-{base_url}" for name in s_names]
 
-    # Check if the URL is reachable first
-    try:
-        r = requests.get(url)
-    except requests.exceptions.ConnectionError:
-        # URL was not reachable therefore assumed empty
-        return None
-    except Exception:
-        # Other exception happened
+    for url in s_urls:
+        # First check if the URL is reachable
+        try:
+            r = session.get(url, timeout=5)
+        except requests.exceptions.ConnectionError:
+            # URL was not reachable therefore assumed empty
+            continue
+        except Exception:
+            # Other exception happened
+            raise HTTPException(
+            status_code=401,
+            detail=f"We had troubles reaching {url}. Make sure it is a valid domain, "\
+                    "otherwise contact with support."
+            )
+
+        # Domain still might be available if the error is a 404 coming **from Traefik**.
+        # We have to check that the error 404 thrown by Traefik and not by some other
+        # application. We do this by checking the headers.
+        # This is a hacky fix for a limitation in Traefik:
+        # https://github.com/traefik/traefik/issues/8141#issuecomment-844548035
+        if r.status_code == 404:
+            traefik_headers = {'Content-Type', 'X-Content-Type-Options', 'Date', 'Content-Length'}
+            headers = set(dict(r.headers).keys())
+            xcontent = r.headers.get('X-Content-Type-Options', None)
+            lcontent = r.headers.get('Content-Length', None)
+
+            if (headers == traefik_headers) and \
+               (xcontent == 'nosniff') and \
+               (lcontent == '19'):
+                continue
+
+        # In every other case, the URL is already in use.
         raise HTTPException(
-        status_code=401,
-        detail=f"We had troubles reaching {url}. Make sure it is a valid domain, "\
-                "otherwise contact with support."
-        )
+            status_code=401,
+            detail=f"The domain {url} seems to be taken. Please try again with a new domain or leave the field empty."
+            )
 
-    # It still might be available if the error is a 404 coming from Traefik.
-    # We still have to check that the error 404 thrown by Traefik and not by some other
-    # application. We do this by checking the headers.
-    # This is a hacky fix for a limitation in Traefik:
-    # https://github.com/traefik/traefik/issues/8141#issuecomment-844548035
-    traefik_headers = {'Content-Type', 'X-Content-Type-Options', 'Date', 'Content-Length'}
-    headers = set(dict(r.headers).keys())
-    xcontent = r.headers.get('X-Content-Type-Options', None)
-    lcontent = r.headers.get('Content-Length', None)
+    return None
 
-    if (headers == traefik_headers) and \
-       (xcontent == 'nosniff') and \
-       (lcontent == '19'):
-        return None
-
-    # In every other case, the URL is already in use.
-    raise HTTPException(
-        status_code=401,
-        detail=f"The domain {url} seems to be taken. Please try again with a new domain or leave the field empty."
-        )
 
 def get_service_base_definition():
     """
@@ -177,4 +125,33 @@ def get_service_base_definition():
                 \nOUTPUT_FILE=\'$TMP_OUTPUT_DIR/$FILE_NAME\'\
                 \necho \'SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\' \
                 \deepaas-predict -i $INPUT_FILE_PATH -o $OUTPUT_FILE"
-    }
+}
+
+def update_values_conf(submitted, reference):
+    """
+    Update the reference YAML values configuration with a user submitted ones.
+    We also check that the submitted conf has the appropriate keys.
+    """
+    for k in submitted.keys():
+
+        # Check level 1 keys
+        if k not in reference.keys():
+            raise HTTPException(
+                status_code=400,
+                detail=f"The key `{k}` in not a valid parameter."
+                )
+
+        # Check level 2 keys
+        s1 = set(submitted[k].keys())
+        s2 = set(reference[k].keys())
+        subs = s1.difference(s2)
+        if subs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"The keys `{subs}` are not a valid parameters."
+                )
+
+        # Update with user values
+        reference[k].update(submitted[k])
+
+    return reference

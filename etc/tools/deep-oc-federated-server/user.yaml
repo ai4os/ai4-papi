@@ -1,0 +1,98 @@
+---
+# User customizable configuration to make a deployment in Nomad.
+# Additional non-customizable values (eg. ports) are hardcoded in `job.nomad`.
+
+# All conf parameters follow the same structure:
+# varname:
+#  name: name of the parameter to be displayed to end user (mandatory)
+#  value: (default) value of the parameter (mandatory)
+#  options: restricted set of values that the parameter can take (optional)
+#  description: some comments on the parameter to be displayed to the end user (optional)
+
+general:
+
+  title:
+    name: Deployment title
+    value: ''
+    description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
+
+  desc:
+    name: Deployment description
+    value: ''
+    description: Provide some additional extended information about this deployment.
+
+  hostname:
+    name: Hostname
+    value: ''
+    description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
+
+  docker_image:
+    name: Docker image
+    value: 'deephdc/deep-oc-federated-server'
+    description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
+
+  docker_tag:
+    name: Docker tag
+    value: 'latest'
+    description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
+    options: ['latest']
+
+  service:
+    name: Service to run
+    value: 'fedserver'
+    description: When selecting FedServer you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab/Vscode, then open a terminal window and run FedServer yourself typing `python3 -m fedserver.server`.
+    options: ['fedserver', 'jupyter', 'vscode']
+
+  jupyter_password:
+    name: IDE password
+    value: ''
+    description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
+
+  federated_secret:
+    name: Secret training token
+    value: ''
+    description: This is the federated secret token that your clients should use to connect to the server.
+
+hardware:
+
+  cpu_num:
+    name: Number of CPUs
+    value: 1
+    range: [1, 2]
+
+  ram:
+    name: RAM memory (in MB)
+    value: 2000
+    range: [2000, 4000]
+
+  disk:
+    name: Disk memory (in MB)
+    value: 1000
+    range: [1000, 2000]
+
+configuration:
+
+  rounds:
+    name: Number of rounds
+    value: 5
+    range: [1, null]
+
+  metric:
+    name: Evaluation metric
+    value: 'accuracy'
+
+  min_clients:
+    name: Minimal number of clients
+    value: 2
+    range: [2, null]
+
+  strategy:
+    name: Federated aggregation strategy
+    value: 'Federated Averaging'
+    options: [
+      'Federated Averaging',  # fedavg
+      'Federated Optimization',  # fedprox
+      'Federated Optimization with Adam',  # fedadam
+      'Adaptive Federated Optimization',  # fedopt
+      'Adaptive Federated Optimization using Yogi',  # fedyogi
+    ]

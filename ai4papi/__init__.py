@@ -14,6 +14,11 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import urllib3
+
 from . import version
 
 __version__ = version.release_string
+
+# Disable warning from python-nomad
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

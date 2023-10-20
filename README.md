@@ -6,6 +6,8 @@
 
 > :warning: The library is under active development, so you might expect some breaking changes to happen.
 
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
+
 [//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
 [//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/releases&#41;)
 [//]: # ([![PyPI]&#40;https://img.shields.io/pypi/v/ai4papi.svg&#41;]&#40;https://pypi.python.org/pypi/ai4papi&#41;)
@@ -130,7 +132,7 @@ Then use the `Access Token` to authenticate your calls.
 eval `oidc-agent-service start`
 oidc-gen \
   --issuer https://aai.egi.eu/auth/realms/egi \
-  --scope "openid profile offline_access eduperson_entitlement" \
+  --scope "openid profile offline_access eduperson_entitlement email" \
   egi-checkin
 ```
 It will open the browser so you can authenticate with your EGI account. Then go back to
@@ -182,18 +184,21 @@ Here follows an overview of the available methods. The :lock: symbol indicates t
 method needs authentication to be accessed and :red_circle: methods that are planned
 but not implemented yet.
 
+Same methods are also valid for `tools` instead of `modules`.
+
 #### Exchange API
 
 The Exchange API offers the possibility to interact with the metadata of the modules in
 the marketplace.
 
 Methods:
-* `GET(/modules)`: returns a list of all modules in the Marketplace
-* `GET(/modules/summary)`: returns a list of all modules' basic metadata (name, title,
+* `GET(/v1/catalog/modules)`: returns a list of all modules in the Marketplace
+* `GET(/v1/catalog/modules/detail)`: returns a list of all modules' basic metadata (name, title,
 summary, keywords)
-* `GET(/modules/metadata/{module_name})`: returns the full metadata of a specific module
-* `PUT(/modules/metadata/{module_name})`: :lock: :red_circle: updates the metadata of a
-specific module
+ `GET(/v1/catalog/modules/tags)`: returns a list of all modules' tags
+* `GET(/v1/catalog/modules/{item_name}/config)`: returns the default configuration for creating a
+deployment for a specific module
+* `GET(/v1/catalog/modules/{item_name}/metadata)`: returns the full metadata of a specific module
 
 **Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see
 [doctring](./ai4papi/routers/v1/modules.py)).
@@ -204,13 +209,13 @@ The Training API offers the possibility to interact with the metadata of the mod
 the marketplace.
 
 Methods:
-* `GET(/deployments)`: :lock: retrieve all deployments (with information) belonging to a
+* `GET(/v1/deployments/modules)`: :lock: retrieve all deployments (with information) belonging to a
 user.
-* `POST(/deployments)`: :lock: create a new deployment belonging to the user.
-* `DELETE(/deployments/{deployment_uuid})`: :lock: delete a deployment, users can only
+* `POST(/v1/deployments/modules)`: :lock: create a new deployment belonging to the user.
+* `GET(/v1/deployments/modules/{deployment_uuid})`: :lock: retrieve info of a single deployment belonging to a user
+* `DELETE(/v1/deployments/modules/{deployment_uuid})`: :lock: delete a deployment, users can only
 delete their own deployments.
-* `GET(/info/conf/{module_name}`: returns the default configuration for creating a
-deployment for a specific module.
+
 
 The functionalities can also be accessed without the API:
 
@@ -221,7 +226,7 @@ from ai4papi.routers.v1 import deployments
 
 
 # Get all the user's deployments
-deployments.get_deployments(
+deployments.modules.get_deployments(
     vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
@@ -249,7 +254,12 @@ deployments.get_deployments(
 
 ## Description
 
-* `etc/main_conf.yaml`: Main configuration file of the API.
-* `etc/userconf.yaml`: User customizable configuration to make a deployment in Nomad.
-Also contains the generic quotas for hardware (see `range` parameter).
-* `etc/job.nomad`: Additional non-customizable values (eg. ports)
+* `etc/main_conf.yaml`: main configuration file of the API
+* `etc/modules`: configuration files for standard modules
+* `etc/tools`: configuration files for tools
+  - `deep-oc-federated-server`: federated server
+
+The pattern for the subfolders follows:
+  - `user.yaml`: user customizable configuration to make a deployment in Nomad.
+    Also contains the generic quotas for hardware (see `range` parameter).
+  - `nomad.hcl`: additional non-customizable values (eg. ports)
