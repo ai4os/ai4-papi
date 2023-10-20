@@ -7,4 +7,4 @@ fastapi >= 0.89.1, < 1.0
 uvicorn[standard]>=0.20.0, < 1.0
 flaat >= 1.1.8, < 2.0
 typer >= 0.7.0, < 1.0
-oscar_python == 1.1.1
+oscar_python == 1.2.1

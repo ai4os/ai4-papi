@@ -174,7 +174,7 @@ def get_service_base_definition():
     "log_level": "CRITICAL",
     "alpine": False,
     "script": "#!/bin/bash \nFILE_NAME=`basename $INPUT_FILE_PATH` \
-                \nOUTPUT_FILE=\"$TMP_OUTPUT_DIR/$FILE_NAME\"\
-                \necho \"SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\" \
+                \nOUTPUT_FILE=\'$TMP_OUTPUT_DIR/$FILE_NAME\'\
+                \necho \'SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\' \
                 \deepaas-predict -i $INPUT_FILE_PATH -o $OUTPUT_FILE"
     }
