@@ -8,6 +8,7 @@ from fastapi.security import HTTPBearer
 from typing import Tuple, Union
 from ai4papi import utils
 import json
+import re
 from ai4papi.conf import MAIN_CONF
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ class Service(BaseModel):
     memory: str
     cpu: str
     image: str
+    input_type: str
 
 
 security = HTTPBearer()
@@ -44,6 +46,20 @@ def get_client_from_auth(auth, cluster_id):
     except:
         raise Exception("Error creating OSCAR client")
 
+def make_service_definition(svc_conf, cluster_id):
+
+    service_definition = utils.get_service_base_definition()
+    service_definition["name"] = svc_conf.name
+    service_definition["memory"] = svc_conf.memory
+    service_definition["cpu"] = svc_conf.cpu
+    service_definition["image"] = svc_conf.image
+    service_definition["script"] = re.sub('.type','.'+svc_conf.input_type, service_definition["script"])
+
+    endpoint = MAIN_CONF["oscar"]["clusters"][cluster_id]["endpoint"]
+    service_url = endpoint+"/services/"+cluster_id+"/"+svc_conf.name
+
+    return service_definition, service_url
+
 # Gets information about the cluster. 
 #  - Returns a JSON with the cluster information.
 @router.get("/cluster/{cluster_id}")
@@ -52,7 +68,7 @@ def get_cluster_info( cluster_id: str,
 
     client = get_client_from_auth(authorization, cluster_id)
     result = client.get_cluster_info()
-    return json.loads(result.text)
+    return (result.status_code, json.loads(result.text))
 
 
 # Creates a new inference service for an AI pre-trained model on a specific cluster 
@@ -63,24 +79,16 @@ def create_service(
                    authorization=Depends(security),
                    ):
     
-    if svc_conf is None:
-        raise HTTPException(
-                status_code=400,
-                detail=f"Service configuration not found."
-        )
-    
-    service_definition = utils.get_service_base_definition()
-    service_definition["name"] = svc_conf.name
-    service_definition["memory"] = svc_conf.memory
-    service_definition["cpu"] = svc_conf.cpu
-    service_definition["image"] = svc_conf.image
+    service_definition, service_url = make_service_definition(svc_conf, cluster_id)
 
-    #TODO return {“service_url”: “string”}
     client = get_client_from_auth(authorization, cluster_id)
-    result = client.create_service(json.dumps(service_definition))
-    return result.text
+    result = client.create_service(service_definition)
+    if result.status_code == 201:
+        return (result.status_code, service_url)
+    else:
+        return (result.status_code, None)
     
-#TODO FIX
+
 # Updates service if it exists
 @router.put("/services/{cluster_id}/{service_name}")
 def update_service(
@@ -90,15 +98,14 @@ def update_service(
                    ):
     
     # Needs all parameters to be on the request
-    service_definition = utils.get_service_base_definition()
-    service_definition["name"] = svc_conf.name
-    service_definition["memory"] = svc_conf.memory
-    service_definition["cpu"] = svc_conf.cpu
-    service_definition["image"] = svc_conf.image
-
-    #TODO return {“service_url”: “string”}
+    service_definition, service_url = make_service_definition(svc_conf, cluster_id)
+    
     client = get_client_from_auth(authorization, cluster_id)
-    client.update_service(service_definition)
+    result = client.update_service(svc_conf.name, service_definition)
+    if result.status_code == 200:
+        return (result.status_code, service_url)
+    else:
+        return (result.status_code, None)
 
 # Retrieves a list of all the deployed services of the cluster. 
 #  - Returns a JSON with the cluster information.
@@ -108,7 +115,7 @@ def get_services_list(cluster_id: str,
 
     client = get_client_from_auth(authorization, cluster_id)
     result = client.list_services()
-    return json.loads(result.text)
+    return (result.status_code, json.loads(result.text))
 
 # Retrieves a specific service.
 #  - Returns a JSON with the cluster information.
@@ -119,7 +126,7 @@ def get_service(cluster_id: str,
 
     client = get_client_from_auth(authorization, cluster_id)
     result = client.get_service(service_name)
-    return json.loads(result.text)
+    return (result.status_code, json.loads(result.text))
 
 # Delete a specific service.
 @router.delete("/services/{cluster_id}/{service_name}")
@@ -128,8 +135,8 @@ def delete_service(cluster_id: str,
                 authorization=Depends(security)):
 
     client = get_client_from_auth(authorization, cluster_id)
-    result = client.delete_service(service_name)
-    return result
+    result = client.remove_service(service_name)
+    return (result.status_code,service_name)
 
 #Make a synchronous execution (inference)
 @router.post("/services/{cluster_id}/{service_name}")
@@ -141,6 +148,6 @@ def inference(  cluster_id: str,
     client = get_client_from_auth(authorization, cluster_id)
     result = client.run_service(service_name, input=data["input_data"])
     try:
-        return json.loads(result.text)
+        return (result.status_code, json.loads(result.text))
     except:
-        return result.text
+        return (result.status_code, result.text)

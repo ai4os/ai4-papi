@@ -1,6 +1,6 @@
 import fastapi
 
-from . import catalog, deployments
+from . import catalog, deployments, inference
 
 app = fastapi.APIRouter()
 app.include_router(catalog.app)

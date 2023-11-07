@@ -121,10 +121,11 @@ def get_service_base_definition():
     return {
     "log_level": "CRITICAL",
     "alpine": False,
-    "script": "#!/bin/bash \nFILE_NAME=`basename $INPUT_FILE_PATH` \
-                \nOUTPUT_FILE=\'$TMP_OUTPUT_DIR/$FILE_NAME\'\
-                \necho \'SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\' \
-                \deepaas-predict -i $INPUT_FILE_PATH -o $OUTPUT_FILE"
+    "script": "#!/bin/bash \nFILE_NAME=`basename \"$INPUT_FILE_PATH\"` \
+                \nOUTPUT_FILE=\"$TMP_OUTPUT_DIR\"/\"$FILE_NAME\" \
+                \nmv \"$INPUT_FILE_PATH\" \"$INPUT_FILE_PATH.type\" \
+                \necho \'SCRIPT: Invoked deepaas-predict command. File available in \"$INPUT_FILE_PATH\".\' \
+                \ndeepaas-predict -i \"$INPUT_FILE_PATH\" -o \"$OUTPUT_FILE\""
 }
 
 def update_values_conf(submitted, reference):
