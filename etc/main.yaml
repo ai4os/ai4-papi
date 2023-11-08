@@ -45,5 +45,3 @@ oscar:
   clusters:
     oscar-ai4eosc-cluster:
       endpoint: https://inference.cloud.ai4eosc.eu
-    oscar-test:
-      endpoint: https://funny-kalam8.im.grycap.net
