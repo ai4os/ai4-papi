@@ -2,38 +2,38 @@ version: "3.9"
 
 services:
 
-    reverse-proxy:
-        image: "jwilder/nginx-proxy:latest"
-        container_name: "reverse-proxy"
-        volumes:
-            - "/home/ubuntu/reverse-proxy/html:/usr/share/nginx/html"
-            - "/home/ubuntu/reverse-proxy/dhparam:/etc/nginx/dhparam"
-            - "/home/ubuntu/reverse-proxy/vhost:/etc/nginx/vhost.d"
-            - "/home/ubuntu/reverse-proxy/certs:/etc/nginx/certs"
-            - "/home/ubuntu/reverse-proxy/config:/etc/nginx/conf.d"
-            - "/run/docker.sock:/tmp/docker.sock:ro"
-        restart: "always"
-        network_mode: bridge
-        ports:
-            - "80:80"
-            - "443:443"
+    # reverse-proxy:
+    #     image: "jwilder/nginx-proxy:latest"
+    #     container_name: "reverse-proxy"
+    #     volumes:
+    #         - "/home/ubuntu/reverse-proxy/html:/usr/share/nginx/html"
+    #         - "/home/ubuntu/reverse-proxy/dhparam:/etc/nginx/dhparam"
+    #         - "/home/ubuntu/reverse-proxy/vhost:/etc/nginx/vhost.d"
+    #         - "/home/ubuntu/reverse-proxy/certs:/etc/nginx/certs"
+    #         - "/home/ubuntu/reverse-proxy/config:/etc/nginx/conf.d"
+    #         - "/run/docker.sock:/tmp/docker.sock:ro"
+    #     restart: "always"
+    #     network_mode: bridge
+    #     ports:
+    #         - "80:80"
+    #         - "443:443"
 
-    letsencrypt:
-        image: "jrcs/letsencrypt-nginx-proxy-companion:latest"
-        container_name: "letsencrypt-helper"
-        volumes:
-            - "/home/ubuntu/reverse-proxy/html:/usr/share/nginx/html"
-            - "/home/ubuntu/reverse-proxy/dhparam:/etc/nginx/dhparam"
-            - "/home/ubuntu/reverse-proxy/vhost:/etc/nginx/vhost.d"
-            - "/home/ubuntu/reverse-proxy/certs:/etc/nginx/certs"
-            - "/run/docker.sock:/var/run/docker.sock:ro"
-        environment:
-            NGINX_PROXY_CONTAINER: "reverse-proxy"
-            DEFAULT_EMAIL: "iheredia@ifca.unican.es"
-        restart: "always"
-        depends_on:
-            - "reverse-proxy"
-        network_mode: bridge
+    # letsencrypt:
+    #     image: "jrcs/letsencrypt-nginx-proxy-companion:latest"
+    #     container_name: "letsencrypt-helper"
+    #     volumes:
+    #         - "/home/ubuntu/reverse-proxy/html:/usr/share/nginx/html"
+    #         - "/home/ubuntu/reverse-proxy/dhparam:/etc/nginx/dhparam"
+    #         - "/home/ubuntu/reverse-proxy/vhost:/etc/nginx/vhost.d"
+    #         - "/home/ubuntu/reverse-proxy/certs:/etc/nginx/certs"
+    #         - "/run/docker.sock:/var/run/docker.sock:ro"
+    #     environment:
+    #         NGINX_PROXY_CONTAINER: "reverse-proxy"
+    #         DEFAULT_EMAIL: "iheredia@ifca.unican.es"
+    #     restart: "always"
+    #     depends_on:
+    #         - "reverse-proxy"
+    #     network_mode: bridge
 
     ai4-papi-prod:
         image: "ignacioheredia/ai4-papi:prod"
@@ -45,8 +45,8 @@ services:
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
         network_mode: bridge
-        # ports:
-        #     - 80:80
+        ports:
+            - 8080:80
 
     ai4-papi-dev:
     # Right now dev is pointing to same services as prod.
@@ -60,3 +60,5 @@ services:
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
         network_mode: bridge
+        ports:
+            - 8081:80
