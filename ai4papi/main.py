@@ -108,6 +108,7 @@ def run(
         port=port,
         ssl_keyfile=ssl_keyfile,
         ssl_certfile=ssl_certfile,
+        forwarded_allow_ips='*',
     )
 
 
