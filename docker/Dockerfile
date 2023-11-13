@@ -33,6 +33,11 @@ ENV NOMAD_CACERT=/home/nomad-certs/nomad-ca.pem
 ENV NOMAD_CLIENT_CERT=/home/nomad-certs/cli.pem
 ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 
+# Allow the ai4os-proxy (172.16.44.228) to forward requests to the API
+# Trying to restrict to internal network (172.16.0.0/16 or 172.*) didn't work
+# ENV FORWARDED_ALLOW_IPS="*"
+ENV FORWARDED_ALLOW_IPS=172.16.44.228
+
 # Install API
 #FIXME: installing directly from Github with pip (`pip install git+https://github.com/`)
 # breaks config (does not copy `etc` folder)
