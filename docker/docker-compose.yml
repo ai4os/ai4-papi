@@ -6,7 +6,7 @@ services:
         image: "ignacioheredia/ai4-papi:prod"
         restart: always
         environment:
-            - NOMAD_ADDR=https://193.146.75.221:4646
+            - NOMAD_ADDR=https://193.146.75.205:4646
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
             - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting
@@ -19,7 +19,7 @@ services:
         image: "ignacioheredia/ai4-papi:prod"
         restart: always
         environment:
-            - NOMAD_ADDR=https://193.146.75.221:4646
+            - NOMAD_ADDR=https://193.146.75.205:4646
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
             - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting

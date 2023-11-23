@@ -28,7 +28,7 @@ RUN apt-get update && \
     apt-get install nomad && \
     rm -rf /var/lib/apt/lists/*
 
-ENV NOMAD_ADDR=https://193.146.75.221:4646
+ENV NOMAD_ADDR=https://193.146.75.205:4646
 ENV NOMAD_CACERT=/home/nomad-certs/nomad-ca.pem
 ENV NOMAD_CLIENT_CERT=/home/nomad-certs/cli.pem
 ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
