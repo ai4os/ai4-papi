@@ -24,6 +24,13 @@ job "userjob-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
+  # Only deploy in nodes serving that namespace
+  constraint {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "${NAMESPACE}"
+  }
+
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
   affinity {
