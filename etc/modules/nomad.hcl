@@ -24,6 +24,13 @@ job "userjob-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
+  # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
+  constraint {
+    attribute = "${meta.compute}"
+    operator  = "="
+    value     = "true"
+  }
+
   # Only deploy in nodes serving that namespace
   constraint {
     attribute = "${meta.namespace}"
