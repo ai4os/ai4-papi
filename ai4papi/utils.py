@@ -11,9 +11,8 @@ import requests
 session = requests.Session()
 
 
-def generate_domain(
+def safe_hostname(
     hostname: str,
-    base_domain: str,
     job_uuid: str,
     ):
 
@@ -47,12 +46,10 @@ def generate_domain(
                 detail="Hostname should be shorter than 40 characters."
                 )
 
-        domain = f"{hostname}.{base_domain}"
+        return hostname
 
-    else:  # we use job_ID as default subdomain
-        domain = f"{job_uuid}.{base_domain}"
-
-    return domain
+    else:  # we use job_ID as default hostname
+        return job_uuid
 
 
 def check_domain(base_url):

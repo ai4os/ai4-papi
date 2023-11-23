@@ -192,13 +192,23 @@ def create_deployment(
     else:
         priority = 50
 
-    # Generate a domain for user-app and check nothing is running there
-    domain = utils.generate_domain(
+    # Remove non-compliant characters from hostname
+    base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
+    hostname = utils.safe_hostname(
         hostname=user_conf['general']['hostname'],
-        base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
         job_uuid=job_uuid,
     )
-    utils.check_domain(domain)
+
+    #TODO: reenable custom hostname, when we are able to parse all node metadata
+    # (domain key) to build the true domain
+    hostname = job_uuid
+
+    # # Check the hostname is available in all data-centers
+    # # (we don't know beforehand where the job will land)
+    # #TODO: make sure this does not break if the datacenter is unavailable
+    # #TODO: disallow custom hostname, pain in the ass, slower deploys
+    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
+    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
     #TODO: remove when we solve disk issues
     # For now on we fix disk here because, if not fixed, jobs are not being deployed
@@ -217,7 +227,8 @@ def create_deployment(
             'OWNER_EMAIL': auth_info['email'],
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
-            'DOMAIN': domain,
+            'BASE_DOMAIN': base_domain,
+            'HOSTNAME': hostname,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
             'SERVICE': user_conf['general']['service'],

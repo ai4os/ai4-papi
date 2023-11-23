@@ -68,7 +68,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-api.tls=true",
-        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${DOMAIN}`, `www.api-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -78,7 +78,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${DOMAIN}`, `www.monitor-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -88,7 +88,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ide.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${DOMAIN}`, `www.ide-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
