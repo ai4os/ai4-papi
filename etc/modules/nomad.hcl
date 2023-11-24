@@ -152,6 +152,7 @@ job "userjob-${JOB_UUID}" {
         args     = ["--${SERVICE}"]
         ports    = ["api", "monitor", "ide"]
         shm_size = ${SHARED_MEMORY}
+        memory_hard_limit = ${RAM}
         volumes  = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
@@ -173,6 +174,7 @@ job "userjob-${JOB_UUID}" {
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}
+        memory_max = ${RAM}
 
         device "gpu" {
           count = ${GPU_NUM}
