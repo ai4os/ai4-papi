@@ -74,7 +74,7 @@ hardware:
   disk:
     name: Disk memory (in MB)
     value: 10000
-    range: [1000, 20000]
+    range: [1000, 50000]
 
 storage:
 

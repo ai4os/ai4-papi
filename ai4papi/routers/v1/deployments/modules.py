@@ -210,12 +210,6 @@ def create_deployment(
     # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
     #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
-    #TODO: remove when we solve disk issues
-    # For now on we fix disk here because, if not fixed, jobs are not being deployed
-    # (ie. "resource disk exhausted").
-    # In any case, this limit is useless because it has not yet been passed to docker
-    user_conf['hardware']['disk'] = 500
-
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {

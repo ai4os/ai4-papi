@@ -154,6 +154,9 @@ job "userjob-${JOB_UUID}" {
         volumes  = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
+        storage_opt = {
+          size = "${DISK}M"
+        }
       }
 
       env {

@@ -106,6 +106,9 @@ job "userjob-${JOB_UUID}" {
         image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         ports    = ["fedserver", "ide"]
         shm_size = ${SHARED_MEMORY}
+        storage_opt = {
+          size = "${DISK}M"
+        }
       }
 
       env {
