@@ -251,10 +251,6 @@ def get_deployment(
                 "the network is restored and you should be able to fully recover " \
                 "your deployment."
 
-        # Disable access to endpoints if there is a network cut
-        if info['status'] == 'down' and info['active_endpoints']:
-            info['active_endpoints'] = []
-
         # Add resources
         res = a['AllocatedResources']['Tasks']['usertask']
         gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0] if res['Devices'] else None
@@ -282,6 +278,10 @@ def get_deployment(
                         info['active_endpoints'].append(k)
                 except requests.exceptions.Timeout:
                     continue
+
+        # Disable access to endpoints if there is a network cut
+        if info['status'] == 'down' and info['active_endpoints']:
+            info['active_endpoints'] = []
 
     elif evals:
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
