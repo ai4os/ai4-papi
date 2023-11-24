@@ -31,7 +31,8 @@ job "userjob-${JOB_UUID}" {
     value     = "true"
   }
 
-  # Only deploy in nodes serving that namespace
+  # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
+  # because Nomad does not allow a node to belong to several node pools)
   constraint {
     attribute = "${meta.namespace}"
     operator  = "regexp"
