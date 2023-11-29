@@ -256,6 +256,10 @@ def create_deployment(
     # If storage credentials not provided, remove storage-related tasks
     if not all(user_conf['storage'].values()):
         tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
+    
+    # If gpu_type not provided, remove related affinity
+    if not user_conf['hardware']['gpu_type']:
+        del usertask['Resources']['Devices'][0]['Affinities']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
