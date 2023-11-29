@@ -249,17 +249,18 @@ def create_deployment(
         usertask
     )
 
-    # Delete GPU section if not needed
+    # Modify the GPU section
     if user_conf['hardware']['gpu_num'] <= 0:
+        # Delete GPU section in CPU deployments
         del usertask['Resources']['Devices']
+    else:
+        # If gpu_type not provided, remove affinity to GPU model
+        if not user_conf['hardware']['gpu_type']:
+            del usertask['Resources']['Devices'][0]['Affinities']
 
     # If storage credentials not provided, remove storage-related tasks
     if not all(user_conf['storage'].values()):
         tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
-    
-    # If gpu_type not provided, remove related affinity
-    if not user_conf['hardware']['gpu_type']:
-        del usertask['Resources']['Devices'][0]['Affinities']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
