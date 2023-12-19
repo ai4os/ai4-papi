@@ -45,14 +45,12 @@ def get_deployments(
     """
     Returns a list of all deployments belonging to a user, in a given namespace.
     """
-
-    # user_jobs = []
-    # for namespace in namespaces:
-
-    # Filter jobs
-    job_filter : str = 'Status != "dead" and Name matches "^userjob" and Meta is not empty and Meta.owner == "' + owner + '"'
-    jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)  # job summaries
-
+    job_filter = \
+        'Status != "dead" and ' + \
+        'Name matches "^userjob" and ' + \
+        'Meta is not empty and ' + \
+        f'Meta.owner == "{owner}"'
+    jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
     return jobs
 
 
