@@ -50,30 +50,10 @@ def get_deployments(
     # for namespace in namespaces:
 
     # Filter jobs
-    jobs = Nomad.jobs.get_jobs(namespace=namespace)  # job summaries
-    fjobs = []
+    job_filter : str = 'Status != "dead" and Name matches "^userjob" and Meta is not empty and Meta.owner == "' + owner + '"'
+    jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)  # job summaries
 
-    for j in jobs:
-        # Skip deleted jobs
-        if j['Status'] == 'dead':
-            continue
-
-        # Skip jobs that do not start with userjob
-        # (useful for admins who might have deployed other jobs eg. Traefik)
-        if not j['Name'].startswith('userjob'):
-            continue
-
-        # Get full job description
-        j = Nomad.job.get_job(
-            id_=j['ID'],
-            namespace=namespace,
-            )
-
-        # Remove jobs not belonging to owner
-        if j['Meta'] and (owner == j['Meta'].get('owner', '')):
-            fjobs.append(j)
-
-    return fjobs
+    return jobs
 
 
 def get_deployment(
