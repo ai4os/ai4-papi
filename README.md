@@ -216,6 +216,16 @@ user.
 * `DELETE(/v1/deployments/modules/{deployment_uuid})`: :lock: delete a deployment, users can only
 delete their own deployments.
 
+#### Stats API
+
+The stats API offers the possibility to retrieve stats about the platform.
+
+Methods:
+* `GET(/v1/stats/deployments/)`: :lock: retrieve historic user/VO usage. \
+  For this you need to declare a ENV variable with the path of the Nomad cluster logs:
+  ```
+  export ACCOUNTING_PTH="/your/custom/path"
+  ```
 
 The functionalities can also be accessed without the API:
 
