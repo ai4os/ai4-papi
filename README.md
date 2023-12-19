@@ -222,10 +222,12 @@ The stats API offers the possibility to retrieve stats about the platform.
 
 Methods:
 * `GET(/v1/stats/deployments/)`: :lock: retrieve historic user/VO usage. \
-  For this you need to declare a ENV variable with the path of the Nomad cluster logs:
+  For this you need to declare a ENV variable with the path of the Nomad cluster
+  logs repo:
   ```
-  export ACCOUNTING_PTH="/your/custom/path"
+  export ACCOUNTING_PTH="/your/custom/path/ai4-accounting"
   ```
+  It will serve the contents of the `ai4-accounting/summaries` folder.
 
 The functionalities can also be accessed without the API:
 
