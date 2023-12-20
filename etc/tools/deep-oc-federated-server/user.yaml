@@ -39,7 +39,7 @@ general:
   service:
     name: Service to run
     value: 'fedserver'
-    description: When selecting FedServer, you won't be able to change the federation options or use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time, your best option is to deploy with JupyterLab/VScode. Then, open a terminal window and run FedServer yourself by typing cd federated-server/fedserver and then python3 server.py.
+    description: When selecting FedServer, you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time, your best option is to deploy with JupyterLab/VScode. Then, open a terminal window and run FedServer yourself by typing `cd federated-server/fedserver` and then `python3 server.py`. You can also modify `server.py` different federation options than the ones initially selected at creation time.
     options: ['fedserver', 'jupyter', 'vscode']
 
   jupyter_password:
