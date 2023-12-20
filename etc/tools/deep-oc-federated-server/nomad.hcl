@@ -72,6 +72,7 @@ job "userjob-${JOB_UUID}" {
         "traefik.http.services.${JOB_UUID}-fedserver.loadbalancer.server.scheme=h2c",  # grpc support
       ]
     }
+
     service {
       name = "${JOB_UUID}-monitor"
       port = "monitor"
@@ -122,4 +123,3 @@ job "userjob-${JOB_UUID}" {
     }
   }
 }
-
