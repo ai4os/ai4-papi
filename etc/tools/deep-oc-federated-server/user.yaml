@@ -10,7 +10,6 @@
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
 general:
-
   title:
     name: Deployment title
     value: ''
@@ -40,7 +39,7 @@ general:
   service:
     name: Service to run
     value: 'fedserver'
-    description: When selecting FedServer you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab/Vscode, then open a terminal window and run FedServer yourself typing `python3 -m fedserver.server`.
+    description: When selecting FedServer, you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time, your best option is to deploy with JupyterLab/VScode. Then, open a terminal window and run FedServer yourself by typing `cd federated-server/fedserver` and then `python3 server.py`. You can also modify `server.py` different federation options than the ones initially selected at creation time.
     options: ['fedserver', 'jupyter', 'vscode']
 
   jupyter_password:
@@ -54,7 +53,6 @@ general:
     description: This is the federated secret token that your clients should use to connect to the server.
 
 hardware:
-
   cpu_num:
     name: Number of CPUs
     value: 1
@@ -71,7 +69,6 @@ hardware:
     range: [1000, 2000]
 
 configuration:
-
   rounds:
     name: Number of rounds
     value: 5
@@ -90,9 +87,9 @@ configuration:
     name: Federated aggregation strategy
     value: 'Federated Averaging'
     options: [
-      'Federated Averaging',  # fedavg
-      'Federated Optimization',  # fedprox
-      'Federated Optimization with Adam',  # fedadam
-      'Adaptive Federated Optimization',  # fedopt
-      'Adaptive Federated Optimization using Yogi',  # fedyogi
-    ]
+        'Federated Averaging', # fedavg
+        'Federated Optimization', # fedprox
+        'Federated Optimization with Adam', # fedadam
+        'Adaptive Federated Optimization', # fedopt
+        'Adaptive Federated Optimization using Yogi', # fedyogi
+      ]
