@@ -80,15 +80,14 @@ def get_stats(
     namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
     # Load proper namespace stats
-    stats = load_stats(namespace=namespace)
+    full_stats = load_stats(namespace=namespace)
 
     # Keep only stats from the current user
-    current_user_stats = copy.deepcopy(stats)
-
+    user_stats = copy.deepcopy(full_stats)
     try:
-        idx = stats['users-agg']['owner'].index(auth_info['id'])
-        current_user_stats['users-agg'] = {k: v[idx] for k, v in stats['users-agg'].items()}
+        idx = full_stats['users-agg']['owner'].index(auth_info['id'])
+        user_stats['users-agg'] = {k: v[idx] for k, v in full_stats['users-agg'].items()}
     except ValueError:  # user has still no recorded stats
-        current_user_stats['users-agg'] = None
+        user_stats['users-agg'] = None
 
-    return current_user_stats
+    return user_stats
