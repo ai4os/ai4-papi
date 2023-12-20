@@ -1,3 +1,4 @@
+import copy
 import csv
 import os
 from pathlib import Path
@@ -82,10 +83,12 @@ def get_stats(
     stats = load_stats(namespace=namespace)
 
     # Keep only stats from the current user
+    current_user_stats = copy.deepcopy(stats)
+
     try:
         idx = stats['users-agg']['owner'].index(auth_info['id'])
-        stats['users-agg'] = {k: v[idx] for k, v in stats['users-agg'].items()}
+        current_user_stats['users-agg'] = {k: v[idx] for k, v in stats['users-agg'].items()}
     except ValueError:  # user has still no recorded stats
-        stats['users-agg'] = None
+        current_user_stats['users-agg'] = None
 
-    return stats
+    return current_user_stats
