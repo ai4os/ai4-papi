@@ -110,10 +110,7 @@ def get_user_stats(
     return user_stats
 
 
-def get_gpu_stats(
-    nodes:any,
-    stats: dict[str, dict]
-    ):
+def get_gpu_flavours():
 
     # Load GPU flavours
     gpu_flavours = {}
@@ -126,15 +123,7 @@ def get_gpu_stats(
             attrs = list(row.keys())[1:]
             gpu_flavours[flavor] = {k: to_type(row[k]) for k in attrs}
 
-    # Compute total number of GPUs for each node
-    for n in nodes:
-        info = Nomad.node.get_node(n['ID'])
-        flavour = info['Attributes'].get('platform.aws.instance-type', None)
-
-        if flavour in gpu_flavours.keys():
-            stats['nodes'][n['ID']]['gpu-total'] = int(gpu_flavours[flavour]['Number of GPUs'])
-
-    return stats
+    return gpu_flavours
 
 
 def get_proper_allocation(allocs):
@@ -180,23 +169,26 @@ def get_cluster_stats():
     # Load nodes
     nodes = Nomad.nodes.get_nodes()
 
-    # Get total stats for each node (except gpu)
+    # Load gpu flavours
+    gpu_flavours = get_gpu_flavours()
+
+    # Get total stats for each node
     for n in nodes:
         node = Nomad.node.get_node(n['ID'])
+        flavour = node['Attributes']['platform.aws.instance-type']
+
         node_stats = {'cpu-total': int(node['Attributes']['cpu.numcores']),
                       'cpu-used': 0,
-                      'gpu-total': 0,
+                      'gpu-total': int(gpu_flavours[flavour]['Number of GPUs']) if flavour in gpu_flavours.keys() else 0,
                       'gpu-used': 0,
                       'ram-total': int(node['Attributes']['memory.totalbytes']),
                       'ram-used': 0,
                       'disk-total': int(node['Attributes']['unique.storage.bytestotal']),
                       'disk-used': int(node['Attributes']['unique.storage.bytesfree']),
                       }
+        
         stats['nodes'][n['ID']] = node_stats
-
-    # Get gpu stats
-    stats = get_gpu_stats(nodes, stats)
-
+        
     # Get aggregated usage stats for each node
     namespaces = ['default', 'ai4eosc', 'imagine', 'tutorials']
 
