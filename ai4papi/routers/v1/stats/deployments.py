@@ -110,22 +110,6 @@ def get_user_stats(
     return user_stats
 
 
-def get_gpu_flavours():
-
-    # Load GPU flavours
-    gpu_flavours = {}
-
-    with open(main_dir / 'gpu_flavors.csv', newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-
-        for row in reader:
-            flavor = row['Flavor']
-            attrs = list(row.keys())[1:]
-            gpu_flavours[flavor] = {k: to_type(row[k]) for k in attrs}
-
-    return gpu_flavours
-
-
 def get_proper_allocation(allocs):
 
         # Reorder allocations based on recency
@@ -167,26 +151,22 @@ def get_cluster_stats():
     cpu_tot_cl = cpu_used_cl = gpu_tot_cl = gpu_used_cl = ram_tot_cl = ram_used_cl = disk_tot_cl = disk_used_cl = 0
     
     # Load nodes
-    nodes = Nomad.nodes.get_nodes()
-
-    # Load gpu flavours
-    gpu_flavours = get_gpu_flavours()
+    nodes = Nomad.nodes.get_nodes(resources=True)
 
     # Get total stats for each node
     for n in nodes:
         node = Nomad.node.get_node(n['ID'])
-        flavour = node['Attributes']['platform.aws.instance-type']
 
         node_stats = {'cpu-total': int(node['Attributes']['cpu.numcores']),
                       'cpu-used': 0,
-                      'gpu-total': int(gpu_flavours[flavour]['Number of GPUs']) if flavour in gpu_flavours.keys() else 0,
+                      'gpu-total': len(n['NodeResources']['Devices'][0]['Instances']) if n['NodeResources']['Devices'] else 0,
                       'gpu-used': 0,
                       'ram-total': int(node['Attributes']['memory.totalbytes']),
                       'ram-used': 0,
                       'disk-total': int(node['Attributes']['unique.storage.bytestotal']),
                       'disk-used': int(node['Attributes']['unique.storage.bytesfree']),
                       }
-        
+           
         stats['nodes'][n['ID']] = node_stats
         
     # Get aggregated usage stats for each node
@@ -206,12 +186,12 @@ def get_cluster_stats():
             id_=job['ID'],
             namespace=namespace,
             )
-            
+
             # Keep the proper allocation
             a = Nomad.allocation.get_allocation(
             get_proper_allocation(allocs)
             )
-            
+
             node_id = a['NodeID']
 
             # Add resources
