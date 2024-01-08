@@ -1,4 +1,7 @@
-import ast
+"""
+Return stats from the user/VO/cluster
+"""
+
 import copy
 import csv
 import os
@@ -8,11 +11,12 @@ import types
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
+import nomad
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
 import ai4papi.nomad.patches as npatches
-import nomad
+
 
 router = APIRouter(
     prefix="/stats",
@@ -20,21 +24,15 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
-Nomad = nomad.Nomad()
 
 main_dir = Path(__file__).resolve().parent
 
+Nomad = nomad.Nomad()
 Nomad.job.get_allocations = types.MethodType(
     npatches.get_allocations,
     Nomad.job
 )
 
-def to_type(s):
-        try:
-            return ast.literal_eval(s)
-        except Exception:
-            return s
-        
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def load_stats(
@@ -139,6 +137,7 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
+#todo: add cached
 @router.get("/cluster")
 def get_cluster_stats():
     """
@@ -147,9 +146,21 @@ def get_cluster_stats():
     * the total capacity
     """
 
-    stats = {'nodes' : {}, 'cluster': {}}
-    cpu_tot_cl = cpu_used_cl = gpu_tot_cl = gpu_used_cl = ram_tot_cl = ram_used_cl = disk_tot_cl = disk_used_cl = 0
-    
+    resources = [
+        'cpu-total',
+        'cpu-used',
+        'gpu-total',
+        'gpu-used',
+        'ram-total',
+        'ram-used',
+        'disk-total',
+        'disk-used',
+    ]
+    stats = {
+        'nodes' : {},  # individual node usage
+        'cluster': {k: 0 for k in resources},  # aggregated cluster usage
+        }
+
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
 
@@ -157,23 +168,22 @@ def get_cluster_stats():
     for n in nodes:
         node = Nomad.node.get_node(n['ID'])
 
-        node_stats = {'cpu-total': int(node['Attributes']['cpu.numcores']),
-                      'cpu-used': 0,
-                      'gpu-total': len(n['NodeResources']['Devices'][0]['Instances']) if n['NodeResources']['Devices'] else 0,
-                      'gpu-used': 0,
-                      'ram-total': int(node['Attributes']['memory.totalbytes']),
-                      'ram-used': 0,
-                      'disk-total': int(node['Attributes']['unique.storage.bytestotal']),
-                      'disk-used': int(node['Attributes']['unique.storage.bytesfree']),
-                      }
-           
-        stats['nodes'][n['ID']] = node_stats
-        
+        stats['nodes'][n['ID']] = {
+            'cpu-total': int(node['Attributes']['cpu.numcores']),
+            'cpu-used': 0,
+            'gpu-total': len(n['NodeResources']['Devices'][0]['Instances']) if n['NodeResources']['Devices'] else 0,
+            'gpu-used': 0,
+            'ram-total': int(node['Attributes']['memory.totalbytes']),
+            'ram-used': 0,
+            'disk-total': int(node['Attributes']['unique.storage.bytestotal']),
+            'disk-used': int(node['Attributes']['unique.storage.bytesfree']),
+            }
+
     # Get aggregated usage stats for each node
     namespaces = ['default', 'ai4eosc', 'imagine', 'tutorials']
 
     for namespace in namespaces:
-        jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')  # job summaries
+        jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')
         for j in jobs:
 
             # Retrieve full job for meta
@@ -181,54 +191,41 @@ def get_cluster_stats():
                 id_=j['ID'],
                 namespace=namespace,
                 )
-            
+
             allocs = Nomad.job.get_allocations(
-            id_=job['ID'],
-            namespace=namespace,
-            )
+                id_=job['ID'],
+                namespace=namespace,
+                )
 
             # Keep the proper allocation
             a = Nomad.allocation.get_allocation(
-            get_proper_allocation(allocs)
-            )
-
-            node_id = a['NodeID']
+                get_proper_allocation(allocs)
+                )
 
             # Add resources
+            n_stats = stats['nodes'][a['NodeID']]
+            #FIXME: we are ignoring resources consumed by other tasks
             if 'usertask' in a['AllocatedResources']['Tasks']:
                 res = a['AllocatedResources']['Tasks']['usertask']
+
                 # cpu
-                cpu = len(res['Cpu']['ReservedCores']) if res['Cpu']['ReservedCores']  else 0
-                stats['nodes'][node_id]['cpu-used'] += cpu
+                if res['Cpu']['ReservedCores']:
+                    n_stats['cpu-used'] += len(res['Cpu']['ReservedCores'])
+
                 # ram
-                ram = res['Memory']['MemoryMB']
-                stats['nodes'][node_id]['ram-used'] += ram
+                n_stats['ram-used'] += res['Memory']['MemoryMB']
+
                 # gpu
-                gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0] if res['Devices'] else None
-                gpu_num = len(gpu['DeviceIDs']) if gpu else 0
-                stats['nodes'][node_id]['gpu-used'] += gpu_num
+                if res['Devices']:
+                    gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
+                    gpu_num = len(gpu['DeviceIDs']) if gpu else 0
+                    n_stats['gpu-used'] += gpu_num
             else:
                 continue
 
     # Compute cluster stats
-    for n in stats['nodes']:
-        cpu_tot_cl +=  stats['nodes'][n]['cpu-total']
-        cpu_used_cl += stats['nodes'][n]['cpu-used']
-        gpu_tot_cl += stats['nodes'][n]['gpu-total']
-        gpu_used_cl += stats['nodes'][n]['gpu-used']
-        ram_tot_cl += stats['nodes'][n]['ram-total']
-        ram_used_cl += stats['nodes'][n]['ram-used']
-        disk_tot_cl += stats['nodes'][n]['disk-total']
-        disk_used_cl += stats['nodes'][n]['disk-used']
-        
-    stats['cluster'] = {'cpu-total': cpu_tot_cl, 
-                      'cpu-used': cpu_used_cl,
-                      'gpu-total': gpu_tot_cl,
-                      'gpu-used': gpu_used_cl,
-                      'ram-total': ram_tot_cl,
-                      'ram-used': ram_used_cl,
-                      'disk-total': disk_tot_cl,
-                      'disk-used': disk_used_cl,
-                      }
+    for n_stats in stats['nodes'].values():
+        for k, v in n_stats.items():
+            stats['cluster'][k] += v
 
     return stats
