@@ -168,16 +168,18 @@ def get_cluster_stats():
     for n in nodes:
         node = Nomad.node.get_node(n['ID'])
 
-        stats['nodes'][n['ID']] = {
-            'cpu-total': int(node['Attributes']['cpu.numcores']),
-            'cpu-used': 0,
-            'gpu-total': len(n['NodeResources']['Devices'][0]['Instances']) if n['NodeResources']['Devices'] else 0,
-            'gpu-used': 0,
-            'ram-total': int(node['Attributes']['memory.totalbytes']),
-            'ram-used': 0,
-            'disk-total': int(node['Attributes']['unique.storage.bytestotal']),
-            'disk-used': int(node['Attributes']['unique.storage.bytesfree']),
-            }
+        n_stats = {k: 0 for k in resources}
+
+        n_stats['cpu-total'] = int(node['Attributes']['cpu.numcores'])
+        n_stats['ram-total'] = int(node['Attributes']['memory.totalbytes'])
+        n_stats['disk-total'] = int(node['Attributes']['unique.storage.bytestotal'])
+        n_stats['disk-used'] = int(node['Attributes']['unique.storage.bytesfree'])
+        if n['NodeResources']['Devices']:
+            for devices in n['NodeResources']['Devices']:
+                if devices['Type'] == 'gpu':
+                    n_stats['gpu-total'] += len(devices['Instances'])
+
+        stats['nodes'][n['ID']] = n_stats
 
     # Get aggregated usage stats for each node
     namespaces = ['default', 'ai4eosc', 'imagine', 'tutorials']
