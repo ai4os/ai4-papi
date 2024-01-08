@@ -137,7 +137,7 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
-#todo: add cached
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 @router.get("/cluster")
 def get_cluster_stats():
     """
