@@ -4,6 +4,7 @@ Return stats from the user/VO/cluster
 
 import copy
 import csv
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 import types
@@ -38,6 +39,10 @@ Nomad.job.get_allocations = types.MethodType(
 def load_stats(
     namespace: str,
     ):
+    """
+    CSV reader and data filtering could be improved with Pandas, but that's a heavy
+    dependency, so we're keeping it like this for the moment.
+    """
 
     main_dir = os.environ.get('ACCOUNTING_PTH', None)
     if not main_dir:
@@ -65,6 +70,17 @@ def load_stats(
                     if k not in ['date', 'owner']:
                         v= int(v)
                     stats[name][k].append(v)
+
+    # In VO timeseries, only return last three months
+    threshold = datetime.now() - timedelta(days=90)
+    threshold = str(threshold.date())
+    try:
+        idx = [i > threshold for i in stats['timeseries']['date']].index(True)
+    except Exception:
+        # If there are no data in the last 90 days, then return last 90 dates
+        idx = -90
+    for k, v in stats['timeseries'].items():
+        stats['timeseries'][k] = v[idx:]
 
     # Namespace aggregates are not lists
     stats['full-agg'] = {k: v[0] for k, v in stats['full-agg'].items()}
