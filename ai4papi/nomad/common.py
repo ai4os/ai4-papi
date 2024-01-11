@@ -11,6 +11,7 @@ from datetime import datetime
 import re
 import types
 
+from cachetools import cached, TTLCache
 from fastapi import HTTPException
 import nomad
 from nomad.api import exceptions
@@ -350,3 +351,17 @@ def delete_deployment(
         )
 
     return {'status': 'success'}
+
+
+def get_gpu_models():
+    """
+    Retrieve available GPU models in the cluster.
+    """
+    gpu_models = set()
+    nodes = Nomad.nodes.get_nodes(resources=True)
+    for node in nodes:
+        devices = node['NodeResources']['Devices']
+        gpus = [d for d in devices if d['Type'] == 'gpu'] if devices else []
+        for gpu in gpus:
+            gpu_models.add(gpu['Name'])
+    return list(gpu_models)
