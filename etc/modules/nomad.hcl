@@ -159,12 +159,13 @@ job "userjob-${JOB_UUID}" {
         device "gpu" {
           count = ${GPU_NUM}
 
-          # Add an affinity for a particular model
-          affinity {
+          # Add a constraint for a particular GPU model
+          constraint {
             attribute = "${device.model}"
+            operator  = "="
             value     = "${GPU_MODELNAME}"
-            weight    = 50
           }
+
         }
       }
     }
@@ -186,4 +187,3 @@ job "userjob-${JOB_UUID}" {
     }
   }
 }
-

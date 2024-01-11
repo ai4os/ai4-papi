@@ -64,7 +64,7 @@ hardware:
     name: GPU model
     value: ''
     options: ['', 'Tesla V100-PCIE-32GB', 'Tesla T4']
-    description: Fill this field if you have preference for a certain kind of GPU model.
+    description: Fill this field only if you have a *hard* requirement for a given kind of GPU model.
 
   ram:
     name: RAM memory (in MB)
