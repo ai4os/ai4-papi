@@ -1,5 +1,3 @@
-#TODO: move to proper testing package
-
 from ai4papi.routers.v1.catalog.tools import Tools
 
 
