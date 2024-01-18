@@ -1,6 +1,8 @@
 from copy import deepcopy
 import re
+import secrets
 import types
+from types import SimpleNamespace
 from typing import Tuple, Union
 import uuid
 
@@ -10,6 +12,7 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
+from ai4papi.routers.v1 import secrets as ai4secrets
 
 
 router = APIRouter(
@@ -226,12 +229,25 @@ def create_deployment(
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'FEDERATED_SECRET': user_conf['general']['federated_secret'],
+            'OIDC_ACCESS_TOKEN': authorization.credentials,  #FIXME: temporal patch to try Vault secret reading in Federated server. Not feasible longterm because token expires. Wait till Nomad is connected with Vault and modify Nomad job.
+            'FEDERATED_SECRET': user_conf['general']['federated_secret'],  #TODO: remove all references to this if no longer needed (ie. we use Vault)
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
         }
+    )
+
+    # Create Vault secret for Federated Server token
+    _ = ai4secrets.create_secret(
+        vo=vo,
+        secret_path=f"deployments/{job_uuid}/federated/default",
+        secret_data={
+            'token': secrets.token_hex(),
+        },
+        authorization=SimpleNamespace(
+            credentials=authorization.credentials,
+        ),
     )
 
     # Convert template to Nomad conf
@@ -277,5 +293,22 @@ def delete_deployment(
         namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
         owner=auth_info['id'],
     )
+
+    # Remove Vault secrets belonging to that deployment
+    r = ai4secrets.get_secrets(
+        vo=vo,
+        subpath=f"/deployments/{deployment_uuid}",
+        authorization=SimpleNamespace(
+            credentials=authorization.credentials,
+        ),
+    )
+    for path in r.keys():
+        r = ai4secrets.delete_secret(
+            vo=vo,
+            secret_path=path,
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
 
     return r
