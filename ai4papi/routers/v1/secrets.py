@@ -81,6 +81,7 @@ def recursive_path_builder(client, kv_list):
 @router.get("/")
 def get_secrets(
     vo: str,
+    subpath: str = '',
     authorization=Depends(security),
     ):
     """
@@ -88,6 +89,10 @@ def get_secrets(
 
     Parameters:
     * **vo**: Virtual Organization where you belong.
+    * **subpath**: retrieve secrets only from a given subpath.
+      If not specified, it will retrieve all secrets from the user. \n
+      Examples:
+         - `/deployments/<deploymentUUID>/federated/`
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -99,11 +104,17 @@ def get_secrets(
         issuer=auth_info['issuer'],
     )
 
+    # Check subpath syntax
+    if not subpath.startswith('/'):
+        subpath = '/' + subpath
+    if not subpath.endswith('/'):
+        subpath += '/'
+
     # Retrieve initial level-0 secrets
-    user_path = f"users/{auth_info['id']}/"
+    user_path = f"users/{auth_info['id']}"
     try:
         r = client.secrets.kv.v1.list_secrets(
-            path=user_path,
+            path = user_path + subpath,
             mount_point=VAULT_MOUNT_POINT
         )
         seed_list = r['data']['keys']
@@ -111,9 +122,9 @@ def get_secrets(
         # InvalidPath is raised when there are no secrets available
         return {}
 
-    # Now iterate recursively to retrieve secrets from subpaths
+    # Now iterate recursively to retrieve all secrets from child paths
     for i, li in enumerate(seed_list):
-        seed_list[i] = (user_path + li)
+        seed_list[i] = user_path + subpath + li
     final_list = recursive_path_builder(client, seed_list)
 
     # Extract secrets data
@@ -146,7 +157,7 @@ def create_secret(
     * **secret_path**: path of the secret.
       Not sensitive to leading/trailing slashes. \n
       Examples:
-         - `deployments/<deploymentUUID>/fl-token`
+         - `/deployments/<deploymentUUID>/federated/<secret-name>`
     * **secret_data**: data to be saved at the path. \n
       Examples:
          - `{'token': 515c5d4f5d45fd15df}`
