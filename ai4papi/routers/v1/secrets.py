@@ -51,6 +51,47 @@ def vault_client(jwt, issuer):
     return client
 
 
+def create_vault_token(
+    jwt,
+    issuer,
+    ttl='1h',
+    subpath='',
+    capabilities = ['read', 'list'],
+    ):
+    """
+    Create a Vault token from a JWT.
+
+    Parameters:
+    * jwt: JSON web token
+    * issuer: JWT issuer
+    * ttl: duration of the token
+    * subpath: whether to restrict with subpath the token has access to
+    * capabilities: capabilities of the token
+    """
+    client = vault_client(jwt, issuer)
+
+    # Create a policy to restrict subpath access and/or capabilities
+    if subpath or capabilities:
+        #TODO: looks like EGI Vault is not allowing to create policies (nor to list them!)
+        # name = subpath + random_string()
+        # client.sys.create_or_update_policy(
+        #     name=name,
+        #     policy=desc,
+        # )
+        # policies = [name]
+        policies = []
+    else:
+        policies = []
+
+    # Generate token
+    token = client.auth.token.create(
+        policies=policies,
+        ttl=ttl,
+        )
+
+    return token['auth']['client_token']
+
+
 def recursive_path_builder(client, kv_list):
     """
     Reference: https://github.com/drewmullen/vault-kv-migrate
