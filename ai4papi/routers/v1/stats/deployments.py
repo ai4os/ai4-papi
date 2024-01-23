@@ -163,14 +163,14 @@ def get_cluster_stats():
     """
 
     resources = [
-        'cpu-total',
-        'cpu-used',
-        'gpu-total',
-        'gpu-used',
-        'ram-total',
-        'ram-used',
-        'disk-total',
-        'disk-used',
+        'cpu_total',
+        'cpu_used',
+        'gpu_total',
+        'gpu_used',
+        'ram_total',
+        'ram_used',
+        'disk_total',
+        'disk_used',
     ]
     stats = {
         'nodes' : {},  # individual node usage
@@ -186,14 +186,15 @@ def get_cluster_stats():
 
         n_stats = {k: 0 for k in resources}
 
-        n_stats['cpu-total'] = int(node['Attributes']['cpu.numcores'])
-        n_stats['ram-total'] = int(node['Attributes']['memory.totalbytes'])
-        n_stats['disk-total'] = int(node['Attributes']['unique.storage.bytestotal'])
-        n_stats['disk-used'] = int(node['Attributes']['unique.storage.bytesfree'])
+        n_stats['name'] = node['Name']
+        n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
+        n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
+        n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
+        n_stats['disk_used'] = int(node['Attributes']['unique.storage.bytesfree']) / 2**20
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
                 if devices['Type'] == 'gpu':
-                    n_stats['gpu-total'] += len(devices['Instances'])
+                    n_stats['gpu_total'] += len(devices['Instances'])
 
         stats['nodes'][n['ID']] = n_stats
 
@@ -228,22 +229,23 @@ def get_cluster_stats():
 
                 # cpu
                 if res['Cpu']['ReservedCores']:
-                    n_stats['cpu-used'] += len(res['Cpu']['ReservedCores'])
+                    n_stats['cpu_used'] += len(res['Cpu']['ReservedCores'])
 
                 # ram
-                n_stats['ram-used'] += res['Memory']['MemoryMB']
+                n_stats['ram_used'] += res['Memory']['MemoryMB']
 
                 # gpu
                 if res['Devices']:
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
-                    n_stats['gpu-used'] += gpu_num
+                    n_stats['gpu_used'] += gpu_num
             else:
                 continue
 
     # Compute cluster stats
     for n_stats in stats['nodes'].values():
         for k, v in n_stats.items():
-            stats['cluster'][k] += v
+            if k != 'name' :
+                stats['cluster'][k] += v
 
     return stats
