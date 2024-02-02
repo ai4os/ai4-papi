@@ -57,6 +57,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
+            name='userjob'
         )
 
         # Retrieve info for jobs in namespace

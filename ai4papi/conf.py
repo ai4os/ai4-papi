@@ -65,6 +65,17 @@ MODULES = {
     }
 }
 
+# Temporal modules
+nmd = load_nomad_job(paths['conf'] / 'inference' / 'nomad.hcl')
+yml = load_yaml_conf(paths['conf'] / 'inference' / 'user.yaml')
+INFERENCES = {
+    'nomad': nmd,
+    'user': {
+        'full': yml[0],
+        'values': yml[1],
+    }
+}
+
 # Tools
 tool_dir = paths['conf'] / 'tools'
 tool_list = [f for f in tool_dir.iterdir() if f.is_dir()]

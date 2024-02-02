@@ -7,34 +7,34 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, quotas, utils
+from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 
 
 router = APIRouter(
-    prefix="/tools",
-    tags=["Tools deployments"],
+    prefix="/inferences",
+    tags=["Inferences temporal deployments"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
 
 
 @router.get("/")
-def get_deployments(
+def get_inferences(
     vos: Union[Tuple, None] = Query(default=None),
     full_info: bool = Query(default=False),
     authorization=Depends(security),
     ):
     """
-    Returns a list of all deployments belonging to a user.
+    Returns a list of all temporal deployments belonging to a user.
 
     Parameters:
-    * **vo**: Virtual Organizations from where you want to retrieve your deployments.
-      If no vo is provided, it will retrieve the deployments of all VOs.
-    * **full_info**: retrieve the full information of each deployment.
+    * **vo**: Virtual Organizations from where you want to retrieve your temporal deployments.
+      If no vo is provided, it will retrieve the temporal deployments of all VOs.
+    * **full_info**: retrieve the full information of each temporal deployment.
       Disabled by default, as it will increase latency too much if there are many
-      deployments.
+      temporal deployments.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -51,19 +51,19 @@ def get_deployments(
             detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}."
             )
 
-    user_jobs = []
+    inferences = []
     for vo in vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
-            name='userjob'
+            name='inference'
         )
 
         # Retrieve info for jobs in namespace
         for j in jobs:
             try:
-                job_info = get_deployment(
+                job_info = get_inference(
                     vo=vo,
                     deployment_uuid=j['ID'],
                     full_info=full_info,
@@ -71,36 +71,36 @@ def get_deployments(
                         credentials=authorization.credentials  # token
                     ),
                 )
-            except HTTPException:  # not a tool
+            except HTTPException:  # not a module
                 continue
             except Exception as e:  # unexpected error
                 raise(e)
 
-            user_jobs.append(job_info)
+            inferences.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j['submit_time'] for j in user_jobs]
+    # Sort temporal deployments by creation date
+    seq = [j['submit_time'] for j in inferences]
     args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    sorted_jobs = [inferences[i] for i in args]
 
     return sorted_jobs
 
 
 @router.get("/{deployment_uuid}")
-def get_deployment(
+def get_inference(
     vo: str,
     deployment_uuid: str,
     full_info: bool = Query(default=True),
     authorization=Depends(security),
     ):
     """
-    Retrieve the info of a specific deployment.
+    Retrieve the info of a specific temporal deployment.
     Format outputs to a Nomad-independent format to be used by the Dashboard
 
     Parameters:
-    * **vo**: Virtual Organization from where you want to retrieve your deployment
-    * **deployment_uuid**: uuid of deployment to gather info about
-    * **full_info**: retrieve the full information of that deployment (may increase
+    * **vo**: Virtual Organization from where you want to retrieve your temporal deployment
+    * **deployment_uuid**: uuid of temporal deployment to gather info about
+    * **full_info**: retrieve the full information of that temporal deployment (may increase
       latency)
 
     Returns a dict with info
@@ -119,75 +119,58 @@ def get_deployment(
         full_info=full_info,
     )
 
-    # Check the deployment is indeed a tool
+    # Check the temporal deployment is indeed a module
     tool_list = papiconf.TOOLS.keys()
-    tool_name = re.search(
+    module_name = re.search(
             '/(.*):',  # remove dockerhub account and tag
             job['docker_image'],
             ).group(1)
-    if tool_name not in tool_list:
+    if module_name in tool_list:
         raise HTTPException(
             status_code=400,
-            detail="This deployment is a module, not a tool.",
+            detail="This deployment is a tool, not a module.",
             )
 
     return job
 
 
 @router.post("/")
-def create_deployment(
+def create_inference(
     vo: str,
-    conf: Union[dict, None] = None,
     authorization=Depends(security),
     ):
     """
-    Submit a deployment to Nomad.
+    Submit a temporal deployment to Nomad.
 
     Parameters:
-    * **vo**: Virtual Organization where you want to create your deployment
-    * **conf**: configuration dict of the deployment to be submitted.
-    For example:
-    ```
-    {
-        "general":{
-            "docker_image": "deephdc/deep-oc-image-classification-tf",
-            "service": "deepaas"
-        },
-        "hardware": {
-            "cpu_num": 4
-        }
-    }
-    ```
-    If only a partial configuration is submitted, the remaining will be filled with
-    [default args](https://github.com/AI4EOSC/ai4-papi/blob/master/etc/userconf.yaml)
-
+    * **vo**: Virtual Organization where you want to create your temporal deployment
+    
     Returns a dict with status
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    # Retrieve toolname from configuration, else deploy first tool in the list
-    try:
-        tool_name = conf["general"]["docker_image"].split('/')[1]  # deephdc/*
-    except Exception:
-        tool_name = list(papiconf.TOOLS.keys())[0]
-
-    # Load tool configuration
-    nomad_conf = deepcopy(papiconf.TOOLS[tool_name]['nomad'])
-    user_conf = deepcopy(papiconf.TOOLS[tool_name]['user']['values'])
-
-    # Update values conf in case we received a submitted conf
-    if conf is not None:
-        user_conf = utils.update_values_conf(
-            submitted=conf,
-            reference=user_conf,
-        )
+    # Load inference configuration
+    nomad_conf = deepcopy(papiconf.INFERENCES['nomad'])
+    user_conf = deepcopy(papiconf.INFERENCES['user']['values'])
 
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(
         conf=user_conf,
         vo=vo,
+    )
+
+    # Check if the provided configuration is within the user quotas
+    deployments = get_inferences(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    quotas.check_userwise(
+        conf=user_conf,
+        deployments=deployments,
     )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -207,6 +190,12 @@ def create_deployment(
     )
     utils.check_domain(domain)
 
+    #TODO: remove when we solve disk issues
+    # For now on we fix disk here because, if not fixed, jobs are not being deployed
+    # (ie. "resource disk exhausted").
+    # In any case, this limit is useless because it has not yet been passed to docker
+    user_conf['hardware']['disk'] = 500
+
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
@@ -221,17 +210,20 @@ def create_deployment(
             'DOMAIN': domain,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
+            'SERVICE': user_conf['general']['service'],
             'CPU_NUM': user_conf['hardware']['cpu_num'],
             'RAM': user_conf['hardware']['ram'],
             'DISK': user_conf['hardware']['disk'],
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
+            'GPU_NUM': user_conf['hardware']['gpu_num'],
+            'GPU_MODELNAME': user_conf['hardware']['gpu_type'],
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'FEDERATED_SECRET': user_conf['general']['federated_secret'],
-            'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
-            'FEDERATED_METRIC': user_conf['configuration']['metric'],
-            'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
-            'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+            'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
+            'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
+            'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
+            'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
+            'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
         }
     )
 
@@ -241,11 +233,24 @@ def create_deployment(
     tasks = nomad_conf['TaskGroups'][0]['Tasks']
     usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
-    # Launch `deep-start` compatible service if needed
-    service = user_conf['general']['service']
-    if service in ['deepaas', 'jupyter', 'vscode']:
-        usertask['Config']['command'] = 'deep-start'
-        usertask['Config']['args'] = [f'--{service}']
+    # Apply patches if needed
+    usertask = module_patches.patch_nextcloud_mount(
+        user_conf['general']['docker_image'],
+        usertask
+    )
+
+    # Modify the GPU section
+    if user_conf['hardware']['gpu_num'] <= 0:
+        # Delete GPU section in CPU deployments
+        usertask['Resources']['Devices'] = None
+    else:
+        # If gpu_type not provided, remove constraint to GPU model
+        if not user_conf['hardware']['gpu_type']:
+            usertask['Resources']['Devices'][0]['Constraints'] = None
+
+    # If storage credentials not provided, remove storage-related tasks
+    if not all(user_conf['storage'].values()):
+        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
@@ -254,17 +259,17 @@ def create_deployment(
 
 
 @router.delete("/{deployment_uuid}")
-def delete_deployment(
+def delete_inference(
     vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
     ):
     """
-    Delete a deployment. Users can only delete their own deployments.
+    Delete a temporal deployment. Users can only delete their own deployments.
 
     Parameters:
-    * **vo**: Virtual Organization where your deployment is located
-    * **deployment_uuid**: uuid of deployment to delete
+    * **vo**: Virtual Organization where your temporal deployment is located
+    * **deployment_uuid**: uuid of temporal deployment to delete
 
     Returns a dict with status
     """
@@ -272,7 +277,7 @@ def delete_deployment(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    # Delete deployment
+    # Delete temporal deployment
     r = nomad.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
