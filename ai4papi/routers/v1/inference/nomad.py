@@ -13,7 +13,7 @@ import ai4papi.nomad.common as nomad
 
 
 router = APIRouter(
-    prefix="/inferences",
+    prefix="/nomad",
     tags=["Inferences temporal deployments"],
     responses={404: {"description": "Not found"}},
 )
