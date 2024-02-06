@@ -155,7 +155,6 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=30))
 @router.get("/cluster")
 def get_cluster_stats():
     """
@@ -165,14 +164,16 @@ def get_cluster_stats():
     """
     
     global cluster_stats
-    stats = cluster_stats
-    return stats
+    return cluster_stats
 
 
+@cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats_bg():
     """
     Background task that computes the stats of the nodes and the cluster every 30 seconds
     """
+    
+    get_cluster_stats_bg.cache_clear()
 
     resources = [
         'cpu_total',
@@ -262,3 +263,5 @@ def get_cluster_stats_bg():
     
     global cluster_stats
     cluster_stats = stats
+
+    return cluster_stats
