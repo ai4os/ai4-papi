@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_utils.tasks import repeat_every
 
 
 description=(
@@ -45,7 +46,7 @@ description=(
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     # on startup
-    get_cluster_stats_thread()
+    await get_cluster_stats_thread()
     yield
     # on shutdown
 
@@ -123,10 +124,10 @@ def run(
     )
 
 # compute cluster stats background task
+@repeat_every(seconds=30)
 def get_cluster_stats_thread():
-        while True:
-            get_cluster_stats_bg()
-            time.sleep(30)
+        get_cluster_stats_bg()
+
 
 if __name__ == "__main__":
     run()
