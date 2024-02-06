@@ -34,6 +34,8 @@ Nomad.job.get_allocations = types.MethodType(
     Nomad.job
 )
 
+cluster_stats = ''
+
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def load_stats(
@@ -153,13 +155,23 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=30))
 @router.get("/cluster")
 def get_cluster_stats():
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
     * the total capacity
+    """
+    
+    global cluster_stats
+    stats = cluster_stats
+    return stats
+
+
+def get_cluster_stats_bg():
+    """
+    Background task that computes the stats of the nodes and the cluster every 30 seconds
     """
 
     resources = [
@@ -247,5 +259,6 @@ def get_cluster_stats():
         for k, v in n_stats.items():
             if k != 'name' :
                 stats['cluster'][k] += v
-
-    return stats
+    
+    global cluster_stats
+    cluster_stats = stats

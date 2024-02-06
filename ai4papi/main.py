@@ -2,12 +2,15 @@
 Create an app with FastAPI
 """
 
+from contextlib import asynccontextmanager
 import fastapi
 import uvicorn
+import time
 
 from ai4papi.conf import MAIN_CONF, paths
 from fastapi.responses import FileResponse
 from ai4papi.routers import v1
+from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -39,9 +42,18 @@ description=(
 
 )
 
+@asynccontextmanager
+async def lifespan(app: fastapi.FastAPI):
+    # on startup
+    get_cluster_stats_thread()
+    yield
+    # on shutdown
+
+
 app = fastapi.FastAPI(
     title="AI4EOSC Platform API",
     description=description,
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -110,6 +122,11 @@ def run(
         ssl_certfile=ssl_certfile,
     )
 
+# compute cluster stats background task
+def get_cluster_stats_thread():
+        while True:
+            get_cluster_stats_bg()
+            time.sleep(30)
 
 if __name__ == "__main__":
     run()
