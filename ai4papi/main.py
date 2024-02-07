@@ -126,6 +126,8 @@ def run(
 # compute cluster stats background task
 @repeat_every(seconds=30)
 async def get_cluster_stats_thread():
+            
+        get_cluster_stats_bg.cache_clear()
         get_cluster_stats_bg()
 
 

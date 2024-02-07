@@ -173,8 +173,6 @@ def get_cluster_stats_bg():
     Background task that computes the stats of the nodes and the cluster every 30 seconds
     """
     
-    get_cluster_stats_bg.cache_clear()
-
     resources = [
         'cpu_total',
         'cpu_used',
