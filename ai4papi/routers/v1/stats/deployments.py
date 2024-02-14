@@ -34,7 +34,7 @@ Nomad.job.get_allocations = types.MethodType(
     Nomad.job
 )
 
-cluster_stats = ''
+cluster_stats = None
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -162,7 +162,7 @@ def get_cluster_stats():
     * the aggregated usage
     * the total capacity
     """
-    
+
     global cluster_stats
     return cluster_stats
 
@@ -170,9 +170,11 @@ def get_cluster_stats():
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats_bg():
     """
-    Background task that computes the stats of the nodes and the cluster every 30 seconds
+    Background task that computes the stats of the nodes.
+    The TTL of this task should be >= than the repeat frequency of the thread defined
+    in main.py.
     """
-    
+
     resources = [
         'cpu_total',
         'cpu_used',
@@ -258,7 +260,8 @@ def get_cluster_stats_bg():
         for k, v in n_stats.items():
             if k != 'name' :
                 stats['cluster'][k] += v
-    
+
+    # Set the new shared variable
     global cluster_stats
     cluster_stats = stats
 
