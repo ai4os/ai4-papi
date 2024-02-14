@@ -34,6 +34,8 @@ Nomad.job.get_allocations = types.MethodType(
     Nomad.job
 )
 
+cluster_stats = None
+
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def load_stats(
@@ -153,13 +155,24 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 @router.get("/cluster")
 def get_cluster_stats():
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
     * the total capacity
+    """
+
+    global cluster_stats
+    return cluster_stats
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=30))
+def get_cluster_stats_bg():
+    """
+    Background task that computes the stats of the nodes.
+    The TTL of this task should be >= than the repeat frequency of the thread defined
+    in main.py.
     """
 
     resources = [
@@ -248,4 +261,8 @@ def get_cluster_stats():
             if k != 'name' :
                 stats['cluster'][k] += v
 
-    return stats
+    # Set the new shared variable
+    global cluster_stats
+    cluster_stats = stats
+
+    return cluster_stats
