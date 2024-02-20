@@ -1,6 +1,10 @@
-name: Build AI4EOSC:prod docker image
+name: Build ai4-papi:prod docker image
 
-on: workflow_dispatch
+on:
+  push:
+    tags:
+      - v1.**
+  workflow_dispatch:
 
 jobs:
   build:
@@ -33,5 +37,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.HARBOR_URL }}/ai4os/ai4eosc-api:prod, ${{ secrets.DOCKERHUB_USERNAME }}/ai4eosc-api:prod
-          file: docker/ai4eosc/prod/Dockerfile
+          tags: ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod, ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
+          file: docker/Dockerfile  #todo: fix this (right now we use flags --build-arg papi_branch)
+
