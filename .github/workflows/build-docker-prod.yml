@@ -38,5 +38,5 @@ jobs:
           context: .
           push: true
           tags: ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod, ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
-          file: docker/Dockerfile  #todo: fix this (right now we use flags --build-arg papi_branch)
+          file: docker/Dockerfile
 
