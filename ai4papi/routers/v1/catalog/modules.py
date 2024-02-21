@@ -6,7 +6,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter
 import requests
 
-from ai4papi import quotas
+from ai4papi import quotas, nomad
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
@@ -65,14 +65,16 @@ def get_config(
         conf["general"]["service"]["options"].insert(0, 'vscode')
         conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
 
-    # Available GPU models
-    # TODO: add automated discovery of GPU models reading the Clients metadata tags
-
     # Modify the resources limits for a given user or VO
     conf['hardware'] = quotas.limit_resources(
         item_name=item_name,
         vo=vo,
     )
+
+    # Fill with available GPU models in the cluster
+    models = nomad.common.get_gpu_models()
+    if models:
+        conf["hardware"]["gpu_type"]["options"] += models
 
     return conf
 

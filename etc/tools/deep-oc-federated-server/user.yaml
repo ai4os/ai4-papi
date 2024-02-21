@@ -10,7 +10,6 @@
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
 general:
-
   title:
     name: Deployment title
     value: ''
@@ -40,7 +39,7 @@ general:
   service:
     name: Service to run
     value: 'fedserver'
-    description: When selecting FedServer you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab/Vscode, then open a terminal window and run FedServer yourself typing `python3 -m fedserver.server`.
+    description: When selecting FedServer, you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time, your best option is to deploy with JupyterLab/VScode. Then, open a terminal window and run FedServer yourself by typing `cd federated-server/fedserver` and then `python3 server.py`. You can also modify `server.py` different federation options than the ones initially selected at creation time.
     options: ['fedserver', 'jupyter', 'vscode']
 
   jupyter_password:
@@ -54,7 +53,6 @@ general:
     description: This is the federated secret token that your clients should use to connect to the server.
 
 hardware:
-
   cpu_num:
     name: Number of CPUs
     value: 1
@@ -71,28 +69,31 @@ hardware:
     range: [1000, 2000]
 
 configuration:
-
   rounds:
     name: Number of rounds
     value: 5
     range: [1, null]
+    description: Number of repetitions of the training.
 
   metric:
     name: Evaluation metric
     value: 'accuracy'
+    description: Metric that will be used for monitoring and validating the process. It will be aggregated according with the different clients. More than one metric can be included.
 
   min_clients:
     name: Minimal number of clients
     value: 2
     range: [2, null]
+    description: Number of minimum clients that must be connected with the server and ready to train the models for starting the process.
 
   strategy:
     name: Federated aggregation strategy
     value: 'Federated Averaging'
+    description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/deephdc/federated-server" target="_blank">Check the different options with their references.</a>
     options: [
-      'Federated Averaging',  # fedavg
-      'Federated Optimization',  # fedprox
-      'Federated Optimization with Adam',  # fedadam
-      'Adaptive Federated Optimization',  # fedopt
-      'Adaptive Federated Optimization using Yogi',  # fedyogi
-    ]
+        'Federated Averaging', # fedavg
+        'Federated Optimization', # fedprox
+        'Federated Optimization with Adam', # fedadam
+        'Adaptive Federated Optimization', # fedopt
+        'Adaptive Federated Optimization using Yogi', # fedyogi
+      ]

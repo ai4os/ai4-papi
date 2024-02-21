@@ -280,7 +280,7 @@ def retrieve_docker_tags(
     """
     Retrieve tags from Dockerhub image
     """
-    url = f"https://registry.hub.docker.com/v2/repositories/{repo}/{image}/tags"
+    url = f"https://registry.hub.docker.com/v2/repositories/{repo}/{image}/tags?page_size=100"
     try:
         r = requests.get(url)
         r.raise_for_status()
