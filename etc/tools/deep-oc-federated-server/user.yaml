@@ -68,19 +68,23 @@ configuration:
     name: Number of rounds
     value: 5
     range: [1, null]
+    description: Number of repetitions of the training.
 
   metric:
     name: Evaluation metric
     value: 'accuracy'
+    description: Metric that will be used for monitoring and validating the process. It will be aggregated according with the different clients. More than one metric can be included.
 
   min_clients:
     name: Minimal number of clients
     value: 2
     range: [2, null]
+    description: Number of minimum clients that must be connected with the server and ready to train the models for starting the process.
 
   strategy:
     name: Federated aggregation strategy
     value: 'Federated Averaging'
+    description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/deephdc/federated-server" target="_blank">Check the different options with their references.</a>
     options: [
         'Federated Averaging', # fedavg
         'Federated Optimization', # fedprox

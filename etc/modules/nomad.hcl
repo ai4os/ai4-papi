@@ -132,12 +132,13 @@ job "userjob-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        command  = "deep-start"
-        args     = ["--${SERVICE}"]
-        ports    = ["api", "monitor", "ide"]
-        shm_size = ${SHARED_MEMORY}
-        volumes  = [
+        force_pull = true
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
+        command    = "deep-start"
+        args       = ["--${SERVICE}"]
+        ports      = ["api", "monitor", "ide"]
+        shm_size   = ${SHARED_MEMORY}
+        volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
       }

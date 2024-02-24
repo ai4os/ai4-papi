@@ -186,8 +186,8 @@ def create_deployment(
             reference=user_conf,
         )
 
-    # Check if the provided configuration is within the quotas
-    quotas.check(
+    # Check if the provided configuration is within the job quotas
+    quotas.check_jobwise(
         conf=user_conf,
         vo=vo,
     )

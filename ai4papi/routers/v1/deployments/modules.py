@@ -177,10 +177,22 @@ def create_deployment(
             reference=user_conf,
         )
 
-    # Check if the provided configuration is within the quotas
-    quotas.check(
+    # Check if the provided configuration is within the job quotas
+    quotas.check_jobwise(
         conf=user_conf,
         vo=vo,
+    )
+
+    # Check if the provided configuration is within the user quotas
+    deployments = get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    quotas.check_userwise(
+        conf=user_conf,
+        deployments=deployments,
     )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -252,11 +264,11 @@ def create_deployment(
     # Modify the GPU section
     if user_conf['hardware']['gpu_num'] <= 0:
         # Delete GPU section in CPU deployments
-        del usertask['Resources']['Devices']
+        usertask['Resources']['Devices'] = None
     else:
-        # If gpu_type not provided, remove affinity to GPU model
+        # If gpu_type not provided, remove constraint to GPU model
         if not user_conf['hardware']['gpu_type']:
-            del usertask['Resources']['Devices'][0]['Affinities']
+            usertask['Resources']['Devices'][0]['Constraints'] = None
 
     # If storage credentials not provided, remove storage-related tasks
     if not all(user_conf['storage'].values()):

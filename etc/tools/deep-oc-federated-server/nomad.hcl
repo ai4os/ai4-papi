@@ -102,9 +102,10 @@ job "userjob-${JOB_UUID}" {
 
       # Use default command defined in the Dockerfile
       config {
-        image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        ports    = ["fedserver", "monitor", "ide"]
-        shm_size = ${SHARED_MEMORY}
+        force_pull = true
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
+        ports      = ["fedserver", "monitor", "ide"]
+        shm_size   = ${SHARED_MEMORY}
       }
 
       env {

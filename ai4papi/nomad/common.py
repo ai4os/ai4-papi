@@ -109,6 +109,7 @@ def get_deployment(
         'active_endpoints': None,
         'main_endpoint': None,
         'alloc_ID': None,
+        'datacenter': None,
     }
 
     # Retrieve tasks
@@ -212,8 +213,11 @@ def get_deployment(
 
         a = Nomad.allocation.get_allocation(allocs[idx]['ID'])
 
-        # Add ID and status
+        # Add ID
         info['alloc_ID'] = a['ID']
+
+        # Add datacenter
+        info['datacenter'] = Nomad.node.get_node(a['NodeID'])['Datacenter']
 
         # Replace Nomad status with a more user-friendly status
         if a['ClientStatus'] == 'pending':
