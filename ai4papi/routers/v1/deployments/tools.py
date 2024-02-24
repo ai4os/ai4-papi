@@ -252,7 +252,6 @@ def create_deployment(
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
             'OIDC_ACCESS_TOKEN': authorization.credentials,  #FIXME: temporal patch to try Vault secret reading in Federated server. Not feasible longterm because token expires. Wait till Nomad is connected with Vault and modify Nomad job.
             'VAULT_TOKEN': vault_token,
-            'FEDERATED_SECRET': user_conf['general']['federated_secret'],  #TODO: remove all references to this if no longer needed (ie. we use Vault)
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
