@@ -147,13 +147,14 @@ job "userjob-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        command  = "deep-start"
-        args     = ["--${SERVICE}"]
-        ports    = ["api", "monitor", "ide"]
-        shm_size = ${SHARED_MEMORY}
+        force_pull = true
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
+        command    = "deep-start"
+        args       = ["--${SERVICE}"]
+        ports      = ["api", "monitor", "ide"]
+        shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
-        volumes  = [
+        volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
         storage_opt = {
@@ -179,12 +180,13 @@ job "userjob-${JOB_UUID}" {
         device "gpu" {
           count = ${GPU_NUM}
 
-          # Add an affinity for a particular model
-          affinity {
+          # Add a constraint for a particular GPU model
+          constraint {
             attribute = "${device.model}"
+            operator  = "="
             value     = "${GPU_MODELNAME}"
-            weight    = 50
           }
+
         }
       }
     }
@@ -206,4 +208,3 @@ job "userjob-${JOB_UUID}" {
     }
   }
 }
-

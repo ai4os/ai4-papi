@@ -69,6 +69,9 @@ job "userjob-${JOB_UUID}" {
       port "fedserver" {
         to = 5000
       }
+      port "monitor" {
+        to = 6006
+      }
       port "ide" {
         to = 8888
       }
@@ -82,6 +85,16 @@ job "userjob-${JOB_UUID}" {
         "traefik.http.routers.${JOB_UUID}-fedserver.tls=true",
         "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
         "traefik.http.services.${JOB_UUID}-fedserver.loadbalancer.server.scheme=h2c",  # grpc support
+      ]
+    }
+
+    service {
+      name = "${JOB_UUID}-monitor"
+      port = "monitor"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
+        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -104,9 +117,10 @@ job "userjob-${JOB_UUID}" {
 
       # Use default command defined in the Dockerfile
       config {
-        image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        ports    = ["fedserver", "ide"]
-        shm_size = ${SHARED_MEMORY}
+        force_pull = true
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
+        ports      = ["fedserver", "monitor", "ide"]
+        shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
           size = "${DISK}M"
@@ -130,4 +144,3 @@ job "userjob-${JOB_UUID}" {
     }
   }
 }
-

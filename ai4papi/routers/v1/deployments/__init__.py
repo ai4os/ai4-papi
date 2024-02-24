@@ -12,4 +12,3 @@ app.include_router(
     router=tools.router,
     prefix='/deployments',
     )
-
