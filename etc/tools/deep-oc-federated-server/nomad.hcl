@@ -106,6 +106,7 @@ job "userjob-${JOB_UUID}" {
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         ports      = ["fedserver", "monitor", "ide"]
         shm_size   = ${SHARED_MEMORY}
+        memory_hard_limit = ${RAM}
       }
 
       env {
@@ -120,6 +121,7 @@ job "userjob-${JOB_UUID}" {
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}
+        memory_max = ${RAM}
       }
     }
   }
