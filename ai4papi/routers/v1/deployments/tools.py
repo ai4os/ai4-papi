@@ -209,7 +209,7 @@ def create_deployment(
     )
     utils.check_domain(domain)
 
-    # Create a Vault secret for Federated Server token
+    # Create a default secret for the Federated Server
     _ = ai4secrets.create_secret(
         vo=vo,
         secret_path=f"deployments/{job_uuid}/federated/default",
@@ -225,9 +225,7 @@ def create_deployment(
     vault_token = ai4secrets.create_vault_token(
         jwt=authorization.credentials,
         issuer=auth_info['issuer'],
-        ttl='1h',  #TODO: increase when ready
-        subpath=f"deployments/{job_uuid}",  # token should only be able to access the Vault deployment path
-        capabilities = ['read', 'list'],
+        ttl='365d',  # 1 year expiration date
     )
 
     # Replace the Nomad job template
@@ -250,7 +248,6 @@ def create_deployment(
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'OIDC_ACCESS_TOKEN': authorization.credentials,  #FIXME: temporal patch to try Vault secret reading in Federated server. Not feasible longterm because token expires. Wait till Nomad is connected with Vault and modify Nomad job.
             'VAULT_TOKEN': vault_token,
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],

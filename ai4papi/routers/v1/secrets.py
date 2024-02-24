@@ -29,8 +29,6 @@ def vault_client(jwt, issuer):
     Common init steps of Vault client
     """
     # Check we are using EGI Check-In prod
-    #TODO: move oidc providers to dict in main.yml configuration
-    # if issuer != papiconf['oicd']['egi_prod]:
     if issuer != 'https://aai.egi.eu/auth/realms/egi':
         raise HTTPException(
             status_code=400,
@@ -55,8 +53,6 @@ def create_vault_token(
     jwt,
     issuer,
     ttl='1h',
-    subpath='',
-    capabilities = ['read', 'list'],
     ):
     """
     Create a Vault token from a JWT.
@@ -65,29 +61,14 @@ def create_vault_token(
     * jwt: JSON web token
     * issuer: JWT issuer
     * ttl: duration of the token
-    * subpath: whether to restrict with subpath the token has access to
-    * capabilities: capabilities of the token
     """
     client = vault_client(jwt, issuer)
+    token = client.auth.token.create(ttl=ttl)
 
-    # Create a policy to restrict subpath access and/or capabilities
-    if subpath or capabilities:
-        #TODO: looks like EGI Vault is not allowing to create policies (nor to list them!)
-        # name = subpath + random_string()
-        # client.sys.create_or_update_policy(
-        #     name=name,
-        #     policy=desc,
-        # )
-        # policies = [name]
-        policies = []
-    else:
-        policies = []
-
-    # Generate token
-    token = client.auth.token.create(
-        policies=policies,
-        ttl=ttl,
-        )
+    #TODO: for extra security we should only allow reading/listing from a given subpath.
+    # - Restrict to read/list can be done with user roles
+    # - Restricting subpaths might not be done because policies are static (and
+    #   deployment paths are dynamic). In addition only admins can create policies)
 
     return token['auth']['client_token']
 
