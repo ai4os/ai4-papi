@@ -189,9 +189,11 @@ def get_cluster_stats_bg():
         'nodes' : {},  # individual node usage
         'cluster': {k: 0 for k in resources},  # aggregated cluster usage
         }
+    stats['cluster']['gpu_models'] = []
 
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
+    gpu_stats = {}
 
     # Get total stats for each node
     for n in nodes:
@@ -208,6 +210,11 @@ def get_cluster_stats_bg():
             for devices in n['NodeResources']['Devices']:
                 if devices['Type'] == 'gpu':
                     n_stats['gpu_total'] += len(devices['Instances'])
+
+                    # Track stats per GPU model type
+                    if devices['Name'] not in gpu_stats.keys():
+                        gpu_stats[devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
+                    gpu_stats[devices['Name']]['gpu_total'] += len(devices['Instances'])
 
         stats['nodes'][n['ID']] = n_stats
 
@@ -252,6 +259,7 @@ def get_cluster_stats_bg():
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
                     n_stats['gpu_used'] += gpu_num
+                    gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
 
@@ -260,6 +268,8 @@ def get_cluster_stats_bg():
         for k, v in n_stats.items():
             if k != 'name' :
                 stats['cluster'][k] += v
+
+    stats['cluster']['gpu_models'] = gpu_stats
 
     # Set the new shared variable
     global cluster_stats
