@@ -3,7 +3,7 @@ version: "3.9"
 services:
 
     ai4-papi-prod:
-        image: "ignacioheredia/ai4-papi:prod"
+        image: "registry.services.ai4os.eu/ai4os/ai4-papi:prod"
         restart: always
         environment:
             - NOMAD_ADDR=https://193.146.75.221:4646
@@ -17,7 +17,7 @@ services:
     ai4-papi-dev:
     # Right now dev is pointing to same services as prod.
     # Will change in the future.
-        image: "ignacioheredia/ai4-papi:prod"
+        image: "registry.services.ai4os.eu/ai4os/ai4-papi:prod"
         restart: always
         environment:
             - NOMAD_ADDR=https://193.146.75.221:4646

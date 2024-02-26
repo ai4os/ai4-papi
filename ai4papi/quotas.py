@@ -8,7 +8,7 @@ from fastapi import HTTPException
 import ai4papi.conf as papiconf
 
 
-def check(
+def check_jobwise(
     conf: dict,
     vo: str,
     ):
@@ -36,6 +36,35 @@ def check(
                     status_code=400,
                     detail=f"The parameter {k} should smaller or equal to {ref[k]['range'][1]}."
                     )
+
+
+def check_userwise(
+    conf: dict,
+    deployments: dict,
+    ):
+    """
+    Check the job configuration does not overflow the generic hardware limits.
+    For example, a user cannot have more than two GPUs running/queued.
+    """
+    # Aggregate user resources
+    user = {'gpu_num': 0}
+    for d in deployments:
+        user['gpu_num'] += d['resources']['gpu_num']
+
+    # Check if aggregate is within the limits
+    threshold = {'gpu_num': 2}
+    if (user['gpu_num'] + conf['hardware']['gpu_num']) > threshold['gpu_num'] and \
+        conf['hardware']['gpu_num']:
+        # TODO: remove this last line ("and conf['hardware']['gpu_num']"") once everyone
+        # is within the quotas. For the time being this line is enabling users that have
+        # overpassed the quotas (*) to make CPU deployments.
+        # (*) before the quotas were in place
+        raise HTTPException(
+            status_code=400,
+            detail="You already have at least 2 GPUs running and/or queued. " \
+                "If you want to make a new GPU deployment please delete one of your " \
+                "existing ones."
+            )
 
 
 def limit_resources(

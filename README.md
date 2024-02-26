@@ -23,7 +23,7 @@ The API is currently deployed here:
 * [production API](https://api.cloud.ai4eosc.eu/docs) (`master` branch)
 * [development API](https://api.dev.ai4eosc.eu/docs) (`dev` branch)
 
-Images of both API are accessible in [Dockerhub](https://hub.docker.com/repositories/ignacioheredia).
+Images of both API are accessible in [our private Harbor](https://registry.services.ai4os.eu/ai4os/ai4-papi) and [Dockerhub](https://hub.docker.com/repository/docker/ignacioheredia/ai4-papi/).
 <!---
 TODO: replace with AI4EOSC Dockerhub account
 -->
