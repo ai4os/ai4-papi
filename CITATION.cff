@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: AI4EOSC - Platform API
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - name: AI4EOSC collaboration
+    email: ai4eosc-support@listas.csic.es
+    website: 'https://ai4os.eu/'

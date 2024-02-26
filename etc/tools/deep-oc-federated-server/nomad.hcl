@@ -102,9 +102,11 @@ job "userjob-${JOB_UUID}" {
 
       # Use default command defined in the Dockerfile
       config {
-        image    = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        ports    = ["fedserver", "monitor", "ide"]
-        shm_size = ${SHARED_MEMORY}
+        force_pull = true
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
+        ports      = ["fedserver", "monitor", "ide"]
+        shm_size   = ${SHARED_MEMORY}
+        memory_hard_limit = ${RAM}
       }
 
       env {
@@ -119,6 +121,7 @@ job "userjob-${JOB_UUID}" {
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}
+        memory_max = ${RAM}
       }
     }
   }
