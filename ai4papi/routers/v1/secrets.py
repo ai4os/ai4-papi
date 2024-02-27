@@ -63,14 +63,19 @@ def create_vault_token(
     * ttl: duration of the token
     """
     client = vault_client(jwt, issuer)
-    token = client.auth.token.create(ttl=ttl)
+
+    # When creating the client (`jwt_login`) we are already creating a login token with
+    # default TTL (1h). So any newly created child token (independently of their TTL)
+    # will be revoked after the login token expires (1h).
+    # So instead of creating a child token, we have to *extend* login token.
+    client.auth.token.renew_self(increment=ttl)
 
     #TODO: for extra security we should only allow reading/listing from a given subpath.
     # - Restrict to read/list can be done with user roles
     # - Restricting subpaths might not be done because policies are static (and
     #   deployment paths are dynamic). In addition only admins can create policies)
 
-    return token['auth']['client_token']
+    return client.token
 
 
 def recursive_path_builder(client, kv_list):
