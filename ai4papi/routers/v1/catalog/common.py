@@ -223,7 +223,7 @@ class Catalog:
         if item_name not in items.keys():
             raise HTTPException(
                 status_code=400,
-                detail=f"Item {item_name} not in catalog: {items.keys()}",
+                detail=f"Item {item_name} not in catalog: {list(items.keys())}",
                 )
 
         # Retrieve metadata from default branch
