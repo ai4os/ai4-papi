@@ -4,7 +4,7 @@ from ai4papi.routers.v1.catalog.modules import Modules
 
 
 # List modules
-modules_list = Modules.get_list()
+modules_list = list(Modules.get_items().keys())
 
 assert isinstance(modules_list, list)
 assert 'deep-oc-image-classification-tf' in modules_list
