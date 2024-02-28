@@ -1,9 +1,9 @@
 import configparser
 from copy import deepcopy
-import re
+import json
 
 from cachetools import cached, TTLCache
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import requests
 
 from ai4papi import quotas, nomad
@@ -11,51 +11,94 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_list(
+def get_items(
     ):
-    """
-    Retrieve a list of *all* modules.
-
-    This is implemented in a separate function as many functions from this router
-    are using this function, so we need to avoid infinite recursions.
-    """
-
     gitmodules_url = "https://raw.githubusercontent.com/deephdc/deep-oc/master/.gitmodules"
     r = requests.get(gitmodules_url)
 
     cfg = configparser.ConfigParser()
     cfg.read_string(r.text)
 
-    # Convert 'submodule "DEEP-OC-..."' --> 'deep-oc-...'
-    modules = [
-        re.search(r'submodule "(.*)"', s).group(1).lower() for s in cfg.sections()
-        ]
+    modules = {}
+    for section in cfg.sections():
+        items = dict(cfg.items(section))
+        key = items.pop('path').lower()
+        modules[key] = items
 
     return modules
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+def get_metadata(
+    item_name: str,
+    ):
+    # Check if item is in the items list
+    items = get_items()
+    if item_name not in items.keys():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Item {item_name} not in catalog: {items.keys()}",
+            )
+
+    # Retrieve metadata from default branch
+    # Use try/except to avoid that a single module formatting error could take down
+    # all the Dashboard
+    branch = items[item_name].get("branch", "master")
+    url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
+    metadata_url = f"{url}/{branch}/metadata.json"
+    try:
+        r = requests.get(metadata_url)
+        metadata = json.loads(r.text)
+    except Exception:
+        print(f'Error parsing metadata: {item_name}')
+        metadata = {
+            "title": item_name,
+            "summary": "",
+            "description": [
+                "The metadata of this module could not be retrieved probably due to a ",
+                "JSON formatting error from the module maintainer."
+            ],
+            "keywords": [],
+            "license": "",
+            "date_creation": "",
+            "sources": {
+                "dockerfile_repo": f"https://github.com/deephdc/{item_name}",
+                "docker_registry_repo": f"deephdc/{item_name}",
+                "code": "",
+            }
+        }
+
+    # Format "description" field nicely for the Dashboards Markdown parser
+    metadata["description"] = "\n".join(metadata["description"])
+
+    return metadata
 
 
 def get_config(
     item_name: str,
     vo: str,
-):
-    """
-    Returns the default configuration (dict) for creating a deployment
-    for a specific module. It is prefilled with the appropriate
-    docker image and the available docker tags.
-    """
-    #TODO: We are not checking if module exists in the marketplace because
-    # we are treating each route as independent. In the future, this can
-    # be done as an API call to the other route.
+    ):
+    # Check if module exists
+    modules = get_items()
+    if item_name not in modules.keys():
+        raise HTTPException(
+            status_code=400,
+            detail=f"{item_name} is not an available module.",
+            )
 
+    # Retrieve module configuration
     conf = deepcopy(papiconf.MODULES['user']['full'])
 
-    # Fill with correct Docker image
-    conf["general"]["docker_image"]["value"] = f"deephdc/{item_name}"
+    # Retrieve module metadata
+    metadata = get_metadata(item_name)
 
     # Add available Docker tags
-    tags = retrieve_docker_tags(item_name)
+    registry = metadata['sources']['docker_registry_repo']
+    repo = registry.split('/')[0]
+    if repo not in ['deephdc', 'ai4oshub']:
+        repo = 'deephdc'
+    tags = retrieve_docker_tags(image=item_name, repo=repo)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
@@ -79,10 +122,10 @@ def get_config(
     return conf
 
 
-
 Modules = Catalog()
-Modules.get_list = get_list
+Modules.get_items  = get_items
 Modules.get_config = get_config
+Modules.get_metadata = get_metadata  # TODO: inherit the common one, because it's the same for modules and tools
 
 
 router = APIRouter(

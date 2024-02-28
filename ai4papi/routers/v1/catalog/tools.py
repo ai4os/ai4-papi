@@ -3,51 +3,55 @@ import json
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
-import requests
 import secrets
+import requests
 
 from ai4papi import quotas
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_list(
+def get_items(
     ):
-    """
-    Retrieve a list of *all* modules.
+    # Set default branch manually (because we are not yet reading this from submodules)
+    tools_branches= {
+        'deep-oc-federated-server': 'main',
+    }
 
-    This is implemented in a separate function as many functions from this router
-    are using this function, so we need to avoid infinite recursions.
-    """
+    tools = {}
+    for k in papiconf.TOOLS.keys():
+        tools[k] = {
+            'url': f'https://github.com/deephdc/{k}',
+            'branch': tools_branches[k],
+        }
 
-    return list(papiconf.TOOLS.keys())
+    return tools
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_metadata(
     item_name: str,
     ):
-    """
-    Get the module's full metadata.
-    """
-    # Get default branch
-    tools_branches= {
-        'deep-oc-federated-server': 'main',
-    }
-    branch = tools_branches[item_name]
+    # Check if item is in the items list
+    items = get_items()
+    if item_name not in items.keys():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Item {item_name} not in catalog: {items.keys()}",
+            )
 
-    # Retrieve metadata from that branch
+    # Retrieve metadata from default branch
     # Use try/except to avoid that a single module formatting error could take down
     # all the Dashboard
-    metadata_url = f"https://raw.githubusercontent.com/deephdc/{item_name}/{branch}/metadata.json"
-
+    branch = items[item_name].get("branch", "master")
+    url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
+    metadata_url = f"{url}/{branch}/metadata.json"
     try:
         r = requests.get(metadata_url)
         metadata = json.loads(r.text)
-
     except Exception:
+        print(f'Error parsing metadata: {item_name}')
         metadata = {
             "title": item_name,
             "summary": "",
@@ -75,11 +79,6 @@ def get_config(
     item_name: str,
     vo: str,
     ):
-    """
-    Returns the default configuration (dict) for creating a deployment
-    for a specific module. It is prefilled with the appropriate
-    docker image and the available docker tags.
-    """
     # Retrieve tool configuration
     try:
         conf = deepcopy(papiconf.TOOLS[item_name]['user']['full'])
@@ -89,8 +88,15 @@ def get_config(
             detail=f"{item_name} is not an available tool.",
             )
 
+    # Retrieve tool metadata
+    metadata = get_metadata(item_name)
+
     # Add available Docker tags
-    tags = retrieve_docker_tags(item_name)
+    registry = metadata['sources']['docker_registry_repo']
+    repo = registry.split('/')[0]
+    if repo not in ['deephdc', 'ai4oshub']:
+        repo = 'deephdc'
+    tags = retrieve_docker_tags(image=item_name, repo=repo)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
@@ -108,12 +114,10 @@ def get_config(
     return conf
 
 
-
 Tools = Catalog()
-Tools.get_list = get_list
+Tools.get_items = get_items
 Tools.get_config = get_config
-Tools.get_metadata = get_metadata
-
+Tools.get_metadata = get_metadata  # TODO: inherit the common one, because it's the same for modules and tools
 
 router = APIRouter(
     prefix="/tools",
