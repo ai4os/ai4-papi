@@ -22,7 +22,7 @@ def get_items(
     tools = {}
     for k in papiconf.TOOLS.keys():
         tools[k] = {
-            'url': f'https://github.com/deephdc/{k}',
+            'url': f'https://github.com/deephdc/{k}',  #TODO: this will need to be updated
             'branch': tools_branches[k],
         }
 
@@ -91,12 +91,17 @@ def get_config(
     # Retrieve tool metadata
     metadata = get_metadata(item_name)
 
-    # Add available Docker tags
+    # Parse docker registry
     registry = metadata['sources']['docker_registry_repo']
-    repo = registry.split('/')[0]
+    repo, image = registry.split('/')[:2]
     if repo not in ['deephdc', 'ai4oshub']:
         repo = 'deephdc'
-    tags = retrieve_docker_tags(image=item_name, repo=repo)
+
+    # Fill with correct Docker image
+    conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+
+    # Add available Docker tags
+    tags = retrieve_docker_tags(image=image, repo=repo)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
