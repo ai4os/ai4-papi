@@ -109,7 +109,6 @@ job "userjob-${JOB_UUID}" {
       }
 
       env {
-        OIDC_ACCESS_TOKEN     = "${OIDC_ACCESS_TOKEN}"
         VAULT_TOKEN           = "${VAULT_TOKEN}"
         jupyterPASSWORD       = "${JUPYTER_PASSWORD}"
         FEDERATED_SECRET      = "${FEDERATED_SECRET}"
