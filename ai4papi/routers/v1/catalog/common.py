@@ -83,8 +83,9 @@ class Catalog:
 
         """
         # Retrieve all modules
-        modules = self.get_items().keys()
-
+        modules = list(self.get_items().keys())
+        # (!): without list(...) FastAPI throws weird error
+        # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
         if any([tags, tags_any, not_tags, not_tags_any]):  # apply filtering
 
             # Move to tag dict for easier manipulation (wildcard substitution)
