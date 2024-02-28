@@ -63,8 +63,8 @@ def get_metadata(
             "license": "",
             "date_creation": "",
             "sources": {
-                "dockerfile_repo": f"https://github.com/deephdc/{item_name}",
-                "docker_registry_repo": f"deephdc/{item_name}",
+                "dockerfile_repo": f"https://github.com/ai4os-hub/{item_name}",
+                "docker_registry_repo": f"ai4oshub/{item_name}",
                 "code": "",
             }
         }
@@ -95,7 +95,7 @@ def get_config(
     registry = metadata['sources']['docker_registry_repo']
     repo, image = registry.split('/')[:2]
     if repo not in ['deephdc', 'ai4oshub']:
-        repo = 'deephdc'
+        repo = 'ai4oshub'
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"{repo}/{image}"

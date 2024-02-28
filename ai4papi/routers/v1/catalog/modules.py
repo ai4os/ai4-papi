@@ -14,7 +14,7 @@ from .common import Catalog, retrieve_docker_tags
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_items(
     ):
-    gitmodules_url = "https://raw.githubusercontent.com/deephdc/deep-oc/master/.gitmodules"
+    gitmodules_url = "https://raw.githubusercontent.com/ai4os-hub/modules-catalog/master/.gitmodules"
     r = requests.get(gitmodules_url)
 
     cfg = configparser.ConfigParser()
@@ -24,6 +24,7 @@ def get_items(
     for section in cfg.sections():
         items = dict(cfg.items(section))
         key = items.pop('path').lower()
+        items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
         modules[key] = items
 
     return modules
@@ -63,8 +64,8 @@ def get_metadata(
             "license": "",
             "date_creation": "",
             "sources": {
-                "dockerfile_repo": f"https://github.com/deephdc/{item_name}",
-                "docker_registry_repo": f"deephdc/{item_name}",
+                "dockerfile_repo": f"https://github.com/ai4os-hub/{item_name}",
+                "docker_registry_repo": f"ai4oshub/{item_name}",
                 "code": "",
             }
         }
@@ -97,7 +98,7 @@ def get_config(
     registry = metadata['sources']['docker_registry_repo']
     repo, image = registry.split('/')[:2]
     if repo not in ['deephdc', 'ai4oshub']:
-        repo = 'deephdc'
+        repo = 'ai4oshub'
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"{repo}/{image}"

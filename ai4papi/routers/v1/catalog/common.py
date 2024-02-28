@@ -247,8 +247,8 @@ class Catalog:
                 "license": "",
                 "date_creation": "",
                 "sources": {
-                    "dockerfile_repo": f"https://github.com/deephdc/{item_name}",
-                    "docker_registry_repo": f"deephdc/{item_name}",
+                    "dockerfile_repo": f"https://github.com/ai4os-hub/{item_name}",
+                    "docker_registry_repo": f"ai4os-hub/{item_name}",
                     "code": "",
                 }
             }
@@ -271,7 +271,7 @@ class Catalog:
 
 def retrieve_docker_tags(
     image: str,
-    repo: str = 'deephdc',
+    repo: str = 'ai4oshub',
     ):
     """
     Retrieve tags from Dockerhub image
