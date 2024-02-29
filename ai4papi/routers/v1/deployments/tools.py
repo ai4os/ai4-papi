@@ -124,7 +124,13 @@ def get_deployment(
             '/(.*):',  # remove dockerhub account and tag
             job['docker_image'],
             ).group(1)
-    if tool_name not in tool_list:
+    # TODO: temporal fix until all the jobs have job_type
+    if 'job_type' in job and job['job_type'] == 'module':
+        raise HTTPException(
+                    status_code=400,
+                    detail="This deployment is a module, not a tool.",
+                    )
+    elif tool_name not in tool_list:
         raise HTTPException(
             status_code=400,
             detail="This deployment is a module, not a tool.",
