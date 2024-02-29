@@ -35,6 +35,7 @@ def get_metadata(
     # Get default branch
     tools_branches= {
         'deep-oc-federated-server': 'main',
+        'deep-oc-kafka': 'master',
     }
     branch = tools_branches[item_name]
 

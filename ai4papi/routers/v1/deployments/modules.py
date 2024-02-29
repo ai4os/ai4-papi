@@ -124,7 +124,8 @@ def get_deployment(
             '/(.*):',  # remove dockerhub account and tag
             job['docker_image'],
             ).group(1)
-    if module_name in tool_list:
+    # TODO: improve harcoded solution
+    if module_name in tool_list or module_name == 'bitnami/kafka':
         raise HTTPException(
             status_code=400,
             detail="This deployment is a tool, not a module.",
