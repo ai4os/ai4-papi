@@ -171,7 +171,7 @@ def create_deployment(
     try:
         tool_name = conf["general"]["docker_image"].split('/')[1]  # deephdc/*
     except Exception:
-        tool_name = list(papiconf.TOOLS.keys())[0]
+        tool_name = list(papiconf.TOOLS.keys())[1]
 
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]['nomad'])

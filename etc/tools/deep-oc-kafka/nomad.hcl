@@ -12,7 +12,6 @@ job "userjob-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
-    job_type = // module o tool
   }
 
   group "kafka" {
