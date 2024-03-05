@@ -91,7 +91,11 @@ def get_config(
             )
 
     # Add available Docker tags
-    tags = retrieve_docker_tags(item_name)
+    # TODO: fix temporal solution
+    if item_name == 'deep-oc-kafka':
+        tags = retrieve_docker_tags('kafka', 'bitnami')
+    else:
+        tags = retrieve_docker_tags(item_name)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 

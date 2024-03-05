@@ -170,6 +170,9 @@ def create_deployment(
     # Retrieve toolname from configuration, else deploy first tool in the list
     try:
         tool_name = conf["general"]["docker_image"].split('/')[1]  # deephdc/*
+        # TODO: fix temporal solution
+        if tool_name == 'kafka':
+            tool_name = 'deep-oc-kafka'
     except Exception:
         tool_name = list(papiconf.TOOLS.keys())[1]
 
@@ -226,8 +229,14 @@ def create_deployment(
             'DISK': user_conf['hardware']['disk'],
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
-            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
             'FEDERATED_SECRET': user_conf['general']['federated_secret'],
+        }
+    )
+    
+    if tool_name == 'deep-oc-federated-server':
+        nomad_conf = nomad_conf.safe_substitute(
+        {
+            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
@@ -242,10 +251,11 @@ def create_deployment(
     usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
     # Launch `deep-start` compatible service if needed
-    service = user_conf['general']['service']
-    if service in ['deepaas', 'jupyter', 'vscode']:
-        usertask['Config']['command'] = 'deep-start'
-        usertask['Config']['args'] = [f'--{service}']
+    if hasattr(user_conf['general'], 'service'):
+        service = user_conf['general']['service']
+        if service in ['deepaas', 'jupyter', 'vscode']:
+            usertask['Config']['command'] = 'deep-start'
+            usertask['Config']['args'] = [f'--{service}']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

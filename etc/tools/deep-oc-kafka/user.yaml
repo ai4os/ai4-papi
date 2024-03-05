@@ -12,7 +12,7 @@
 general:
   title:
     name: Deployment title
-    value: 'Kafka'
+    value: ''
     description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
 
   desc:
@@ -27,7 +27,7 @@ general:
 
   docker_image:
     name: Docker image
-    value: 'deephdc/deep-oc-kafka'
+    value: 'bitnami/kafka'
     description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
 
   docker_tag:
@@ -36,21 +36,10 @@ general:
     description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
     options: ['latest']
 
-  service:
-    name: Service to run
-    value: 'fedserver'
-    description: When selecting FedServer, you won't be able to use JupyterLab/VScode, and vice versa. If you want to have access to both services at the same time, your best option is to deploy with JupyterLab/VScode. Then, open a terminal window and run FedServer yourself by typing `cd federated-server/fedserver` and then `python3 server.py`. You can also modify `server.py` different federation options than the ones initially selected at creation time.
-    options: ['fedserver', 'jupyter', 'vscode']
-
-  jupyter_password:
-    name: IDE password
-    value: ''
-    description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
-
-  federated_secret:
+  secret:
     name: Secret training token
     value: ''
-    description: This is the federated secret token that your clients should use to connect to the server.
+    description: This is the secret token that your clients should use to connect to the server.
 
 hardware:
   cpu_num:
@@ -68,32 +57,7 @@ hardware:
     value: 1000
     range: [1000, 2000]
 
-configuration:
-  rounds:
-    name: Number of rounds
-    value: 5
-    range: [1, null]
-    description: Number of repetitions of the training.
-
-  metric:
-    name: Evaluation metric
-    value: 'accuracy'
-    description: Metric that will be used for monitoring and validating the process. It will be aggregated according with the different clients. More than one metric can be included.
-
-  min_clients:
-    name: Minimal number of clients
-    value: 2
-    range: [2, null]
-    description: Number of minimum clients that must be connected with the server and ready to train the models for starting the process.
-
-  strategy:
-    name: Federated aggregation strategy
-    value: 'Federated Averaging'
-    description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/deephdc/federated-server" target="_blank">Check the different options with their references.</a>
-    options: [
-        'Federated Averaging', # fedavg
-        'Federated Optimization', # fedprox
-        'Federated Optimization with Adam', # fedadam
-        'Adaptive Federated Optimization', # fedopt
-        'Adaptive Federated Optimization using Yogi', # fedyogi
-      ]
+  instances_num:
+    name: Number of instances
+    value: 3
+    range: [1, 3]

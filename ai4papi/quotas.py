@@ -17,6 +17,9 @@ def check_jobwise(
     """
     # Retrieve generic quotas (vo-dependent)
     item_name = conf['general']['docker_image'].split('/')[-1]
+    # TODO: fix temporal solution
+    if item_name == 'kafka':
+        item_name = 'deep-oc-kafka'
     ref = limit_resources(
         item_name=item_name,
         vo=vo,
