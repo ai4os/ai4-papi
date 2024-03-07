@@ -125,7 +125,7 @@ def get_deployment(
             job['docker_image'],
             ).group(1)
     # TODO: improve harcoded solution
-    if module_name in tool_list or module_name == 'bitnami/kafka':
+    if module_name in tool_list or module_name == 'kafka':
         raise HTTPException(
             status_code=400,
             detail="This deployment is a tool, not a module.",

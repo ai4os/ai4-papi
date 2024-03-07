@@ -47,10 +47,10 @@ general:
     value: ''
     description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
 
-  federated_secret:
+  secret:
     name: Secret training token
     value: ''
-    description: This is the federated secret token that your clients should use to connect to the server.
+    description: This is the secret token that your clients should use to connect to the server.
 
 hardware:
   cpu_num:

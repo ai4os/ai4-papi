@@ -105,10 +105,8 @@ def get_config(
         vo=vo,
     )
 
-    # Extra tool-dependent steps
-    if item_name == 'deep-oc-federated-server':
-        # Create unique secret for that federated server
-        conf["general"]["federated_secret"]["value"] = secrets.token_hex()
+    # Create unique secret
+    conf["general"]["secret"]["value"] = secrets.token_hex()
 
     return conf
 

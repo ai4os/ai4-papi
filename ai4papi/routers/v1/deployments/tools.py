@@ -125,7 +125,7 @@ def get_deployment(
             job['docker_image'],
             ).group(1)
     # TODO: improve harcoded solution
-    if tool_name not in tool_list and tool_name != 'bitnami/kafka':
+    if tool_name not in tool_list and tool_name != 'kafka':
         raise HTTPException(
             status_code=400,
             detail="This deployment is a module, not a tool.",
@@ -211,7 +211,9 @@ def create_deployment(
     utils.check_domain(domain)
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    # TODO: maybe there is a better way to approach this substitution
+    if tool_name == 'deep-oc-federated-server':
+        nomad_conf = nomad_conf.safe_substitute(
         {
             'JOB_UUID': job_uuid,
             'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
@@ -229,18 +231,34 @@ def create_deployment(
             'DISK': user_conf['hardware']['disk'],
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
-            'FEDERATED_SECRET': user_conf['general']['federated_secret'],
-        }
-    )
-    
-    if tool_name == 'deep-oc-federated-server':
-        nomad_conf = nomad_conf.safe_substitute(
-        {
+            'SECRET': user_conf['general']['secret'],
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+        }
+    )
+    else:
+        nomad_conf = nomad_conf.safe_substitute(
+        {
+            'JOB_UUID': job_uuid,
+            'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+            'PRIORITY': priority,
+            'OWNER': auth_info['id'],
+            'OWNER_NAME': auth_info['name'],
+            'OWNER_EMAIL': auth_info['email'],
+            'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+            'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+            'DOMAIN': domain,
+            'DOCKER_IMAGE': user_conf['general']['docker_image'],
+            'DOCKER_TAG': user_conf['general']['docker_tag'],
+            'CPU_NUM': user_conf['hardware']['cpu_num'],
+            'RAM': user_conf['hardware']['ram'],
+            'DISK': user_conf['hardware']['disk'],
+            'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
+            # Limit at 50% of RAM memory, in bytes
+            'SECRET': user_conf['general']['secret']
         }
     )
 

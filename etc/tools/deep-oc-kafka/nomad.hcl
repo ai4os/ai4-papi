@@ -4,6 +4,7 @@
 job "userjob-${JOB_UUID}" {
 
   id = "${JOB_UUID}"
+  priority  = "${PRIORITY}"
   namespace = "${NAMESPACE}"
 
   meta {
@@ -18,7 +19,7 @@ job "userjob-${JOB_UUID}" {
     count = 3
 
     ephemeral_disk {
-      size = 20000
+      size = ${DISK}
     }
 
     network {
@@ -33,7 +34,7 @@ job "userjob-${JOB_UUID}" {
     }
 
     service {
-        name = "kafka-broker"
+        name = "${JOB_UUID}-broker"
         provider = "consul"
         address = "${attr.unique.network.ip-address}"
         port = "kafka-broker"
@@ -54,7 +55,7 @@ job "userjob-${JOB_UUID}" {
     }
 
     service {
-        name = "kafka-controller"
+        name = "${JOB_UUID}-controller"
         provider = "consul"
         address = "${attr.unique.network.ip-address}"
         port = "kafka-controller"
@@ -79,7 +80,7 @@ job "userjob-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image   = "docker.io/bitnami/kafka:latest"
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         privileged = true
         ports = ["kafka-broker", "kafka-controller"]
         network_mode = "host"
@@ -125,8 +126,9 @@ EOF
       }
 
       resources {
-        cpu    = 2000
-        memory = 1024
+        cores  = ${CPU_NUM}
+        memory = ${RAM}
+        memory_max = ${RAM}
       }
     }
   }
