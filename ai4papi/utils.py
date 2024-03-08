@@ -125,8 +125,8 @@ def get_service_base_definition():
                 \nINPUT_FILE_PATH=\"$INPUT_FILE_PATH.type\" \
                 \nFILE_NAME=`basename \"$INPUT_FILE_PATH\"` \
                 \nOUTPUT_FILE=\"$TMP_OUTPUT_DIR\"/\"$FILE_NAME\" \
-                \necho \'SCRIPT: Invoked deepaas-predict command. File available in $INPUT_FILE_PATH.\' \
-                \ndeepaas-predict -i $INPUT_FILE_PATH -o $OUTPUT_FILE"
+                \necho \'SCRIPT: Invoked deepaas-cli command.\' \
+                \ndeepaas-cli --deepaas_method_output $OUTPUT_FILE predict --files $INPUT_FILE_PATH"
     }
 
 def update_values_conf(submitted, reference):

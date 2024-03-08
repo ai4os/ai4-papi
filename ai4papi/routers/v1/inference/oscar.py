@@ -3,7 +3,7 @@ Manage OSCAR clusters to create and execute services.
 
 """
 from oscar_python.client import Client
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.security import HTTPBearer
 from typing import Tuple, Union
 from ai4papi import auth, utils
@@ -18,23 +18,31 @@ router = APIRouter(
     responses={404: {"description": "Inference not found"}},
 )
 
+app = FastAPI()
+
 class Service(BaseModel):
-    cluster_id: str  #fixme: (caterina) redundant? does not seem to be need as cluster_id already provided as parameter of the function
     name: str
     memory: str
     cpu: str
     image: str
     input_type: str
+    allowed_users: list[str]
 
-    #todo: service names are unique right? Shouldn't it be better renamed to "service_id"?
-    # which better conveys the uniqueness of the identifier. Just guessing.
-    # Additionally having a name/title is also helpful, but those are not need to be
-    # necessarily unique
-
-    #todo: (caterina) Add Basemodel example request for better documentation of usage
-    # https://fastapi.tiangolo.com/tutorial/schema-extra-example/#extra-json-schema-data-in-pydantic-models
-    # eg. what are possible input types?!
-
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {            
+                    "name": "string",
+                    "memory": "string",
+                    "cpu": "string",
+                    "image": "string",
+                    "input_type": "string",
+                    "output_type": "string",
+                    "allowed_users": ["string"]
+                }
+            ]
+        }
+    }
 
 security = HTTPBearer()
 
@@ -71,6 +79,7 @@ def make_service_definition(svc_conf, cluster_id):
     service_definition["cpu"] = svc_conf.cpu
     service_definition["image"] = svc_conf.image
     service_definition["script"] = re.sub('.type','.'+svc_conf.input_type, service_definition["script"])
+    service_definition["allowed_users"] = svc_conf.allowed_users
 
     endpoint = MAIN_CONF["oscar"]["clusters"][cluster_id]["endpoint"]
     service_url = endpoint+"/services/"+cluster_id+"/"+svc_conf.name
@@ -118,13 +127,10 @@ def update_service(cluster_id: str,
 
     client = get_client_from_auth(authorization, cluster_id, vo)
 
-    #todo: (caterina) first you would need to retrieve the existing service and
-    # check that service belongs to the user. Users should not be able to update
-    # services from other users.
-
     # If authentication doesn't fail set user vo on the service
     service_definition, service_url = make_service_definition(svc_conf, cluster_id)
     service_definition["vo"] = vo
+    service_definition["allowed_users"] = svc_conf.allowed_users
 
     # update_service method needs all service parameters to be on the request
     result = client.update_service(svc_conf.name, service_definition)
@@ -143,14 +149,6 @@ def get_services_list(cluster_id: str,
     client = get_client_from_auth(authorization, cluster_id, vo)
     result = client.list_services()
 
-    #todo: (caterina) this is returning **all** services, not the ones belonging to the
-    # user. If OSCAR is not filtering the services based on the oidc_token you provided
-    # in the "client", then you should filter them yourself here.
-
-    # todo: (caterina) In addition, services seem to be saving the "token", not the
-    # "user_id" which is what you should use to identify users, because token change
-    # after 1hr.
-
     return (result.status_code, json.loads(result.text))
 
 # Retrieves a specific service.
@@ -164,8 +162,6 @@ def get_service(cluster_id: str,
     client = get_client_from_auth(authorization, cluster_id, vo)
     result = client.get_service(service_name)
 
-    #todo: (caterina) same comment as above, check service belong to user
-
     return (result.status_code, json.loads(result.text))
 
 # Delete a specific service.
@@ -176,10 +172,6 @@ def delete_service(cluster_id: str,
                     authorization=Depends(security)):
 
     client = get_client_from_auth(authorization, cluster_id, vo)
-
-    #todo: (caterina) again, you should check that the service belongs to the user
-    # before allowing him to delete it (unless OSCAR is checking it, which do not
-    # seem the case from the "get_service_list" function).
 
     result = client.remove_service(service_name)
     return (result.status_code,service_name)
@@ -192,8 +184,6 @@ def inference(cluster_id: str,
                 data: dict,
                 authorization=Depends(security)):
     client = get_client_from_auth(authorization, cluster_id, vo)
-
-    #todo: (caterina) same comment as above, check service belongs to user
 
     result = client.run_service(service_name, input=data["input_data"])
     try:

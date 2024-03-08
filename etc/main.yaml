@@ -39,8 +39,6 @@ lb:  # load balancer, Traefik
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
 
-#TODO create endpoints here
-
 oscar:
   clusters:
     oscar-ai4eosc-cluster:

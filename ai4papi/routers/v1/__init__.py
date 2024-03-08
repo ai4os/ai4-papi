@@ -1,11 +1,13 @@
 import fastapi
 
-from . import catalog, deployments, inference
+from .inference import oscar
+
+from . import catalog, deployments
 
 app = fastapi.APIRouter()
 app.include_router(catalog.app)
 app.include_router(deployments.app)
-app.include_router(inference.router)
+app.include_router(oscar.router)
 
 @app.get(
     "/",
