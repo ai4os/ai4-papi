@@ -1,10 +1,12 @@
 import fastapi
 
-from . import catalog, deployments
+from . import catalog, deployments, inference
+
 
 app = fastapi.APIRouter()
 app.include_router(catalog.app)
 app.include_router(deployments.app)
+app.include_router(inference.app)
 
 
 @app.get(

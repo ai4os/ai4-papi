@@ -42,15 +42,17 @@ session = requests.Session()
 def get_deployments(
     namespace: str,
     owner: str,
+    name: str
     ):
     """
     Returns a list of all deployments belonging to a user, in a given namespace.
     """
     job_filter = \
         'Status != "dead" and ' + \
-        'Name matches "^userjob" and ' + \
+        f'Name matches "^{name}" and ' + \
         'Meta is not empty and ' + \
         f'Meta.owner == "{owner}"'
+
     jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
     return jobs
 
