@@ -99,6 +99,7 @@ def get_deployment(
         'owner': j['Meta']['owner'],
         'title': j['Meta']['title'],
         'description': j['Meta']['description'],
+        'job_type': None,
         'docker_image': None,
         'docker_command': None,
         'submit_time': datetime.fromtimestamp(
@@ -111,6 +112,10 @@ def get_deployment(
         'alloc_ID': None,
         'datacenter': None,
     }
+
+    # TODO: temporal fix until all jobs have job type
+    if 'job_type' in j['Meta']:
+        info['job_type'] = j['Meta']['job_type']
 
     # Retrieve tasks
     tasks = j['TaskGroups'][0]['Tasks']
