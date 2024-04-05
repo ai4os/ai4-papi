@@ -115,7 +115,7 @@ def get_deployment(
 
     # TODO: temporal fix until all jobs have job type
     if 'job_type' in j['Meta']:
-        info['job_type'] = j['Meta']['job_type'],
+        info['job_type'] = j['Meta']['job_type']
 
     # Retrieve tasks
     tasks = j['TaskGroups'][0]['Tasks']
