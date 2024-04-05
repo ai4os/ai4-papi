@@ -248,7 +248,7 @@ class Catalog:
                 "license": "",
                 "date_creation": "",
                 "sources": {
-                    "dockerfile_repo": f"https://github.com/ai4os-hub/{item_name}",
+                    "dockerfile_repo": f"https://github.com/ai4oshub/{item_name}",
                     "docker_registry_repo": f"ai4os-hub/{item_name}",
                     "code": "",
                 }

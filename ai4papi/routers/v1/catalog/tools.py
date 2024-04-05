@@ -1,5 +1,5 @@
 from copy import deepcopy
-import json
+import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
@@ -12,8 +12,7 @@ from .common import Catalog, retrieve_docker_tags
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_items(
-    ):
+def get_items(self):
     # Set default branch manually (because we are not yet reading this from submodules)
     tools_branches= {
         'deep-oc-federated-server': 'main',
@@ -29,53 +28,8 @@ def get_items(
     return tools
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_metadata(
-    item_name: str,
-    ):
-    # Check if item is in the items list
-    items = get_items()
-    if item_name not in items.keys():
-        raise HTTPException(
-            status_code=400,
-            detail=f"Item {item_name} not in catalog: {list(items.keys())}",
-            )
-
-    # Retrieve metadata from default branch
-    # Use try/except to avoid that a single module formatting error could take down
-    # all the Dashboard
-    branch = items[item_name].get("branch", "master")
-    url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
-    metadata_url = f"{url}/{branch}/metadata.json"
-    try:
-        r = requests.get(metadata_url)
-        metadata = json.loads(r.text)
-    except Exception:
-        print(f'Error parsing metadata: {item_name}')
-        metadata = {
-            "title": item_name,
-            "summary": "",
-            "description": [
-                "The metadata of this module could not be retrieved probably due to a ",
-                "JSON formatting error from the module maintainer."
-            ],
-            "keywords": [],
-            "license": "",
-            "date_creation": "",
-            "sources": {
-                "dockerfile_repo": f"https://github.com/ai4os-hub/{item_name}",
-                "docker_registry_repo": f"ai4oshub/{item_name}",
-                "code": "",
-            }
-        }
-
-    # Format "description" field nicely for the Dashboards Markdown parser
-    metadata["description"] = "\n".join(metadata["description"])
-
-    return metadata
-
-
 def get_config(
+    self,
     item_name: str,
     vo: str,
     ):
@@ -89,7 +43,7 @@ def get_config(
             )
 
     # Retrieve tool metadata
-    metadata = get_metadata(item_name)
+    metadata = self.get_metadata(item_name)
 
     # Parse docker registry
     registry = metadata['sources']['docker_registry_repo']
@@ -120,9 +74,9 @@ def get_config(
 
 
 Tools = Catalog()
-Tools.get_items = get_items
-Tools.get_config = get_config
-Tools.get_metadata = get_metadata  # TODO: inherit the common one, because it's the same for modules and tools
+Tools.get_items = types.MethodType(get_items, Tools)
+Tools.get_config = types.MethodType(get_config, Tools)
+
 
 router = APIRouter(
     prefix="/tools",

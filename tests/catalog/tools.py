@@ -8,7 +8,7 @@ tools_list = list(Tools.get_items().keys())
 
 assert isinstance(tools_list, list)
 assert 'deep-oc-federated-server' in tools_list
-assert 'deep-oc-image-classification-tf' not in tools_list
+assert 'dogs-breed-detector' not in tools_list
 
 # List filtered tools
 tools_list2 = Tools.get_filtered_list(

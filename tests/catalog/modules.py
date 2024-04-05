@@ -7,7 +7,7 @@ from ai4papi.routers.v1.catalog.modules import Modules
 modules_list = list(Modules.get_items().keys())
 
 assert isinstance(modules_list, list)
-assert 'deep-oc-image-classification-tf' in modules_list
+assert 'dogs-breed-detector' in modules_list
 assert 'deep-oc-federated-server' not in modules_list
 
 # List filtered modules
