@@ -213,9 +213,7 @@ def create_deployment(
     _ = ai4secrets.create_secret(
         vo=vo,
         secret_path=f"deployments/{job_uuid}/federated/default",
-        secret_data={
-            'token': user_conf['general']['federated_secret'],
-        },
+        secret_data={'token': secrets.token_hex()},
         authorization=SimpleNamespace(
             credentials=authorization.credentials,
         ),
@@ -248,7 +246,6 @@ def create_deployment(
             'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
             # Limit at 50% of RAM memory, in bytes
             'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'FEDERATED_SECRET': user_conf['general']['federated_secret'],
             'VAULT_TOKEN': vault_token,
             'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
