@@ -16,7 +16,7 @@ If running from VScode make sure to launch `code` from that terminal so it can a
 that ENV variable.'
         )
 
-SECRET_PATH = 'demo-papi-tests/demo-secret'
+SECRET_PATH = '/demo-papi-tests/demo-secret'
 SECRET_DATA = {'pwd': 12345}
 
 # Create secret
