@@ -3,6 +3,7 @@ import re
 import types
 from typing import Tuple, Union
 import uuid
+import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -231,33 +232,21 @@ def create_deployment(
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+            #Mail parameters
+
+            'MAIL_IMAGE' : 'sftobias/mail-client',
+            'MAIL_TAG' : 'prod',
+            'DAYS_THRESHOLD' : 7,
+            # 'DATE' : str(datetime.date.today()),
+            'DATE' : '2022-01-01',
+            'MAILING_TOKEN' : "YVv4Yv7QMkmvcEMk4i8lSwo0ePbwUpjIkqGfakM1piuth2zl8brBXtjwZmZQ4WSG",
         }
     )
 
     # Convert template to Nomad conf
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    tasks = nomad_conf["TaskGroups"][0]["Tasks"]
-
-    # Add a new task to the tasks list
-    email_task = {
-        "lifecycle": {"hook": "prestart", "sidecar": False},
-        "Name": "email",
-        "Driver": "docker",
-        "Config": {"image": "sftobias/mail-client:prod"},
-        "env": {
-            "NUM_DAYS": "7",
-            "DATE": str(utils.get_date()),
-            "DEST": auth_info["email"],
-            "BODY": f"The job \"{user_conf['general']['title']}\" has started its execution.\n You can access it at:\n\n https://dashboard.cloud.ai4eosc.eu/deployments.\n\n https://ide-{job_uuid}.deployments.cloud.ai4eosc.eu/login",
-            "SUBJECT": f"\"{user_conf['general']['title']}\" execution has started",
-            "MAILING_TOKEN": "YVv4Yv7QMkmvcEMk4i8lSwo0ePbwUpjIkqGfakM1piuth2zl8brBXtjwZmZQ4WSG",
-        },
-        "RestartPolicy": {"Attempts": 0, "Mode": "fail"},
-    }
-    
-    tasks.append(email_task)    
-    
+    tasks = nomad_conf["TaskGroups"][0]["Tasks"]    
     usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
     # Launch `deep-start` compatible service if needed

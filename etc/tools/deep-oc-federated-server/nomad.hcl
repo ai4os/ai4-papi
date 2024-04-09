@@ -124,5 +124,39 @@ job "userjob-${JOB_UUID}" {
         memory_max = ${RAM}
       }
     }
+
+    task "mail-task" {
+
+      lifecycle {
+        hook = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        image = "${MAIL_IMAGE}:${MAIL_TAG}"
+      }
+
+      env {
+        NUM_DAYS="${DAYS_THRESHOLD}"
+        DATE="${DATE}"
+        DEST="${OWNER_EMAIL}"
+        BODY="The job \"${TITLE}\" has started its execution.\n You can access it at:\n\n https://dashboard.cloud.ai4eosc.eu/deployments.\n\n https://ide-${JOB_UUID}.deployments.cloud.ai4eosc.eu/login"
+        SUBJECT="${TITLE} execution has started" 
+        MAILING_TOKEN="${MAILING_TOKEN}"
+      }
+
+      resources {
+        cores  = 1
+      }
+
+      restart {
+        attempts = 0
+        mode     = "fail"
+      }
+
+    }
+
   }
 }
