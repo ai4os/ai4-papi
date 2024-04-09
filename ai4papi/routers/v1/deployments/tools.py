@@ -3,6 +3,8 @@ import re
 import types
 from typing import Tuple, Union
 import uuid
+import datetime
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -231,13 +233,20 @@ def create_deployment(
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+            #Mail parameters
+
+            'MAIL_IMAGE' : 'sftobias/mail-client',
+            'MAIL_TAG' : 'prod',
+            'DAYS_THRESHOLD' : 7,
+            'DATE' : str(datetime.date.today()),
+            'MAILING_TOKEN' : os.getenv("MAIL_TOKEN", default=None),
         }
     )
 
     # Convert template to Nomad conf
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    tasks = nomad_conf['TaskGroups'][0]['Tasks']
+    tasks = nomad_conf["TaskGroups"][0]["Tasks"]    
     usertask = [t for t in tasks if t['Name']=='usertask'][0]
 
     # Launch `deep-start` compatible service if needed

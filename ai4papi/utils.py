@@ -6,7 +6,6 @@ import re
 from fastapi import HTTPException
 import requests
 
-
 # Persistent requests session for faster requests
 session = requests.Session()
 
@@ -141,3 +140,5 @@ def update_values_conf(submitted, reference):
         reference[k].update(submitted[k])
 
     return reference
+
+
