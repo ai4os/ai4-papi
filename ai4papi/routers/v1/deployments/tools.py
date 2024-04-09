@@ -237,8 +237,7 @@ def create_deployment(
             'MAIL_IMAGE' : 'sftobias/mail-client',
             'MAIL_TAG' : 'prod',
             'DAYS_THRESHOLD' : 7,
-            # 'DATE' : str(datetime.date.today()),
-            'DATE' : '2022-01-01',
+            'DATE' : str(datetime.date.today()),
             'MAILING_TOKEN' : "YVv4Yv7QMkmvcEMk4i8lSwo0ePbwUpjIkqGfakM1piuth2zl8brBXtjwZmZQ4WSG",
         }
     )
