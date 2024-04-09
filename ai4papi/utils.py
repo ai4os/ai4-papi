@@ -5,6 +5,8 @@ import re
 
 from fastapi import HTTPException
 import requests
+from dateutil import parser
+
 
 
 # Persistent requests session for faster requests
@@ -141,3 +143,13 @@ def update_values_conf(submitted, reference):
         reference[k].update(submitted[k])
 
     return reference
+
+
+def get_date():
+    global current_date
+    url = "http://worldtimeapi.org/api/timezone/Europe/Madrid"
+    response = requests.get(url)
+    data = response.json()
+    current_date = parser.parse(data["datetime"])
+
+    return current_date
