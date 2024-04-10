@@ -1,8 +1,6 @@
 """
 Manage OSCAR clusters to create and execute services.
-
-"""
-from oscar_python.client import Client
+from typing import List
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.security import HTTPBearer
 from typing import Tuple, Union
@@ -24,7 +22,7 @@ class Service(BaseModel):
     cpu: str
     image: str
     input_type: str
-    allowed_users: list[str]
+    allowed_users: List[str]
 
     model_config = {
         "json_schema_extra": {
