@@ -13,12 +13,10 @@ from ai4papi.conf import MAIN_CONF
 from pydantic import BaseModel
 
 router = APIRouter(
-    prefix="/inference",
-    tags=["inference"],
+    prefix="/oscar",
+    tags=["OSCAR inference"],
     responses={404: {"description": "Inference not found"}},
 )
-
-app = FastAPI()
 
 class Service(BaseModel):
     name: str
