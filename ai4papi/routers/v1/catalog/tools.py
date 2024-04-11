@@ -5,7 +5,6 @@ import types
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
 import requests
-import secrets
 
 from ai4papi import quotas
 import ai4papi.conf as papiconf
@@ -101,12 +100,7 @@ def get_config(
         item_name=item_name,
         vo=vo,
     )
-
-    # Extra tool-dependent steps
-    if item_name == 'deep-oc-federated-server':
-        # Create unique secret for that federated server
-        conf["general"]["federated_secret"]["value"] = secrets.token_hex()
-
+    
     return conf
 
 
