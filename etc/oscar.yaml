@@ -4,14 +4,14 @@ log_level: CRITICAL
 alpine: False
 name: ${NAME}
 image: ${IMAGE}
-cpu: ${CPU}
-memory: ${MEMORY}
+cpu: "${CPU}"
+memory: "${MEMORY}"
 vo: ${VO}
 allowed_users: ${ALLOWED_USERS}
 script: |-
    #!/bin/bash
-   mv $INPUT_FILE_PATH "$INPUT_FILE_PATH.type"
-   INPUT_FILE_PATH="$INPUT_FILE_PATH.type"
+   mv $INPUT_FILE_PATH "$INPUT_FILE_PATH.${TYPE}"
+   INPUT_FILE_PATH="$INPUT_FILE_PATH.${TYPE}"
    FILE_NAME=`basename "$INPUT_FILE_PATH"`
    OUTPUT_FILE="$TMP_OUTPUT_DIR"/"$FILE_NAME"
    echo 'SCRIPT: Invoked deepaas-cli command.'
