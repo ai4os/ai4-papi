@@ -3,8 +3,8 @@ Manage OSCAR clusters to create and execute services.
 """
 from copy import deepcopy
 import json
-import re
 from typing import List
+import yaml
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer
@@ -69,24 +69,27 @@ def get_client_from_auth(token, vo):
 
 
 def make_service_definition(svc_conf, vo):
+    # Create service definition
+    service = deepcopy(OSCAR_TMPL)  # init from template
+    service = service.safe_substitute(
+        {
+            'NAME': svc_conf.name,
+            'IMAGE': svc_conf.image,
+            'CPU': svc_conf.cpu,
+            'MEMORY': svc_conf.memory,
+            'TYPE': svc_conf.input_type,
+            'ALLOWED_USERS': svc_conf.allowed_users,
+            'VO': vo,
+        }
+    )
+    service = yaml.safe_load(service)
 
-    service_definition = deepcopy(OSCAR_TMPL)
-    service_definition["name"] = svc_conf.name
-    service_definition["memory"] = svc_conf.memory
-    service_definition["cpu"] = svc_conf.cpu
-    service_definition["image"] = svc_conf.image
-    service_definition["script"] = re.sub(
-        '.type',
-        '.'+svc_conf.input_type,
-        service_definition["script"]
-        )
-    service_definition["allowed_users"] = svc_conf.allowed_users
-
+    # Create service url
     cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
     endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-    service_url = endpoint+"/services/"+cluster_id+"/"+svc_conf.name
+    url = f"{endpoint}/services/{cluster_id}/{svc_conf.name}"
 
-    return service_definition, service_url
+    return service, url
 
 
 @router.get("/cluster")
@@ -156,15 +159,13 @@ def create_service(
     """
     client = get_client_from_auth(authorization.credentials, vo)
 
-    # If authentication doesn't fail set user vo on the service
+    # Create service
     service_definition, service_url = make_service_definition(svc_conf, vo)
-    service_definition["vo"] = vo
-
-    result = client.create_service(service_definition)
-    if result.status_code == 201:
-        return (result.status_code, service_url)
+    r = client.create_service(service_definition)
+    if r.status_code == 201:
+        return (r.status_code, service_url)
     else:
-        return (result.status_code, None)
+        return (r.status_code, None)
 
 
 @router.put("/services/{service_name}")
@@ -174,21 +175,18 @@ def update_service(
     authorization=Depends(security),
     ):
     """
-    Updates service if it exists
+    Updates service if it exists.
+    The method needs all service parameters to be on the request.
     """
     client = get_client_from_auth(authorization.credentials, vo)
 
-    # If authentication doesn't fail set user vo on the service
+    # Update service
     service_definition, service_url = make_service_definition(svc_conf, vo)
-    service_definition["vo"] = vo
-    service_definition["allowed_users"] = svc_conf.allowed_users
-
-    # update_service method needs all service parameters to be on the request
-    result = client.update_service(svc_conf.name, service_definition)
-    if result.status_code == 200:
-        return (result.status_code, service_url)
+    r = client.update_service(svc_conf.name, service_definition)
+    if r.status_code == 200:
+        return (r.status_code, service_url)
     else:
-        return (result.status_code, None)
+        return (r.status_code, None)
 
 
 @router.delete("/services/{service_name}")
@@ -201,8 +199,8 @@ def delete_service(
     Delete a specific service.
     """
     client = get_client_from_auth(authorization.credentials, vo)
-    result = client.remove_service(service_name)
-    return (result.status_code,service_name)
+    r = client.remove_service(service_name)
+    return (r.status_code, service_name)
 
 
 @router.post("/services/{service_name}")
@@ -216,8 +214,8 @@ def inference(
     Make a synchronous execution (inference)
     """
     client = get_client_from_auth(authorization.credentials, vo)
-    result = client.run_service(service_name, input=data["input_data"])
+    r = client.run_service(service_name, input=data["input_data"])
     try:
-        return (result.status_code, json.loads(result.text))
+        return (r.status_code, json.loads(r.text))
     except Exception:
-        return (result.status_code, result.text)
+        return (r.status_code, r.text)
