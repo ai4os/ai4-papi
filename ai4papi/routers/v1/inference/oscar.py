@@ -47,18 +47,17 @@ class Service(BaseModel):
 security = HTTPBearer()
 
 
-def get_client_from_auth(authorization, vo):
+def get_client_from_auth(token, vo):
     """
-    Retrieve authenticated user info
+    Retrieve authenticated user info and init OSCAR client.
     """
-    oidc_token = authorization.credentials
-    auth_info = auth.get_user_info(token=oidc_token)
+    auth_info = auth.get_user_info(token)
     auth.check_vo_membership(vo, auth_info['vos'])
 
     client_options = {
         'cluster_id': MAIN_CONF["oscar"]["clusters"][vo]['cluster_id'],
         'endpoint': MAIN_CONF["oscar"]["clusters"][vo]['endpoint'],
-        'oidc_token': oidc_token,
+        'oidc_token': token,
         'ssl': 'true',
         }
 
@@ -98,7 +97,7 @@ def get_cluster_info(
     Gets information about the cluster.
     - Returns a JSON with the cluster information.
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
     r = client.get_cluster_info()
     return (r.status_code, json.loads(r.text))
 
@@ -118,7 +117,7 @@ def get_services_list(
 
     - Returns a JSON with the cluster information.
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
     r = client.list_services()
 
     # Filter out public services, if requested
@@ -140,7 +139,7 @@ def get_service(
     Retrieves a specific service.
     - Returns a JSON with the cluster information.
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
     result = client.get_service(service_name)
     return (result.status_code, json.loads(result.text))
 
@@ -154,7 +153,7 @@ def create_service(
     """
     Creates a new inference service for an AI pre-trained model on a specific cluster
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
 
     # If authentication doesn't fail set user vo on the service
     service_definition, service_url = make_service_definition(svc_conf, vo)
@@ -176,7 +175,7 @@ def update_service(
     """
     Updates service if it exists
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
 
     # If authentication doesn't fail set user vo on the service
     service_definition, service_url = make_service_definition(svc_conf, vo)
@@ -200,7 +199,7 @@ def delete_service(
     """
     Delete a specific service.
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
     result = client.remove_service(service_name)
     return (result.status_code,service_name)
 
@@ -215,7 +214,7 @@ def inference(
     """
     Make a synchronous execution (inference)
     """
-    client = get_client_from_auth(authorization, vo)
+    client = get_client_from_auth(authorization.credentials, vo)
     result = client.run_service(service_name, input=data["input_data"])
     try:
         return (result.status_code, json.loads(result.text))
