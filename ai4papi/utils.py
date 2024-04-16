@@ -113,22 +113,6 @@ def check_domain(base_url):
     return None
 
 
-def get_service_base_definition():
-    """
-    Base parameters of an OSCAR service
-
-    """
-    return {
-    "log_level": "CRITICAL",
-    "alpine": False,
-    "script": "#!/bin/bash \nmv $INPUT_FILE_PATH \"$INPUT_FILE_PATH.type\" \
-                \nINPUT_FILE_PATH=\"$INPUT_FILE_PATH.type\" \
-                \nFILE_NAME=`basename \"$INPUT_FILE_PATH\"` \
-                \nOUTPUT_FILE=\"$TMP_OUTPUT_DIR\"/\"$FILE_NAME\" \
-                \necho \'SCRIPT: Invoked deepaas-cli command.\' \
-                \ndeepaas-cli --deepaas_method_output $OUTPUT_FILE predict --files $INPUT_FILE_PATH"
-    }
-
 def update_values_conf(submitted, reference):
     """
     Update the reference YAML values configuration with a user submitted ones.

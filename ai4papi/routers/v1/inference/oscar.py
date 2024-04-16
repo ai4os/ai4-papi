@@ -1,6 +1,7 @@
 """
 Manage OSCAR clusters to create and execute services.
 """
+from copy import deepcopy
 import json
 import re
 from typing import List
@@ -10,8 +11,8 @@ from fastapi.security import HTTPBearer
 from oscar_python.client import Client
 from pydantic import BaseModel
 
-from ai4papi import auth, utils
-from ai4papi.conf import MAIN_CONF
+from ai4papi import auth
+from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
 
 
 router = APIRouter(
@@ -69,7 +70,7 @@ def get_client_from_auth(token, vo):
 
 def make_service_definition(svc_conf, vo):
 
-    service_definition = utils.get_service_base_definition()
+    service_definition = deepcopy(OSCAR_TMPL)
     service_definition["name"] = svc_conf.name
     service_definition["memory"] = svc_conf.memory
     service_definition["cpu"] = svc_conf.cpu

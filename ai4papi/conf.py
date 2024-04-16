@@ -79,3 +79,7 @@ for tool_path in tool_list:
             'values': yml[1],
         }
     }
+
+# OSCAR template
+with open(paths['conf'] / 'oscar.yaml', 'r') as f:
+    OSCAR_TMPL = yaml.safe_load(f)

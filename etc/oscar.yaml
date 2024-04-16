@@ -1,0 +1,12 @@
+# OSCAR service definition
+
+log_level: CRITICAL
+alpine: False
+script: |-
+   #!/bin/bash
+   mv $INPUT_FILE_PATH "$INPUT_FILE_PATH.type"
+   INPUT_FILE_PATH="$INPUT_FILE_PATH.type"
+   FILE_NAME=`basename "$INPUT_FILE_PATH"`
+   OUTPUT_FILE="$TMP_OUTPUT_DIR"/"$FILE_NAME"
+   echo 'SCRIPT: Invoked deepaas-cli command.'
+   deepaas-cli --deepaas_method_output $OUTPUT_FILE predict --files $INPUT_FILE_PATH
