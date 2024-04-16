@@ -124,7 +124,7 @@ def get_services_list(
     # Filter out public services, if requested
     services = []
     for s in json.loads(r.text):
-        if s['allowed_users'] or public:
+        if s.get('allowed_users', None) or public:
             services.append(s)
 
     return (r.status_code, services)
