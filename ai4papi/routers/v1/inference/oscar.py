@@ -5,7 +5,7 @@ import json
 import re
 from typing import List
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
 from pydantic import BaseModel
@@ -106,15 +106,28 @@ def get_cluster_info(
 @router.get("/services")
 def get_services_list(
     vo: str,
+    public: bool = Query(default=False),
     authorization=Depends(security),
     ):
     """
     Retrieves a list of all the deployed services of the cluster.
+
+    **Parameters**
+    * **public**: whether to retrieve also public services, not specifically tied to
+      your particular user.
+
     - Returns a JSON with the cluster information.
     """
     client = get_client_from_auth(authorization, vo)
     r = client.list_services()
-    return (r.status_code, json.loads(r.text))
+
+    # Filter out public services, if requested
+    services = []
+    for s in json.loads(r.text):
+        if s['allowed_users'] or public:
+            services.append(s)
+
+    return (r.status_code, services)
 
 
 @router.get("/services/{service_name}")
