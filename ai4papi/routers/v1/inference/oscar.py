@@ -5,7 +5,6 @@ import json
 import re
 from typing import List
 
-
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
@@ -48,7 +47,7 @@ class Service(BaseModel):
 security = HTTPBearer()
 
 
-def get_client_from_auth(authorization, cluster_id, vo):
+def get_client_from_auth(authorization, vo):
     """
     Retrieve authenticated user info
     """
@@ -56,18 +55,9 @@ def get_client_from_auth(authorization, cluster_id, vo):
     auth_info = auth.get_user_info(token=oidc_token)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    try:
-        endpoint = MAIN_CONF["oscar"]["clusters"][cluster_id]["endpoint"]
-    except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail=f"The provided cluster id '{cluster_id}' is not listed on the" \
-                    "configuration file.",
-        )
-
     client_options = {
-        'cluster_id': cluster_id,
-        'endpoint': endpoint,
+        'cluster_id': MAIN_CONF["oscar"]["clusters"][vo]['cluster_id'],
+        'endpoint': MAIN_CONF["oscar"]["clusters"][vo]['endpoint'],
         'oidc_token': oidc_token,
         'ssl': 'true',
         }
@@ -78,7 +68,7 @@ def get_client_from_auth(authorization, cluster_id, vo):
         raise Exception("Error creating OSCAR client")
 
 
-def make_service_definition(svc_conf, cluster_id):
+def make_service_definition(svc_conf, vo):
 
     service_definition = utils.get_service_base_definition()
     service_definition["name"] = svc_conf.name
@@ -92,15 +82,15 @@ def make_service_definition(svc_conf, cluster_id):
         )
     service_definition["allowed_users"] = svc_conf.allowed_users
 
-    endpoint = MAIN_CONF["oscar"]["clusters"][cluster_id]["endpoint"]
+    cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
+    endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
     service_url = endpoint+"/services/"+cluster_id+"/"+svc_conf.name
 
     return service_definition, service_url
 
 
-@router.get("/cluster/{cluster_id}")
+@router.get("/cluster")
 def get_cluster_info(
-    cluster_id: str,
     vo: str,
     authorization=Depends(security),
     ):
@@ -108,14 +98,42 @@ def get_cluster_info(
     Gets information about the cluster.
     - Returns a JSON with the cluster information.
     """
-    client = get_client_from_auth(authorization, cluster_id, vo)
-    result = client.get_cluster_info()
+    client = get_client_from_auth(authorization, vo)
+    r = client.get_cluster_info()
+    return (r.status_code, json.loads(r.text))
+
+
+@router.get("/services")
+def get_services_list(
+    vo: str,
+    authorization=Depends(security),
+    ):
+    """
+    Retrieves a list of all the deployed services of the cluster.
+    - Returns a JSON with the cluster information.
+    """
+    client = get_client_from_auth(authorization, vo)
+    r = client.list_services()
+    return (r.status_code, json.loads(r.text))
+
+
+@router.get("/services/{service_name}")
+def get_service(
+    vo: str,
+    service_name: str,
+    authorization=Depends(security),
+    ):
+    """
+    Retrieves a specific service.
+    - Returns a JSON with the cluster information.
+    """
+    client = get_client_from_auth(authorization, vo)
+    result = client.get_service(service_name)
     return (result.status_code, json.loads(result.text))
 
 
-@router.post("/services/{cluster_id}")
+@router.post("/services")
 def create_service(
-    cluster_id: str,
     vo: str,
     svc_conf: Service,
     authorization=Depends(security),
@@ -123,10 +141,10 @@ def create_service(
     """
     Creates a new inference service for an AI pre-trained model on a specific cluster
     """
-    client = get_client_from_auth(authorization, cluster_id, vo)
+    client = get_client_from_auth(authorization, vo)
 
     # If authentication doesn't fail set user vo on the service
-    service_definition, service_url = make_service_definition(svc_conf, cluster_id)
+    service_definition, service_url = make_service_definition(svc_conf, vo)
     service_definition["vo"] = vo
 
     result = client.create_service(service_definition)
@@ -136,9 +154,8 @@ def create_service(
         return (result.status_code, None)
 
 
-@router.put("/services/{cluster_id}/{service_name}")
+@router.put("/services/{service_name}")
 def update_service(
-    cluster_id: str,
     vo: str,
     svc_conf: Service,
     authorization=Depends(security),
@@ -146,10 +163,10 @@ def update_service(
     """
     Updates service if it exists
     """
-    client = get_client_from_auth(authorization, cluster_id, vo)
+    client = get_client_from_auth(authorization, vo)
 
     # If authentication doesn't fail set user vo on the service
-    service_definition, service_url = make_service_definition(svc_conf, cluster_id)
+    service_definition, service_url = make_service_definition(svc_conf, vo)
     service_definition["vo"] = vo
     service_definition["allowed_users"] = svc_conf.allowed_users
 
@@ -161,40 +178,8 @@ def update_service(
         return (result.status_code, None)
 
 
-@router.get("/services/{cluster_id}")
-def get_services_list(
-    cluster_id: str,
-    vo: str,
-    authorization=Depends(security),
-    ):
-    """
-    Retrieves a list of all the deployed services of the cluster.
-    - Returns a JSON with the cluster information.
-    """
-    client = get_client_from_auth(authorization, cluster_id, vo)
-    result = client.list_services()
-    return (result.status_code, json.loads(result.text))
-
-
-@router.get("/services/{cluster_id}/{service_name}")
-def get_service(
-    cluster_id: str,
-    vo: str,
-    service_name: str,
-    authorization=Depends(security),
-    ):
-    """
-    Retrieves a specific service.
-    - Returns a JSON with the cluster information.
-    """
-    client = get_client_from_auth(authorization, cluster_id, vo)
-    result = client.get_service(service_name)
-    return (result.status_code, json.loads(result.text))
-
-
-@router.delete("/services/{cluster_id}/{service_name}")
+@router.delete("/services/{service_name}")
 def delete_service(
-    cluster_id: str,
     vo: str,
     service_name: str,
     authorization=Depends(security),
@@ -202,14 +187,13 @@ def delete_service(
     """
     Delete a specific service.
     """
-    client = get_client_from_auth(authorization, cluster_id, vo)
+    client = get_client_from_auth(authorization, vo)
     result = client.remove_service(service_name)
     return (result.status_code,service_name)
 
 
-@router.post("/services/{cluster_id}/{service_name}")
+@router.post("/services/{service_name}")
 def inference(
-    cluster_id: str,
     vo: str,
     service_name: str,
     data: dict,
@@ -218,7 +202,7 @@ def inference(
     """
     Make a synchronous execution (inference)
     """
-    client = get_client_from_auth(authorization, cluster_id, vo)
+    client = get_client_from_auth(authorization, vo)
     result = client.run_service(service_name, input=data["input_data"])
     try:
         return (result.status_code, json.loads(result.text))
