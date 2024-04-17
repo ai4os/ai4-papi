@@ -4,8 +4,8 @@ log_level: CRITICAL
 alpine: False
 name: ${NAME}
 image: ${IMAGE}
-cpu: "${CPU}"
-memory: "${MEMORY}"
+cpu: "${CPU}"  # has to be string
+memory: ${MEMORY}Mi
 vo: ${VO}
 allowed_users: ${ALLOWED_USERS}
 script: |-

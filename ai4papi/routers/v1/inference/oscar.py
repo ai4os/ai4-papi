@@ -9,7 +9,7 @@ import yaml
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, NonNegativeInt
 
 from ai4papi import auth
 from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
@@ -23,22 +23,21 @@ router = APIRouter(
 
 class Service(BaseModel):
     name: str
-    memory: str
-    cpu: str
     image: str
+    cpu: NonNegativeInt = 2
+    memory: NonNegativeInt = 3000,
     input_type: str
-    allowed_users: List[str]
+    allowed_users: List[str] = []  # no additional users by default
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "name": "string",
-                    "memory": "string",
-                    "cpu": "string",
-                    "image": "string",
-                    "input_type": "string",
-                    "output_type": "string",
+                    "name": "demo-service-papi",
+                    "image": "deephdc/deep-oc-image-classification-tf",
+                    "cpu": 2,
+                    "memory": 3000,
+                    "input_type": "str",
                     "allowed_users": ["string"]
                 }
             ]
