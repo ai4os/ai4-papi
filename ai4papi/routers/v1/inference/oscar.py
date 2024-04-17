@@ -283,24 +283,27 @@ def delete_service(
     return service_name
 
 
-@router.post("/services/{service_name}")
-def inference(
-    vo: str,
-    service_name: str,
-    data: dict,
-    authorization=Depends(security),
-    ):
-    """
-    Make a synchronous execution (inference)
-    """
-    # Retrieve authenticated user info
-    auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+# TODO: inference is temporarily disabled until we define how the Dashboard is going to
+# use OSCAR services
 
-    # Make inference
-    client = get_client_from_auth(authorization.credentials, vo)
-    r = client.run_service(service_name, input=data["input_data"])
-    try:
-        return (r.status_code, json.loads(r.text))
-    except Exception:
-        return (r.status_code, r.text)
+# @router.post("/services/{service_name}")
+# def inference(
+#     vo: str,
+#     service_name: str,
+#     data: dict,
+#     authorization=Depends(security),
+#     ):
+#     """
+#     Make a synchronous execution (inference)
+#     """
+#     # Retrieve authenticated user info
+#     auth_info = auth.get_user_info(authorization.credentials)
+#     auth.check_vo_membership(vo, auth_info['vos'])
+
+#     # Make inference
+#     client = get_client_from_auth(authorization.credentials, vo)
+#     r = client.run_service(service_name, input=data["input_data"])
+#     try:
+#         return (r.status_code, json.loads(r.text))
+#     except Exception:
+#         return (r.status_code, r.text)
