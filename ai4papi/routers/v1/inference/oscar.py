@@ -9,7 +9,7 @@ import yaml
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
-from pydantic import BaseModel, Field, NonNegativeInt
+from pydantic import BaseModel, NonNegativeInt
 
 from ai4papi import auth
 from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
@@ -126,11 +126,16 @@ def get_services_list(
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.list_services()
 
-    # Filter out public services, if requested
+    # Filter services
     services = []
     for s in json.loads(r.text):
-        if s.get('allowed_users', None) or public:
-            services.append(s)
+        # Filter out public services, if requested
+        if not (s.get('allowed_users', None) or public):
+            continue
+        # Keep only services that belong to vo
+        if vo not in s.get('vo', []):
+            continue
+        services.append(s)
 
     return (r.status_code, services)
 
