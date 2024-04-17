@@ -2,14 +2,16 @@
 Manage OSCAR clusters to create and execute services.
 """
 from copy import deepcopy
+from functools import wraps
 import json
 from typing import List
 import yaml
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
 from pydantic import BaseModel, NonNegativeInt
+import requests
 
 from ai4papi import auth
 from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
@@ -47,6 +49,40 @@ class Service(BaseModel):
 security = HTTPBearer()
 
 
+def raise_for_status(func):
+    """
+    Raise HTML error if the response of OSCAR functions has status!=2**.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+
+        # Catch first errors happening internally
+        try:
+            r = func(*args, **kwargs)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=e,
+                )
+        except requests.exceptions.HTTPError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=e,
+                )
+
+        # Catch errors when the function itself does not raise errors but the response
+        # has a non-successful code
+        if str(r.status_code).startswith('2'):
+            return r
+        else:
+            raise HTTPException(
+                status_code=r.status_code,
+                detail=r.text,
+                )
+
+    return wrapper
+
+
 def get_client_from_auth(token, vo):
     """
     Retrieve authenticated user info and init OSCAR client.
@@ -59,9 +95,20 @@ def get_client_from_auth(token, vo):
         }
 
     try:
-        return Client(client_options)
+        client = Client(client_options)
     except Exception:
         raise Exception("Error creating OSCAR client")
+
+    # Decorate Client functions to propagate OSCAR status codes to PAPI
+    client.get_cluster_info = raise_for_status(client.get_cluster_info)
+    client.list_services = raise_for_status(client.list_services)
+    client.get_service = raise_for_status(client.get_service)
+    client.create_service = raise_for_status(client.create_service)
+    client.update_service = raise_for_status(client.update_service)
+    client.remove_service = raise_for_status(client.remove_service)
+    # client.run_service = raise_for_status(client.run_service)  #TODO: reenable when ready?
+
+    return client
 
 
 def make_service_definition(svc_conf, vo):
@@ -97,12 +144,15 @@ def get_cluster_info(
     Gets information about the cluster.
     - Returns a JSON with the cluster information.
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Get cluster info
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.get_cluster_info()
-    return (r.status_code, json.loads(r.text))
+
+    return json.loads(r.text)
 
 
 @router.get("/services")
@@ -120,9 +170,11 @@ def get_services_list(
 
     - Returns a JSON with the cluster information.
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Get services list
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.list_services()
 
@@ -137,7 +189,7 @@ def get_services_list(
             continue
         services.append(s)
 
-    return (r.status_code, services)
+    return services
 
 
 @router.get("/services/{service_name}")
@@ -150,12 +202,15 @@ def get_service(
     Retrieves a specific service.
     - Returns a JSON with the cluster information.
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Get service
     client = get_client_from_auth(authorization.credentials, vo)
     result = client.get_service(service_name)
-    return (result.status_code, json.loads(result.text))
+
+    return json.loads(result.text)
 
 
 @router.post("/services")
@@ -167,19 +222,19 @@ def create_service(
     """
     Creates a new inference service for an AI pre-trained model on a specific cluster
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    client = get_client_from_auth(authorization.credentials, vo)
-
-    # Create service
+    # Create service definition
     service_definition, service_url = make_service_definition(svc_conf, vo)
     service_definition['allowed_users'] += [auth_info['id']]  # add service owner
+
+    # Update service
+    client = get_client_from_auth(authorization.credentials, vo)
     r = client.create_service(service_definition)
-    if r.status_code == 201:
-        return (r.status_code, service_url)
-    else:
-        return (r.status_code, None)
+
+    return service_url
 
 
 @router.put("/services/{service_name}")
@@ -192,19 +247,19 @@ def update_service(
     Updates service if it exists.
     The method needs all service parameters to be on the request.
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    client = get_client_from_auth(authorization.credentials, vo)
-
-    # Update service
+    # Create service definition
     service_definition, service_url = make_service_definition(svc_conf, vo)
     service_definition['allowed_users'] += [auth_info['id']]  # add service owner
+
+    # Update service
+    client = get_client_from_auth(authorization.credentials, vo)
     r = client.update_service(svc_conf.name, service_definition)
-    if r.status_code == 200:
-        return (r.status_code, service_url)
-    else:
-        return (r.status_code, None)
+
+    return service_url
 
 
 @router.delete("/services/{service_name}")
@@ -215,13 +270,17 @@ def delete_service(
     ):
     """
     Delete a specific service.
+    Raises 500 if the service does not exists.
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Delete service
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.remove_service(service_name)
-    return (r.status_code, service_name)
+
+    return service_name
 
 
 @router.post("/services/{service_name}")
@@ -234,9 +293,11 @@ def inference(
     """
     Make a synchronous execution (inference)
     """
+    # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Make inference
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.run_service(service_name, input=data["input_data"])
     try:
