@@ -25,7 +25,7 @@ class Service(BaseModel):
     name: str
     image: str
     cpu: NonNegativeInt = 2
-    memory: NonNegativeInt = 3000,
+    memory: NonNegativeInt = 3000
     input_type: str
     allowed_users: List[str] = []  # no additional users by default
 
@@ -51,9 +51,6 @@ def get_client_from_auth(token, vo):
     """
     Retrieve authenticated user info and init OSCAR client.
     """
-    auth_info = auth.get_user_info(token)
-    auth.check_vo_membership(vo, auth_info['vos'])
-
     client_options = {
         'cluster_id': MAIN_CONF["oscar"]["clusters"][vo]['cluster_id'],
         'endpoint': MAIN_CONF["oscar"]["clusters"][vo]['endpoint'],
@@ -100,6 +97,9 @@ def get_cluster_info(
     Gets information about the cluster.
     - Returns a JSON with the cluster information.
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.get_cluster_info()
     return (r.status_code, json.loads(r.text))
@@ -120,6 +120,9 @@ def get_services_list(
 
     - Returns a JSON with the cluster information.
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.list_services()
 
@@ -142,6 +145,9 @@ def get_service(
     Retrieves a specific service.
     - Returns a JSON with the cluster information.
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
     result = client.get_service(service_name)
     return (result.status_code, json.loads(result.text))
@@ -156,10 +162,14 @@ def create_service(
     """
     Creates a new inference service for an AI pre-trained model on a specific cluster
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
 
     # Create service
     service_definition, service_url = make_service_definition(svc_conf, vo)
+    service_definition['allowed_users'] += [auth_info['id']]  # add service owner
     r = client.create_service(service_definition)
     if r.status_code == 201:
         return (r.status_code, service_url)
@@ -177,10 +187,14 @@ def update_service(
     Updates service if it exists.
     The method needs all service parameters to be on the request.
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
 
     # Update service
     service_definition, service_url = make_service_definition(svc_conf, vo)
+    service_definition['allowed_users'] += [auth_info['id']]  # add service owner
     r = client.update_service(svc_conf.name, service_definition)
     if r.status_code == 200:
         return (r.status_code, service_url)
@@ -197,6 +211,9 @@ def delete_service(
     """
     Delete a specific service.
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.remove_service(service_name)
     return (r.status_code, service_name)
@@ -212,6 +229,9 @@ def inference(
     """
     Make a synchronous execution (inference)
     """
+    auth_info = auth.get_user_info(authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.run_service(service_name, input=data["input_data"])
     try:
