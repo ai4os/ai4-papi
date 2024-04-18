@@ -2,12 +2,14 @@
 
 log_level: CRITICAL
 alpine: False
+cluster_id: ${CLUSTER_ID}
 name: ${NAME}
 image: ${IMAGE}
 cpu: "${CPU}"  # has to be string
 memory: ${MEMORY}Mi
 vo: ${VO}
 allowed_users: ${ALLOWED_USERS}
+environment: ${ENV_VARS}
 script: |-
    #!/bin/bash
    mv $INPUT_FILE_PATH "$INPUT_FILE_PATH.${TYPE}"

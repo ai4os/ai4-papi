@@ -5,6 +5,7 @@ from copy import deepcopy
 from functools import wraps
 import json
 from typing import List
+import uuid
 import yaml
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -24,23 +25,26 @@ router = APIRouter(
 )
 
 class Service(BaseModel):
-    name: str
     image: str
     cpu: NonNegativeInt = 2
     memory: NonNegativeInt = 3000
     input_type: str
     allowed_users: List[str] = []  # no additional users by default
+    title: str = ''
+
+    # Not configurable
+    _name: str = ''  # filled by PAPI with UUID
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "name": "demo-service-papi",
+                    "title": "Demo image classification service",
                     "image": "deephdc/deep-oc-image-classification-tf",
                     "cpu": 2,
                     "memory": 3000,
                     "input_type": "str",
-                    "allowed_users": ["string"]
+                    "allowed_users": []
                 }
             ]
         }
@@ -116,21 +120,27 @@ def make_service_definition(svc_conf, vo):
     service = deepcopy(OSCAR_TMPL)  # init from template
     service = service.safe_substitute(
         {
-            'NAME': svc_conf.name,
+            'CLUSTER_ID': MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
+            'NAME': svc_conf._name,
             'IMAGE': svc_conf.image,
             'CPU': svc_conf.cpu,
             'MEMORY': svc_conf.memory,
             'TYPE': svc_conf.input_type,
             'ALLOWED_USERS': svc_conf.allowed_users,
             'VO': vo,
+            'ENV_VARS': {
+                'Variables':{
+                    'PAPI_TITLE': svc_conf.title,
+                },
+            },
         }
     )
     service = yaml.safe_load(service)
 
     # Create service url
     cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
-    endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-    url = f"{endpoint}/services/{cluster_id}/{svc_conf.name}"
+    cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+    url = f"{cluster_endpoint}/services/{cluster_id}/{svc_conf._name}"
 
     return service, url
 
@@ -208,9 +218,7 @@ def get_service(
 
     # Get service
     client = get_client_from_auth(authorization.credentials, vo)
-    result = client.get_service(service_name)
-
-    return json.loads(result.text)
+    r = client.get_service(service_name)
 
 
 @router.post("/services")
@@ -220,11 +228,15 @@ def create_service(
     authorization=Depends(security),
     ):
     """
-    Creates a new inference service for an AI pre-trained model on a specific cluster
+    Creates a new inference service for an AI pre-trained model on a specific cluster.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
+
+    # Assign random UUID to service to avoid clashes
+    # We clip it because OSCAR only seems to support names smaller than 39 characters
+    svc_conf._name = f'ai4papi-{uuid.uuid1()}'[:39]
 
     # Create service definition
     service_definition, service_url = make_service_definition(svc_conf, vo)
@@ -234,12 +246,13 @@ def create_service(
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.create_service(service_definition)
 
-    return service_url
+    return svc_conf._name, service_url
 
 
 @router.put("/services/{service_name}")
 def update_service(
     vo: str,
+    service_name: str,
     svc_conf: Service,
     authorization=Depends(security),
     ):
@@ -252,14 +265,15 @@ def update_service(
     auth.check_vo_membership(vo, auth_info['vos'])
 
     # Create service definition
+    svc_conf._name = service_name
     service_definition, service_url = make_service_definition(svc_conf, vo)
     service_definition['allowed_users'] += [auth_info['id']]  # add service owner
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
-    r = client.update_service(svc_conf.name, service_definition)
+    r = client.update_service(svc_conf._name, service_definition)
 
-    return service_url
+    return service_name, service_url
 
 
 @router.delete("/services/{service_name}")

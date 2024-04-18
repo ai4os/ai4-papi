@@ -17,35 +17,13 @@ that ENV variable.'
 
 # Test service
 service = oscar.Service(
-    name='test-papi',
     image='deephdc/deep-oc-image-classification-tf',
     input_type='str',
     cpu=2,
-    # memory=3000,
-    # allowed_users=[],
 )
-
-# List services
-slist = oscar.get_services_list(
-    vo='vo.ai4eosc.eu',
-    authorization=SimpleNamespace(
-        credentials=token
-    ),
-)
-
-# If service already exists, delete it, otherwise error will be thrown when creating
-names = [s['name'] for s in slist]
-if service.name in names:
-    _ = oscar.delete_service(
-        vo='vo.ai4eosc.eu',
-        service_name=service.name,
-        authorization=SimpleNamespace(
-            credentials=token
-        ),
-    )
 
 # Create service
-oscar.create_service(
+sname, surl = oscar.create_service(
     vo='vo.ai4eosc.eu',
     svc_conf=service,
     authorization=SimpleNamespace(
@@ -61,12 +39,13 @@ slist = oscar.get_services_list(
     ),
 )
 names = [s['name'] for s in slist]
-assert service.name in names, "Service does not exist"
+assert sname in names, "Service does not exist"
 
 # Update service
 service.cpu = 1
 oscar.update_service(
     vo='vo.ai4eosc.eu',
+    service_name=sname,
     svc_conf=service,
     authorization=SimpleNamespace(
         credentials=token
@@ -76,7 +55,7 @@ oscar.update_service(
 # Delete the service
 oscar.delete_service(
     vo='vo.ai4eosc.eu',
-    service_name=service.name,
+    service_name=sname,
     authorization=SimpleNamespace(
         credentials=token
     ),
@@ -90,6 +69,6 @@ slist = oscar.get_services_list(
     ),
 )
 names = [s['name'] for s in slist]
-assert service.name not in names, "Service exists"
+assert sname not in names, "Service exists"
 
 print('Inference (OSCAR) tests passed!')
