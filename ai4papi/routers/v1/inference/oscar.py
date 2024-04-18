@@ -191,12 +191,20 @@ def get_services_list(
     # Filter services
     services = []
     for s in json.loads(r.text):
+
         # Filter out public services, if requested
         if not (s.get('allowed_users', None) or public):
             continue
+
         # Keep only services that belong to vo
         if vo not in s.get('vo', []):
             continue
+
+        # Add service endpoint
+        cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
+        cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+        s['endpoint'] = f"{cluster_endpoint}/services/{cluster_id}/{s['name']}"
+
         services.append(s)
 
     return services
@@ -219,6 +227,14 @@ def get_service(
     # Get service
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.get_service(service_name)
+    service = json.loads(r.text)
+
+    # Add service endpoint
+    cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
+    cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+    service['endpoint'] = f"{cluster_endpoint}/services/{cluster_id}/{service_name}"
+
+    return service
 
 
 @router.post("/services")
