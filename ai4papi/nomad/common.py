@@ -17,6 +17,7 @@ import nomad
 from nomad.api import exceptions
 import requests
 
+import ai4papi.conf as papiconf
 import ai4papi.nomad.patches as nomad_patches
 
 
@@ -367,13 +368,19 @@ def delete_deployment(
     return {'status': 'success'}
 
 
-def get_gpu_models():
+@cached(cache=TTLCache(maxsize=1024, ttl=1*60*60))
+def get_gpu_models(vo):
     """
-    Retrieve available GPU models in the cluster.
+    Retrieve available GPU models in the cluster, filtering nodes by VO.
     """
     gpu_models = set()
     nodes = Nomad.nodes.get_nodes(resources=True)
     for node in nodes:
+        # Discard nodes that don't belong to the requested VO
+        meta = Nomad.node.get_node(node['ID'])['Meta']
+        if papiconf.MAIN_CONF['nomad']['namespaces'][vo] not in meta['namespace']:
+            continue
+
         # Discard GPU models of nodes that are not eligible
         if node['SchedulingEligibility'] != 'eligible':
             continue
