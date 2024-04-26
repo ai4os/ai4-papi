@@ -186,7 +186,9 @@ def load_datacenters():
 
 
 @router.get("/cluster")
-def get_cluster_stats():
+def get_cluster_stats(
+    vo: str,
+    ):
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
@@ -194,6 +196,12 @@ def get_cluster_stats():
     """
 
     global cluster_stats
+
+    #TODO: filter cluster stats to only return stats of the nodes that support a
+    # given VO. This is blocked until we move to the federated cluster where VO support
+    # is specified in the node metadata.
+    # (!) Total cluster resources will need to be computed after this filtering is done
+
     return cluster_stats
 
 
