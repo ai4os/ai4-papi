@@ -158,11 +158,12 @@ def get_proper_allocation(allocs):
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def load_datacenters():
 
-    pth = Path('var/datacenters_info.csv')
+    # Check if datacenter info file is available
+    pth = papiconf.main_path.parent / 'var' / 'datacenters_info.csv'
     if not pth.is_file():
         return {}
 
-    # Load datacenters info
+    # Load datacenter info
     datacenters = {}
     with open(pth, 'r') as f:
         reader = csv.DictReader(f, delimiter=';')
@@ -178,9 +179,6 @@ def load_datacenters():
                     datacenters[name][k] = float(v)
 
     return datacenters
-
-
-print(load_datacenters())
 
 
 @router.get("/cluster")
