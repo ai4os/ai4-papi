@@ -160,11 +160,8 @@ def load_datacenters():
 
     pth = Path('var/datacenters_info.csv')
     if not pth.is_file():
-        raise HTTPException(
-            status_code=500,
-            detail="Datacenters information not available (missing file).",
-            )
-    
+        return {}
+
     # Load datacenters info
     datacenters = {}
     with open(pth, 'r') as f:
@@ -181,6 +178,9 @@ def load_datacenters():
                     datacenters[name][k] = float(v)
 
     return datacenters
+
+
+print(load_datacenters())
 
 
 @router.get("/cluster")
