@@ -223,7 +223,7 @@ def get_cluster_stats_bg():
         'disk_total',
         'disk_used',
     ]
-    datacenters =  load_datacenters() # available datacenters info
+    datacenters = load_datacenters() # available datacenters info
     stats = {
         'datacenters' : datacenters,  # aggregated datacenter usage
         'cluster': {k: 0 for k in resources},  # aggregated cluster usage
@@ -246,22 +246,22 @@ def get_cluster_stats_bg():
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
         n_stats['disk_used'] = int(node['Attributes']['unique.storage.bytesfree']) / 2**20
         n_stats['gpu_models'] = {}
-        
+
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
                 if devices['Type'] == 'gpu':
                     n_stats['gpu_total'] += len(devices['Instances'])
-                    
+
                     # Track stats per GPU model type
                     if devices['Name'] not in gpu_stats.keys():
                         gpu_stats[devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
-                        
-                    if devices['Name'] not in n_stats['gpu_models'].keys():    
+
+                    if devices['Name'] not in n_stats['gpu_models'].keys():
                         n_stats['gpu_models'][devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
-                        
+
                     gpu_stats[devices['Name']]['gpu_total'] += len(devices['Instances'])
                     n_stats['gpu_models'][devices['Name']]['gpu_total'] += len(devices['Instances'])
-        
+
         # If datacenter is not in csv, load default info
         if n['Datacenter'] not in stats['datacenters']:
             stats['datacenters'][n['Datacenter']] = {'lat':0, 'lon':0, 'PUE':0, 'energy_quality':0, 'nodes':{}}
@@ -280,7 +280,7 @@ def get_cluster_stats_bg():
                 id_=j['ID'],
                 namespace=namespace,
                 )
-            
+
             allocs = Nomad.job.get_allocations(
                 id_=job['ID'],
                 namespace=namespace,
@@ -317,6 +317,11 @@ def get_cluster_stats_bg():
                     n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
+
+    # Ignore datacenters with no nodes
+    for k, v in stats['datacenters'].copy().items():
+        if not v['nodes']:
+            del stats['datacenters'][k]
 
     # Compute cluster stats
     for dc_stats in stats['datacenters'].values():
