@@ -167,20 +167,18 @@ def load_datacenters():
     
     # Load datacenters info
     datacenters = {}
-    resources = ['lat', 'lon', 'PUE', 'energy_quality', 'nodes']
-
     with open(pth, 'r') as f:
         reader = csv.DictReader(f, delimiter=';')
+        dc_keys = reader.fieldnames.copy()
+        dc_keys.remove('name')
         for row in reader:
-            name = ''
             for k, v in row.items():
                 if k == 'name':
                     name = v
-                    datacenters[name] = {k: 0 for k in resources}
+                    datacenters[name] = {k: 0 for k in dc_keys}
                     datacenters[name]['nodes'] = {}
                 else:
-                    v = float(v)
-                    datacenters[name][k] = v
+                    datacenters[name][k] = float(v)
 
     return datacenters
 
