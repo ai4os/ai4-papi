@@ -57,6 +57,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
+            prefix='module',
         )
 
         # Retrieve info for jobs in namespace
@@ -119,21 +120,10 @@ def get_deployment(
     )
 
     # Check the deployment is indeed a module
-    tool_list = papiconf.TOOLS.keys()
-    module_name = re.search(
-            '/(.*):',  # remove dockerhub account and tag
-            job['docker_image'],
-            ).group(1)
-    # TODO: temporal fix until all the jobs have job_type
-    if 'job_type' in job and job['job_type'] == 'tool':
+    if not job['name'].startswith('module'):
         raise HTTPException(
             status_code=400,
-            detail="This deployment is a tool, not a module.",
-            )
-    elif module_name in tool_list:
-        raise HTTPException(
-            status_code=400,
-            detail="This deployment is a tool, not a module.",
+            detail="This deployment is not a module.",
             )
 
     return job
@@ -264,7 +254,7 @@ def create_deployment(
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
     tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='usertask'][0]
+    usertask = [t for t in tasks if t['Name']=='main'][0]
 
     # Apply patches if needed
     usertask = module_patches.patch_nextcloud_mount(
@@ -283,7 +273,7 @@ def create_deployment(
 
     # If storage credentials not provided, remove storage-related tasks
     if not all(user_conf['storage'].values()):
-        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
+        tasks[:] = [t for t in tasks if t['Name'] not in {'storage_mount', 'storage_cleanup'}]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

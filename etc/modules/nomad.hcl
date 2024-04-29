@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "userjob-${JOB_UUID}" {
+job "module-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -112,7 +112,7 @@ job "userjob-${JOB_UUID}" {
       size = ${DISK}
     }
 
-    task "storagetask" {
+    task "storage_mount" {
       // Running task in charge of mounting storage
 
       driver = "docker"
@@ -142,7 +142,7 @@ job "userjob-${JOB_UUID}" {
       }
     }
 
-    task "usertask" {
+    task "main" {
       // Task configured by the user (deepaas, jupyter, vscode)
 
       driver = "docker"
@@ -192,7 +192,7 @@ job "userjob-${JOB_UUID}" {
       }
     }
 
-    task "storagecleanup" {
+    task "storage_cleanup" {
       // Unmount empty storage folder and delete it from host
 
       lifecycle {

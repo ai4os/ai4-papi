@@ -60,6 +60,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
+            prefix='tool',
         )
 
         # Retrieve info for jobs in namespace
@@ -122,21 +123,10 @@ def get_deployment(
     )
 
     # Check the deployment is indeed a tool
-    tool_list = papiconf.TOOLS.keys()
-    tool_name = re.search(
-            '/(.*):',  # remove dockerhub account and tag
-            job['docker_image'],
-            ).group(1)
-    # TODO: temporal fix until all the jobs have job_type
-    if 'job_type' in job and job['job_type'] == 'module':
-        raise HTTPException(
-                    status_code=400,
-                    detail="This deployment is a module, not a tool.",
-                    )
-    elif tool_name not in tool_list:
+    if not job['name'].startswith('tool'):
         raise HTTPException(
             status_code=400,
-            detail="This deployment is a module, not a tool.",
+            detail="This deployment is not a tool.",
             )
 
     return job
@@ -215,7 +205,7 @@ def create_deployment(
     )
 
     #TODO: reenable custom hostname, when we are able to parse all node metadata
-    # (domain key) to build the true domain 
+    # (domain key) to build the true domain
     hostname = job_uuid
 
     # # Check the hostname is available in all data-centers
@@ -275,7 +265,7 @@ def create_deployment(
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
     tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='usertask'][0]
+    usertask = [t for t in tasks if t['Name']=='main'][0]
 
     # Launch `deep-start` compatible service if needed
     service = user_conf['general']['service']

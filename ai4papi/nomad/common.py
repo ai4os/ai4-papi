@@ -43,13 +43,14 @@ session = requests.Session()
 def get_deployments(
     namespace: str,
     owner: str,
+    prefix: str = "",
     ):
     """
     Returns a list of all deployments belonging to a user, in a given namespace.
     """
     job_filter = \
         'Status != "dead" and ' + \
-        'Name matches "^userjob" and ' + \
+        f'Name matches "^{prefix}" and ' + \
         'Meta is not empty and ' + \
         f'Meta.owner == "{owner}"'
     jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
@@ -96,6 +97,7 @@ def get_deployment(
     # Create job info dict
     info = {
         'job_ID': j['ID'],
+        'name': j['Name'],
         'status': '',  # do not use j['Status'] as misleading
         'owner': j['Meta']['owner'],
         'title': j['Meta']['title'],
@@ -114,13 +116,9 @@ def get_deployment(
         'datacenter': None,
     }
 
-    # TODO: temporal fix until all jobs have job type
-    if 'job_type' in j['Meta']:
-        info['job_type'] = j['Meta']['job_type']
-
     # Retrieve tasks
     tasks = j['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name'] == 'usertask'][0]
+    usertask = [t for t in tasks if t['Name'] == 'main'][0]
 
     # Retrieve Docker image
     info['docker_image'] = usertask['Config']['image']
@@ -224,7 +222,7 @@ def get_deployment(
 
         # Add error messages if needed
         if info['status'] == 'failed':
-            info['error_msg'] = a['TaskStates']['usertask']['Events'][0]['Message']
+            info['error_msg'] = a['TaskStates']['main']['Events'][0]['Message']
 
             # Replace with clearer message
             if info['error_msg'] == 'Docker container exited with non-zero exit code: 1':
@@ -241,7 +239,7 @@ def get_deployment(
                 "your deployment."
 
         # Add resources
-        res = a['AllocatedResources']['Tasks']['usertask']
+        res = a['AllocatedResources']['Tasks']['main']
         gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0] if res['Devices'] else None
         cpu_cores = res['Cpu']['ReservedCores']
         info['resources'] = {

@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "userjob-${JOB_UUID}" {
+job "tool-fl-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -113,7 +113,7 @@ job "userjob-${JOB_UUID}" {
       size = ${DISK}
     }
 
-    task "usertask" {
+    task "main" {
       driver = "docker"
 
       # Use default command defined in the Dockerfile
