@@ -102,7 +102,6 @@ def get_deployment(
         'owner': j['Meta']['owner'],
         'title': j['Meta']['title'],
         'description': j['Meta']['description'],
-        'job_type': None,
         'docker_image': None,
         'docker_command': None,
         'submit_time': datetime.fromtimestamp(

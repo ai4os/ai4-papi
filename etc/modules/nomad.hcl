@@ -22,7 +22,6 @@ job "module-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
-    job_type    = "module"
   }
 
   # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
