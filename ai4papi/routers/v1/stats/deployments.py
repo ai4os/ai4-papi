@@ -155,8 +155,36 @@ def get_proper_allocation(allocs):
         return allocs[idx]['ID']
 
 
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+def load_datacenters():
+
+    # Check if datacenter info file is available
+    pth = papiconf.main_path.parent / 'var' / 'datacenters_info.csv'
+    if not pth.is_file():
+        return {}
+
+    # Load datacenter info
+    datacenters = {}
+    with open(pth, 'r') as f:
+        reader = csv.DictReader(f, delimiter=';')
+        dc_keys = reader.fieldnames.copy()
+        dc_keys.remove('name')
+        for row in reader:
+            for k, v in row.items():
+                if k == 'name':
+                    name = v
+                    datacenters[name] = {k: 0 for k in dc_keys}
+                    datacenters[name]['nodes'] = {}
+                else:
+                    datacenters[name][k] = float(v)
+
+    return datacenters
+
+
 @router.get("/cluster")
-def get_cluster_stats():
+def get_cluster_stats(
+    vo: str,
+    ):
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
@@ -164,6 +192,12 @@ def get_cluster_stats():
     """
 
     global cluster_stats
+
+    #TODO: filter cluster stats to only return stats of the nodes that support a
+    # given VO. This is blocked until we move to the federated cluster where VO support
+    # is specified in the node metadata.
+    # (!) Total cluster resources will need to be computed after this filtering is done
+
     return cluster_stats
 
 
@@ -185,8 +219,9 @@ def get_cluster_stats_bg():
         'disk_total',
         'disk_used',
     ]
+    datacenters = load_datacenters() # available datacenters info
     stats = {
-        'nodes' : {},  # individual node usage
+        'datacenters' : datacenters,  # aggregated datacenter usage
         'cluster': {k: 0 for k in resources},  # aggregated cluster usage
         }
     stats['cluster']['gpu_models'] = []
@@ -194,18 +229,20 @@ def get_cluster_stats_bg():
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
     gpu_stats = {}
+    nodes_dc = {} # dict(node, datacenter)
 
     # Get total stats for each node
     for n in nodes:
         node = Nomad.node.get_node(n['ID'])
-
         n_stats = {k: 0 for k in resources}
-
         n_stats['name'] = node['Name']
+        n_stats['jobs_num'] = 0
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
         n_stats['disk_used'] = int(node['Attributes']['unique.storage.bytesfree']) / 2**20
+        n_stats['gpu_models'] = {}
+
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
                 if devices['Type'] == 'gpu':
@@ -214,9 +251,19 @@ def get_cluster_stats_bg():
                     # Track stats per GPU model type
                     if devices['Name'] not in gpu_stats.keys():
                         gpu_stats[devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
-                    gpu_stats[devices['Name']]['gpu_total'] += len(devices['Instances'])
 
-        stats['nodes'][n['ID']] = n_stats
+                    if devices['Name'] not in n_stats['gpu_models'].keys():
+                        n_stats['gpu_models'][devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
+
+                    gpu_stats[devices['Name']]['gpu_total'] += len(devices['Instances'])
+                    n_stats['gpu_models'][devices['Name']]['gpu_total'] += len(devices['Instances'])
+
+        # If datacenter is not in csv, load default info
+        if n['Datacenter'] not in stats['datacenters']:
+            stats['datacenters'][n['Datacenter']] = {'lat':0, 'lon':0, 'PUE':0, 'energy_quality':0, 'nodes':{}}
+
+        stats['datacenters'][n['Datacenter']]['nodes'][n['ID']] = n_stats
+        nodes_dc[n['ID']] = n['Datacenter']
 
     # Get aggregated usage stats for each node
     namespaces = ['default', 'ai4eosc', 'imagine', 'tutorials']
@@ -224,7 +271,6 @@ def get_cluster_stats_bg():
     for namespace in namespaces:
         jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')
         for j in jobs:
-
             # Retrieve full job for meta
             job = Nomad.job.get_job(
                 id_=j['ID'],
@@ -242,7 +288,11 @@ def get_cluster_stats_bg():
                 )
 
             # Add resources
-            n_stats = stats['nodes'][a['NodeID']]
+            datacenter = nodes_dc[a['NodeID']]
+            n_stats = stats['datacenters'][datacenter]['nodes'][a['NodeID']]
+            if 'userjob' in job['Name']:
+                n_stats['jobs_num'] += 1
+
             #FIXME: we are ignoring resources consumed by other tasks
             if 'usertask' in a['AllocatedResources']['Tasks']:
                 res = a['AllocatedResources']['Tasks']['usertask']
@@ -260,14 +310,21 @@ def get_cluster_stats_bg():
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
                     n_stats['gpu_used'] += gpu_num
                     gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
+                    n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
 
+    # Ignore datacenters with no nodes
+    for k, v in stats['datacenters'].copy().items():
+        if not v['nodes']:
+            del stats['datacenters'][k]
+
     # Compute cluster stats
-    for n_stats in stats['nodes'].values():
-        for k, v in n_stats.items():
-            if k != 'name' :
-                stats['cluster'][k] += v
+    for dc_stats in stats['datacenters'].values():
+        for n_stats in dc_stats['nodes'].values():
+            for k, v in n_stats.items():
+                if k not in ['name', 'jobs_num']:
+                    stats['cluster'][k] += v
 
     stats['cluster']['gpu_models'] = gpu_stats
 
