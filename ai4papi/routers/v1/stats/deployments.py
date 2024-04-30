@@ -240,7 +240,10 @@ def get_cluster_stats_bg():
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
-        n_stats['disk_used'] = int(node['Attributes']['unique.storage.bytesfree']) / 2**20
+        n_stats['disk_used'] = \
+            ( int(node['Attributes']['unique.storage.bytestotal']) \
+            - int(node['Attributes']['unique.storage.bytesfree'])) \
+            / 2**20
         n_stats['gpu_models'] = {}
 
         if n['NodeResources']['Devices']:
