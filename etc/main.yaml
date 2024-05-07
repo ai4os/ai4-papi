@@ -16,6 +16,7 @@ auth:
     - https://dashboard-stage.cloud.ai4eosc.eu
 
     - https://tutorials.cloud.ai4eosc.eu
+    - http://localhost:8080
 
   OP:  # OIDC providers
 
