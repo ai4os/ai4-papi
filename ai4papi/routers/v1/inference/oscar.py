@@ -138,9 +138,8 @@ def make_service_definition(svc_conf, vo):
     service = yaml.safe_load(service)
 
     # Create service url
-    cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
     cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-    url = f"{cluster_endpoint}/services/{cluster_id}/{svc_conf._name}"
+    url = f"{cluster_endpoint}/run/{svc_conf._name}"
 
     return service, url
 
@@ -201,9 +200,8 @@ def get_services_list(
             continue
 
         # Add service endpoint
-        cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
         cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-        s['endpoint'] = f"{cluster_endpoint}/services/{cluster_id}/{s['name']}"
+        s['endpoint'] = f"{cluster_endpoint}/run/{s['name']}"
 
         services.append(s)
 
@@ -230,9 +228,8 @@ def get_service(
     service = json.loads(r.text)
 
     # Add service endpoint
-    cluster_id = MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"]
     cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-    service['endpoint'] = f"{cluster_endpoint}/services/{cluster_id}/{service_name}"
+    service['endpoint'] = f"{cluster_endpoint}/run/{service_name}"
 
     return service
 
