@@ -23,7 +23,7 @@ service = oscar.Service(
 )
 
 # Create service
-sname, surl = oscar.create_service(
+sname = oscar.create_service(
     vo='vo.ai4eosc.eu',
     svc_conf=service,
     authorization=SimpleNamespace(

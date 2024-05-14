@@ -137,11 +137,7 @@ def make_service_definition(svc_conf, vo):
     )
     service = yaml.safe_load(service)
 
-    # Create service url
-    cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
-    url = f"{cluster_endpoint}/run/{svc_conf._name}"
-
-    return service, url
+    return service
 
 
 @router.get("/cluster")
@@ -252,14 +248,14 @@ def create_service(
     svc_conf._name = f'ai4papi-{uuid.uuid1()}'[:39]
 
     # Create service definition
-    service_definition, service_url = make_service_definition(svc_conf, vo)
+    service_definition = make_service_definition(svc_conf, vo)
     service_definition['allowed_users'] += [auth_info['id']]  # add service owner
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.create_service(service_definition)
 
-    return svc_conf._name, service_url
+    return svc_conf._name
 
 
 @router.put("/services/{service_name}")
@@ -279,14 +275,14 @@ def update_service(
 
     # Create service definition
     svc_conf._name = service_name
-    service_definition, service_url = make_service_definition(svc_conf, vo)
+    service_definition = make_service_definition(svc_conf, vo)
     service_definition['allowed_users'] += [auth_info['id']]  # add service owner
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.update_service(svc_conf._name, service_definition)
 
-    return service_name, service_url
+    return service_name
 
 
 @router.delete("/services/{service_name}")
