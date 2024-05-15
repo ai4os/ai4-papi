@@ -1,10 +1,10 @@
 from copy import deepcopy
 import json
+import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
 import requests
-import secrets
 
 from ai4papi import quotas
 import ai4papi.conf as papiconf
@@ -13,8 +13,7 @@ from .common import Catalog, retrieve_docker_tags
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_list(
-    ):
+def get_list(self):
     """
     Retrieve a list of *all* modules.
 
@@ -27,6 +26,7 @@ def get_list(
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_metadata(
+    self,
     item_name: str,
     ):
     """
@@ -72,6 +72,7 @@ def get_metadata(
 
 
 def get_config(
+    self,
     item_name: str,
     vo: str,
     ):
@@ -99,20 +100,15 @@ def get_config(
         item_name=item_name,
         vo=vo,
     )
-
-    # Extra tool-dependent steps
-    if item_name == 'deep-oc-federated-server':
-        # Create unique secret for that federated server
-        conf["general"]["federated_secret"]["value"] = secrets.token_hex()
-
+    
     return conf
 
 
 
 Tools = Catalog()
-Tools.get_list = get_list
-Tools.get_config = get_config
-Tools.get_metadata = get_metadata
+Tools.get_list = types.MethodType(get_list, Tools)
+Tools.get_config = types.MethodType(get_config, Tools)
+Tools.get_metadata = types.MethodType(get_metadata, Tools)
 
 
 router = APIRouter(
