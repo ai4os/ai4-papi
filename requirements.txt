@@ -10,3 +10,7 @@ flaat >= 1.1.8, < 2.0
 typer >= 0.7.0, < 1.0
 oscar_python == 1.2.1
 hvac >= 2.1.0, < 3.0
+pydantic >= 2.5.2
+# needed for OSCAR pydantic model (_name private arg)
+# --> install after fastapi_utils 0.2.1 to avoid downgrade
+# (! using Pydantic 2.5.2 does not break fastapi_utils 0.2.1)
