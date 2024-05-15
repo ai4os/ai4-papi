@@ -364,8 +364,14 @@ def get_gpu_models():
     gpu_models = set()
     nodes = Nomad.nodes.get_nodes(resources=True)
     for node in nodes:
+        # Discard GPU models of nodes that are not eligible
+        if node['SchedulingEligibility'] != 'eligible':
+            continue
+
+        # Retrieve GPU models of the node
         devices = node['NodeResources']['Devices']
         gpus = [d for d in devices if d['Type'] == 'gpu'] if devices else []
         for gpu in gpus:
             gpu_models.add(gpu['Name'])
+
     return list(gpu_models)
