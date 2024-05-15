@@ -1,6 +1,7 @@
 import configparser
 from copy import deepcopy
 import re
+import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter
@@ -13,8 +14,7 @@ from .common import Catalog, retrieve_docker_tags
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_list(
-    ):
+def get_list(self):
     """
     Retrieve a list of *all* modules.
 
@@ -37,9 +37,10 @@ def get_list(
 
 
 def get_config(
+    self,
     item_name: str,
     vo: str,
-):
+    ):
     """
     Returns the default configuration (dict) for creating a deployment
     for a specific module. It is prefilled with the appropriate
@@ -81,8 +82,8 @@ def get_config(
 
 
 Modules = Catalog()
-Modules.get_list = get_list
-Modules.get_config = get_config
+Modules.get_list = types.MethodType(get_list, Modules)
+Modules.get_config = types.MethodType(get_config, Modules)
 
 
 router = APIRouter(

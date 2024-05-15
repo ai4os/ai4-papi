@@ -4,8 +4,6 @@
 
 # AI4EOSC - Platform API
 
-> :warning: The library is under active development, so you might expect some breaking changes to happen.
-
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 
 [//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
@@ -16,7 +14,7 @@
 This is the Platform API for interacting with the AI4EOSC services, built using
 [FastAPI](https://fastapi.tiangolo.com/).
 It aims at providing a stable UI, effectively decoupling the services offered by the
-project from the underlying tools we use to provide them (ie. Nomad).
+project from the underlying tools we use to provide them (ie. Nomad, OSCAR).
 
 The API is currently deployed here:
 
@@ -62,45 +60,46 @@ pip install -e .
 ```
 
 
-## Usage
+## Running the API
 
 To deploy the API, the are several options:
 
 1. Using entrypoints:
-```bash
-ai4papi-run --host 0.0.0.0 --port 8080
-```
+   ```bash
+   ai4papi-run --host 0.0.0.0 --port 8080
+   ```
 
 2. Using uvicorn directly (with the auto `reload` feature enabled if you are developing):
-```bash
-uvicorn ai4papi.main:app --reload
-```
+   ```bash
+   uvicorn ai4papi.main:app --reload
+   ```
 
 3. Using our [Makefile](./Makefile)
+   ```bash
+   make run
+   ```
 
 4. From Dockerhub
-
-```bash
-docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ignacioheredia/ai4-papi:prod
-```
+   ```bash
+   docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ignacioheredia/ai4-papi:prod
+   ```
 
 5. Building from our [Dockerfile](./docker/Dockerfile).
-
-```bash
-docker build -t ai4-papi:prod --build-arg papi_branch=master .
-docker run -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ai4-papi:prod
-```
+   ```bash
+   docker build -t ai4-papi:prod --build-arg papi_branch=master .
+   docker run -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ai4-papi:prod
+   ```
 
 Once the API is running, go to http://127.0.0.1:8080/docs to check the API methods in the
 Swagger UI.
 
 
-### Authentication
+## Authentication
 
-Some of the API methods are authenticated (:lock:) via OIDC tokens, so you will need to
+Some of the API methods are authenticated (🔒) via OIDC tokens, so you will need to
 perform the following steps to access those methods.
 
-#### Configure the OIDC provider
+### Configure the OIDC provider
 
 1. Create an [EGI Check-In](https://aai.egi.eu/registry/) account.
 2. Enroll (`People > Enroll`) in one of the approved Virtual Organizations:
@@ -112,118 +111,120 @@ with the next steps.
 Supported OIDC providers and Virtual Organizations are described in the
 [configuration](./etc/main_conf.yaml).
 
-#### Generating a valid refresh token
+### Generating a valid refresh token
 
 There are two ways of generating a valid refresh user token to access the methods:
 either via an UI or via the terminal.
 
-##### Generate a token with a UI
+#### Generate a token with a UI
 
 If have a EGI Check-In account, you can generate a refresh user token with
 [EGI token](https://aai.egi.eu/token): click `Authorise` and sign-in with your account.
 Then use the `Access Token` to authenticate your calls.
 
-##### Generate a token via the terminal
+#### Generate a token via the terminal
 
 1. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
 
 2. Configure the OIDC agent:
-```bash
-eval `oidc-agent-service start`
-oidc-gen \
-  --issuer https://aai.egi.eu/auth/realms/egi \
-  --scope "openid profile offline_access eduperson_entitlement email" \
-  egi-checkin
-```
-It will open the browser so you can authenticate with your EGI account. Then go back to
-the terminal and finish by setting and encryption password.
+   ```bash
+   eval `oidc-agent-service start`
+   oidc-gen \
+     --issuer https://aai.egi.eu/auth/realms/egi \
+     --scope "openid profile offline_access eduperson_entitlement email" \
+     egi-checkin
+   ```
+   It will open the browser so you can authenticate with your EGI account. Then go back to
+  the terminal and finish by setting and encryption password.
 
 3. Add the following line to your `.bashrc` to start the agent automatically at startup
-([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
-```bash
-eval `oidc-agent-service use` > /dev/null
-```
+   ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
+   ```bash
+   eval `oidc-agent-service use` > /dev/null
+   ```
 
 4. Generate the OIDC token
-```bash
-oidc-token egi-checkin
-```
+   ```bash
+   oidc-token egi-checkin
+   ```
 
 5. `Optional`: You can check you have set everything up correctly by running:
-```bash
-flaat-userinfo --oidc-agent-account egi-checkin
-```
-This should print you EGI user information.
+   ```bash
+   flaat-userinfo --oidc-agent-account egi-checkin
+   ```
+   This should print you EGI user information.
 
-#### Making authenticated calls
+### Making authenticated calls
 
-To make authenticated calls:
-* An authenticated CURL call looks like the following:
-```bash
-curl --location 'http://localhost:8080' --header 'Authorization: Bearer <your-OIDC-token>'
-```
+To make authenticated calls, you have several options:
+
+* Using CURL calls:
+  ```bash
+  curl --location 'http://localhost:8080' --header 'Authorization: Bearer <your-OIDC-token>'
+  ```
+
 * From in the Swagger UI (http://localhost:8080/docs), click in the upper right corner
-button `Authorize` :unlock: and input your token. From now on you will be authenticated
-when making API calls from the Swagger UI.
-* From inside a Python script:
+  button `Authorize` 🔓 and input your token. From now on you will be authenticated
+  when making API calls from the Swagger UI.
+
+* <details>
+  <summary>From inside a Python script</summary>
+
+  ```python
+  from types import SimpleNamespace
+  from ai4papi.routers.v1 import deployments
+
+  deployments.get_deployments(
+      vos=['vo.ai4eosc.eu'],
+      authorization=SimpleNamespace(
+          credentials='your-OIDC-token'
+      ),
+  )
+  ```
+
+  </details>
+
+
+## Description
+
+### API methods
+
+Here follows an overall summary of the available routes.
+The 🔒 symbol indicates the method needs authentication to be accessed.
+More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
+
+* `/v1/catalog/`:
+  interact with the metadata of the modules/tools in the marketplace.
+
+  **Notes**: The catalog caches results for up to 6 hours to improve UX (see
+  [doctring](./ai4papi/routers/v1/modules.py)).
+
+* `/v1/deployments/`: (🔒)
+   deploy modules/tools in the platform to perform trainings
+
+* `/v1/stats/deployments/`: (🔒)
+  retrieve usage stats for users and overall platform.
+
+  <details>
+  <summary>Requirements</summary>
+
+  For this you need to declare a ENV variable with the path of the Nomad cluster
+  logs repo:
+  ```bash
+  export ACCOUNTING_PTH="/your/custom/path/ai4-accounting"
+  ```
+  It will serve the contents of the `ai4-accounting/summaries` folder.
+  </details>
+
+
+<details>
+<summary>The API methods can also be accessed by interacting directly with
+the Python package.</summary>
+
 ```python
 from types import SimpleNamespace
-from ai4papi.routers.v1 import deployments
-
-deployments.get_deployments(
-    vos=['vo.ai4eosc.eu'],
-    authorization=SimpleNamespace(
-        credentials='your-OIDC-token'
-    ),
-)
-```
-
-#### API methods
-
-Here follows an overview of the available methods. The :lock: symbol indicates the
-method needs authentication to be accessed and :red_circle: methods that are planned
-but not implemented yet.
-
-Same methods are also valid for `tools` instead of `modules`.
-
-#### Exchange API
-
-The Exchange API offers the possibility to interact with the metadata of the modules in
-the marketplace.
-
-Methods:
-* `GET(/v1/catalog/modules)`: returns a list of all modules in the Marketplace
-* `GET(/v1/catalog/modules/detail)`: returns a list of all modules' basic metadata (name, title,
-summary, keywords)
- `GET(/v1/catalog/modules/tags)`: returns a list of all modules' tags
-* `GET(/v1/catalog/modules/{item_name}/config)`: returns the default configuration for creating a
-deployment for a specific module
-* `GET(/v1/catalog/modules/{item_name}/metadata)`: returns the full metadata of a specific module
-
-**Notes**: The Exchange API returns results cached for up to 6 hours to improve UX (see
-[doctring](./ai4papi/routers/v1/modules.py)).
-
-#### Training API
-
-The Training API offers the possibility to interact with the metadata of the modules in
-the marketplace.
-
-Methods:
-* `GET(/v1/deployments/modules)`: :lock: retrieve all deployments (with information) belonging to a
-user.
-* `POST(/v1/deployments/modules)`: :lock: create a new deployment belonging to the user.
-* `GET(/v1/deployments/modules/{deployment_uuid})`: :lock: retrieve info of a single deployment belonging to a user
-* `DELETE(/v1/deployments/modules/{deployment_uuid})`: :lock: delete a deployment, users can only
-delete their own deployments.
-
-
-The functionalities can also be accessed without the API:
-
-```python
-from types import SimpleNamespace
 
 from ai4papi.routers.v1 import deployments
-
 
 # Get all the user's deployments
 deployments.modules.get_deployments(
@@ -232,6 +233,7 @@ deployments.modules.get_deployments(
         credentials='your-OIDC-token'
     ),
 )
+#
 # [{'job_ID': 'example',
 #   'status': 'running',
 #   'owner': '4545898984949741@someprovider',
@@ -251,8 +253,11 @@ deployments.modules.get_deployments(
 # }]
 ```
 
+</details>
 
-## Description
+### Configuration files
+
+These are the configuration files the API uses:
 
 * `etc/main_conf.yaml`: main configuration file of the API
 * `etc/modules`: configuration files for standard modules
