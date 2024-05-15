@@ -202,6 +202,21 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
 * `/v1/deployments/`: (🔒)
    deploy modules/tools in the platform to perform trainings
 
+* `/v1/stats/deployments/`: (🔒)
+  retrieve usage stats for users and overall platform.
+
+  <details>
+  <summary>Requirements</summary>
+
+  For this you need to declare a ENV variable with the path of the Nomad cluster
+  logs repo:
+  ```bash
+  export ACCOUNTING_PTH="/your/custom/path/ai4-accounting"
+  ```
+  It will serve the contents of the `ai4-accounting/summaries` folder.
+  </details>
+
+
 <details>
 <summary>The API methods can also be accessed by interacting directly with
 the Python package.</summary>
