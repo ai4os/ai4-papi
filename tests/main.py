@@ -17,3 +17,4 @@ import deployments.tools
 import routes
 import test_secrets
 import test_stats
+import test_launch
