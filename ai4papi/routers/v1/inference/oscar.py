@@ -76,7 +76,7 @@ def raise_for_status(func):
 
         # Catch errors when the function itself does not raise errors but the response
         # has a non-successful code
-        if str(r.status_code).startswith('2'):
+        if r.ok:
             return r
         else:
             raise HTTPException(
