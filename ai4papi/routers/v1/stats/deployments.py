@@ -210,6 +210,7 @@ def get_cluster_stats_bg():
     """
 
     resources = [
+        'jobs_num',
         'cpu_total',
         'cpu_used',
         'gpu_total',
@@ -235,7 +236,6 @@ def get_cluster_stats_bg():
         node = Nomad.node.get_node(n['ID'])
         n_stats = {k: 0 for k in resources}
         n_stats['name'] = node['Name']
-        n_stats['jobs_num'] = 0
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
@@ -269,6 +269,7 @@ def get_cluster_stats_bg():
     for namespace in namespaces:
         jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')
         for j in jobs:
+
             # Retrieve full job for meta
             job = Nomad.job.get_job(
                 id_=j['ID'],
@@ -288,10 +289,12 @@ def get_cluster_stats_bg():
             # Add resources
             datacenter = nodes_dc[a['NodeID']]
             n_stats = stats['datacenters'][datacenter]['nodes'][a['NodeID']]
-            if 'userjob' in job['Name']:
+
+            #TODO: we are ignoring resources consumed by other jobs
+            if job['Name'].startswith('module') or job['Name'].startswith('tool'):
                 n_stats['jobs_num'] += 1
 
-            #FIXME: we are ignoring resources consumed by other tasks
+            #TODO: we are ignoring resources consumed by other tasks
             if 'usertask' in a['AllocatedResources']['Tasks']:
                 res = a['AllocatedResources']['Tasks']['usertask']
 
