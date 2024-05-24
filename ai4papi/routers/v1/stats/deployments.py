@@ -181,6 +181,7 @@ def load_datacenters():
     return datacenters
 
 
+@cached(cache=TTLCache(maxsize=1024, ttl=30))
 @router.get("/cluster")
 def get_cluster_stats(
     vo: str,
@@ -192,13 +193,49 @@ def get_cluster_stats(
     """
 
     global cluster_stats
+    stats = cluster_stats
 
-    #TODO: filter cluster stats to only return stats of the nodes that support a
-    # given VO. This is blocked until we move to the federated cluster where VO support
-    # is specified in the node metadata.
-    # (!) Total cluster resources will need to be computed after this filtering is done
+    namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
-    return cluster_stats
+    for k, v in stats['datacenters'].copy().items():
+
+        # Filter out nodes that do not support the given VO
+        nodes = {}
+        for n_id, n_stats in v['nodes'].items():
+            if namespace in n_stats['namespaces']:
+                nodes[n_id] = n_stats
+
+        # Ignore datacenters with no nodes
+        if not nodes:
+            del stats['datacenters'][k]
+        else:
+            stats['datacenters'][k]['nodes'] = nodes
+
+    # Compute cluster stats after node filtering is done
+    for dc_stats in stats['datacenters'].values():
+        for n_stats in dc_stats['nodes'].values():
+            for k, v in n_stats.items():
+
+                # Ignore keys
+                if k in ['name', 'namespaces']:
+                    continue
+
+                # Aggregate nested gpu_models dict
+                elif k == 'gpu_models':
+                    for k1, v1 in v.items():
+                        model_stats = stats['cluster']['gpu_models'].get(
+                            k1,
+                            {'gpu_total': 0, 'gpu_used': 0,}  # init value
+                        )
+                        for k2, v2 in v1.items():
+                            model_stats[k2] += v2
+                        stats['cluster']['gpu_models'][k1] = model_stats
+
+                # Aggregate other resources
+                else:
+                    stats['cluster'][k] += v
+
+    return stats
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
@@ -244,6 +281,7 @@ def get_cluster_stats_bg():
             - int(node['Attributes']['unique.storage.bytesfree'])) \
             / 2**20
         n_stats['gpu_models'] = {}
+        n_stats['namespaces'] = node['Meta']['namespace']
 
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
@@ -313,35 +351,6 @@ def get_cluster_stats_bg():
                     n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
-
-    # Ignore datacenters with no nodes
-    for k, v in stats['datacenters'].copy().items():
-        if not v['nodes']:
-            del stats['datacenters'][k]
-
-    # Compute cluster stats
-    for dc_stats in stats['datacenters'].values():
-        for n_stats in dc_stats['nodes'].values():
-            for k, v in n_stats.items():
-
-                # Ignore keys
-                if k in ['name', 'namespaces']:
-                    continue
-
-                # Aggregate nested gpu_models dict
-                elif k == 'gpu_models':
-                    for k1, v1 in v.items():
-                        model_stats = stats['cluster']['gpu_models'].get(
-                            k1,
-                            {'gpu_total': 0, 'gpu_used': 0,}  # init value
-                        )
-                        for k2, v2 in v1.items():
-                            model_stats[k2] += v2
-                        stats['cluster']['gpu_models'][k1] = model_stats
-
-                # Aggregate other resources
-                else:
-                    stats['cluster'][k] += v
 
     # Set the new shared variable
     global cluster_stats
