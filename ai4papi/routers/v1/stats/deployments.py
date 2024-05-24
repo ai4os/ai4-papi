@@ -224,11 +224,10 @@ def get_cluster_stats_bg():
         'datacenters' : datacenters,  # aggregated datacenter usage
         'cluster': {k: 0 for k in resources},  # aggregated cluster usage
         }
-    stats['cluster']['gpu_models'] = []
+    stats['cluster']['gpu_models'] = {}
 
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
-    gpu_stats = {}
     nodes_dc = {} # dict(node, datacenter)
 
     # Get total stats for each node
@@ -252,13 +251,9 @@ def get_cluster_stats_bg():
                     n_stats['gpu_total'] += len(devices['Instances'])
 
                     # Track stats per GPU model type
-                    if devices['Name'] not in gpu_stats.keys():
-                        gpu_stats[devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
-
                     if devices['Name'] not in n_stats['gpu_models'].keys():
                         n_stats['gpu_models'][devices['Name']] = {'gpu_total': 0, 'gpu_used': 0}
 
-                    gpu_stats[devices['Name']]['gpu_total'] += len(devices['Instances'])
                     n_stats['gpu_models'][devices['Name']]['gpu_total'] += len(devices['Instances'])
 
         # If datacenter is not in csv, load default info
@@ -312,7 +307,6 @@ def get_cluster_stats_bg():
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
                     n_stats['gpu_used'] += gpu_num
-                    gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
                     n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
@@ -326,10 +320,25 @@ def get_cluster_stats_bg():
     for dc_stats in stats['datacenters'].values():
         for n_stats in dc_stats['nodes'].values():
             for k, v in n_stats.items():
-                if k not in ['name', 'jobs_num']:
-                    stats['cluster'][k] += v
 
-    stats['cluster']['gpu_models'] = gpu_stats
+                # Ignore keys
+                if k in ['name', 'namespaces']:
+                    continue
+
+                # Aggregate nested gpu_models dict
+                elif k == 'gpu_models':
+                    for k1, v1 in v.items():
+                        model_stats = stats['cluster']['gpu_models'].get(
+                            k1,
+                            {'gpu_total': 0, 'gpu_used': 0,}  # init value
+                        )
+                        for k2, v2 in v1.items():
+                            model_stats[k2] += v2
+                        stats['cluster']['gpu_models'][k1] = model_stats
+
+                # Aggregate other resources
+                else:
+                    stats['cluster'][k] += v
 
     # Set the new shared variable
     global cluster_stats
