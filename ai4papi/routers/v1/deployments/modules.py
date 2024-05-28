@@ -246,6 +246,7 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+            'ZENODO_RECORD_ID': user_conf['storage']['zenodo_record_id'],
         }
     )
 
@@ -270,9 +271,19 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
 
-    # If storage credentials not provided, remove storage-related tasks
-    if not all(user_conf['storage'].values()):
-        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
+    # Remove tasks that weren't configured
+    exclude_tasks = []
+
+    # If Zenodo record ID not provided, remove zenodo download task
+    if not user_conf['storage']['zenodo_record_id']:
+        exclude_tasks += ['zenododownload']
+
+    # If storage credentials not provided, remove all storage-related tasks
+    rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
+    if not all(rclone.values()):
+        exclude_tasks += ['storagetask', 'storagecleanup', 'zenododownload']
+
+    tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

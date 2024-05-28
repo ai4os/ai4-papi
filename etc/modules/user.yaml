@@ -102,3 +102,7 @@ storage:
   rclone_password:
     name: RCLONE user password
     value: ''
+
+  zenodo_record_id:
+    name: Zenodo record ID
+    value: ''
