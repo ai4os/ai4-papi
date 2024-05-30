@@ -45,11 +45,3 @@ lb:  # load balancer, Traefik
     vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
-
-zenodo:
-
-  communities:  # map VO to Zenodo communities
-
-    vo.ai4eosc.eu: ai4eosc
-    vo.imagine-ai.eu: imagine-project
-    training.egi.eu: ai4eosc

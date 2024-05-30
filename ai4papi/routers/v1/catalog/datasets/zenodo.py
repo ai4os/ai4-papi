@@ -1,20 +1,23 @@
 """
-Parse Zenodo API and return results as is.
+This route mimics Zenodo API and return results as is.
 
-We go through PAPI (ie. not query Zenodo directly from the Dashboard) because we want to
-make *authenticated* calls with Zenodo. And we cannot have a Zenodo token in the Dashboard
-because the calls are being run on the client side (ie. the client would see the Zenodo
-token).
+PAPI is acting as a proxy between the Dashboard and Zenodo because we want to
+make *authenticated* calls with Zenodo. And we cannot have a Zenodo token in the
+Dashboard because the calls are being run on the client side (ie. the client would see
+the Zenodo token).
 """
 
 import os
+import re
 import requests
-import time
+from typing import Union
+
 
 from cachetools import cached, TTLCache
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
 
-import ai4papi.conf as papiconf
+from ai4papi import auth
 
 
 router = APIRouter(
@@ -22,14 +25,12 @@ router = APIRouter(
     tags=["Zenodo datasets"],
     responses={404: {"description": "Not found"}},
 )
-
-
-API_URL = 'https://zenodo.org'
-
-session = requests.Session()
+security = HTTPBearer()
 
 # If available, authenticate the call to Zenodo to increase rate limit.
 # https://developers.zenodo.org/#rate-limiting
+API_URL = 'https://zenodo.org'
+session = requests.Session()
 zenodo_token = os.environ.get('ZENODO_TOKEN', None)
 if zenodo_token:
     session.headers = {
@@ -38,89 +39,67 @@ if zenodo_token:
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_dataset_versions(
-    _id: str,
+def _zenodo_proxy(
+    api_route: str,
+    params: Union[dict, None] = None,
     ):
     """
-    Retrieve all versions from a concept_id.
-
-    Parameters
-    ----------
-    * _id: Zenodo ID (ie. ID that represents all versions).
-      Has to be a non-conceptual ID, otherwise the GET fails.
+    We use this hidden function to allow for caching responses.
+    Otherwise error will be raised, because "authorization" param cannot be cached
+    --> TypeError: unhashable type: 'types.SimpleNamespace'
     """
+    # To avoid security issues, only allow a subset of Zenodo API (to avoid users
+    # using *our* Zenodo token to update any record)
+    allowed_routes = [
+        '^communities/[a-zA-Z0-9-]+/records*$',
+        '^records/[0-9]+/versions*$',
+        ]
+    allowed = False
+    for i in allowed_routes:
+        if re.match(i, api_route):
+            allowed = True
+            break
+    if not allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Zenodo API route not allowed."  \
+                   f"Allowed routes: {allowed_routes}",
+            )
 
-    r = session.get(f"{API_URL}/api/records/{_id}/versions")
+    # Make the call
+    r = session.get(
+        f"{API_URL}/api/{api_route}",
+        params=params,
+        )
 
     if not r.ok:
         raise HTTPException(
             status_code=500,
-            detail="Failed to query Zenodo (versions).",
+            detail="Failed to query Zenodo.",
             )
 
-    versions = []
-    for record in r.json()['hits']['hits']:
-        versions.append({
-            'version': record['metadata']['version'],
-            'title': record['title'],
-            'doi': record['doi'],
-            'latest': record['metadata']['relations']['version'][0]['is_last'],
-            })
-
-    return versions
+    return r.json()
 
 
 @router.get("/")
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_datasets(
-    vo: str,
-    versions: bool = True,
+def zenodo_proxy(
+    api_route: str,
+    params: Union[dict, None] = None,
+    authorization=Depends(security),
     ):
     """
-    Returns a list of all datasets belonging for a given Zenodo community.
-
-    For each record, we return the ID and the DOI of the conceptual record (the
-    record that is used to reference *all* versions)
+    Zenodo proxy
 
     Parameters
     ----------
-    * **vo**: Virtual Organization to maps to a Zenodo community
-    * **versions**: Whether to include additional versions in the output
+    * api_route:
+      For example:
+        - communities/imagine-project/records
+        - records/11195949/versions
+    * params:
+      Any additional params the Zenodo call might need for that given route.
     """
-    # Build base query
-    community = papiconf.MAIN_CONF['zenodo']['communities'][vo]
-    url = f"{API_URL}/api/communities/{community}/records"
-    params = {'q': 'resource_type.type:dataset'}
+    # To avoid DDoS in Zenodo, only allow access to EGI authenticated users.
+    _ = auth.get_user_info(token=authorization.credentials)
 
-    # Iterate over results
-    datasets = []
-    while True:
-        r = session.get(url, params=params)
-
-        if not r.ok:
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to query Zenodo (datasets).",
-                )
-
-        r = r.json()
-        for record in r['hits']['hits']:
-            datasets.append({
-                'title': record['title'],
-                'id': record['id'],
-                'doi': record['doi'],
-                })
-
-            if versions:
-                # Sleep for 1s to avoid reaching 60 queries per minute limit
-                # https://developers.zenodo.org/#rate-limiting
-                time.sleep(1)
-                datasets[-1]['versions'] = get_dataset_versions(record['id'])
-
-        if 'next' in r['links']:
-            url =  r['links']['next']
-            time.sleep(1)
-        else:
-            break
-
-    return datasets
+    return _zenodo_proxy(api_route, params)
