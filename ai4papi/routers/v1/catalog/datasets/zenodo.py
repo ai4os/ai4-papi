@@ -1,3 +1,13 @@
+"""
+Parse Zenodo API and return results as is.
+
+We go through PAPI (ie. not query Zenodo directly from the Dashboard) because we want to
+make *authenticated* calls with Zenodo. And we cannot have a Zenodo token in the Dashboard
+because the calls are being run on the client side (ie. the client would see the Zenodo
+token).
+"""
+
+import os
 import requests
 import time
 
@@ -17,6 +27,14 @@ router = APIRouter(
 API_URL = 'https://zenodo.org'
 
 session = requests.Session()
+
+# If available, authenticate the call to Zenodo to increase rate limit.
+# https://developers.zenodo.org/#rate-limiting
+zenodo_token = os.environ.get('ZENODO_TOKEN', None)
+if zenodo_token:
+    session.headers = {
+        'Authorization': f'Bearer {zenodo_token}',
+    }
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
