@@ -38,15 +38,23 @@ if zenodo_token:
     }
 
 
-# @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def _zenodo_proxy(
     api_route: str,
-    params: Union[dict, None] = None,
+    params: Union[frozenset, None] = None,
     ):
     """
     We use this hidden function to allow for caching responses.
     Otherwise error will be raised, because "authorization" param cannot be cached
-    --> TypeError: unhashable type: 'types.SimpleNamespace'
+    `TypeError: unhashable type: 'types.SimpleNamespace'`
+
+    **Note**:
+    - we use `frozenset` instead of `dict` because dicts are not hashable because they
+      are mutable. To convert back and forth:
+      ```
+      fset = frozenset(d.items())  # to frozenset
+      d = dict(fset)  # to dict
+      ```
     """
     # To avoid security issues, only allow a subset of Zenodo API (to avoid users
     # using *our* Zenodo token to update any record)
@@ -113,4 +121,7 @@ def zenodo_proxy(
     # To avoid DDoS in Zenodo, only allow access to EGI authenticated users.
     _ = auth.get_user_info(token=authorization.credentials)
 
-    return _zenodo_proxy(api_route, params)
+    # Convert params to frozenset
+    fparams = frozenset(params.items())
+
+    return _zenodo_proxy(api_route, fparams)
