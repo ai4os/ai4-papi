@@ -38,7 +38,7 @@ if zenodo_token:
     }
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+# @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def _zenodo_proxy(
     api_route: str,
     params: Union[dict, None] = None,
@@ -81,7 +81,7 @@ def _zenodo_proxy(
     return r.json()
 
 
-@router.get("/")
+@router.post("/")
 def zenodo_proxy(
     api_route: str,
     params: Union[dict, None] = None,
@@ -94,10 +94,21 @@ def zenodo_proxy(
     ----------
     * api_route:
       For example:
-        - communities/imagine-project/records
-        - records/11195949/versions
+        - `communities/imagine-project/records`
+        - `records/11195949/versions`
     * params:
       Any additional params the Zenodo call might need for that given route.
+      For example, in when calling `communities/*/records`:
+      ```
+      {"q": "resource_type.type:dataset"}
+      ```
+
+    **Notes**:
+    The method if a POST because GET methods with body are not supported in FastAPI [1,2].
+    Zenodo API seems to support them, probably because it is using Elastic Search [3].
+    [1]: https://github.com/tiangolo/fastapi/discussions/6450
+    [2]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/GET
+    [3]: https://github.com/whatwg/fetch/issues/551
     """
     # To avoid DDoS in Zenodo, only allow access to EGI authenticated users.
     _ = auth.get_user_info(token=authorization.credentials)
