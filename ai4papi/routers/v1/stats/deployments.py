@@ -312,8 +312,13 @@ def get_cluster_stats_bg():
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
                     n_stats['gpu_used'] += gpu_num
-                    gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
-                    n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
+
+                    # Sometime the node fails and GPUs are not detected [1].
+                    # In that case, avoid counting that GPU in the stats.
+                    # [1]: https://docs.ai4os.eu/en/latest/user/others/faq.html#my-gpu-just-disappeared-from-my-deployment
+                    if n_stats['gpu_models']:
+                        gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
+                        n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
 
