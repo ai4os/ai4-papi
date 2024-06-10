@@ -106,3 +106,4 @@ storage:
   zenodo_record_id:
     name: Zenodo record ID
     value: ''
+    description: Zenodo record ID you want to download to your storage. It requires the definition of all RCLONE variables.
