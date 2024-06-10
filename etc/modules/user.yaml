@@ -107,3 +107,8 @@ storage:
     name: Zenodo record ID
     value: ''
     description: Zenodo record ID you want to download to your storage. It requires the definition of all RCLONE variables.
+
+  zenodo_force_pull:
+    name: Force pull dataset
+    value: false
+    description: If "True" and Zenodo dataset already exists, it will delete the existing files and re-download the dataset.

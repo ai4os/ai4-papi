@@ -247,6 +247,7 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
             'ZENODO_RECORD_ID': user_conf['storage']['zenodo_record_id'],
+            'ZENODO_FORCE_PULL': str(user_conf['storage']['zenodo_force_pull']).lower(),
         }
     )
 

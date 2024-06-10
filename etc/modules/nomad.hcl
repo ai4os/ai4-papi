@@ -153,6 +153,7 @@ job "userjob-${JOB_UUID}" {
 
       env {
         RECORD_ID = "${ZENODO_RECORD_ID}"
+        FORCE_PULL = "${ZENODO_FORCE_PULL}"
       }
 
       resources {
