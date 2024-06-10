@@ -107,9 +107,8 @@ job "userjob-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        // TODO: move image to harbor before marging
         force_pull = true
-        image      = "sftobias/docker-storage:latest"
+        image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
         privileged = true
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
@@ -145,7 +144,7 @@ job "userjob-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "sftobias/zenodo-download"
+        image      = "registry.services.ai4os.eu/ai4os/docker-zenodo:latest"
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
