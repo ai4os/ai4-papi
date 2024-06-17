@@ -132,8 +132,8 @@ job "userjob-${JOB_UUID}" {
       }
     }
 
-    task "zenododownload" {
-      // Download a Zenodo dataset to the Nextcloud-mounted storage
+    task "dataset_download" {
+      // Download a dataset to the Nextcloud-mounted storage
 
       lifecycle {
         hook    = "prestart"
@@ -151,8 +151,8 @@ job "userjob-${JOB_UUID}" {
       }
 
       env {
-        RECORD_ID = "${ZENODO_RECORD_ID}"
-        FORCE_PULL = "${ZENODO_FORCE_PULL}"
+        DOI = "${DATASET_DOI}"
+        FORCE_PULL = "${DATASET_FORCE_PULL}"
       }
 
       resources {

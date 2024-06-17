@@ -177,6 +177,9 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
+
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(
         conf=user_conf,
@@ -246,8 +249,8 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
-            'ZENODO_RECORD_ID': user_conf['storage']['zenodo_record_id'],
-            'ZENODO_FORCE_PULL': str(user_conf['storage']['zenodo_force_pull']).lower(),
+            'DATASET_DOI': user_conf['storage']['datasets'][0]['doi'],  #TODO: change this to allow downloading more than one dataset
+            'DATASET_FORCE_PULL': str(user_conf['storage']['datasets'][0]['force_pull']).lower(),
         }
     )
 
@@ -275,14 +278,14 @@ def create_deployment(
     # Remove tasks that weren't configured
     exclude_tasks = []
 
-    # If Zenodo record ID not provided, remove zenodo download task
-    if not user_conf['storage']['zenodo_record_id']:
-        exclude_tasks += ['zenododownload']
+    # If dataset DOI not provided, remove dataset download task
+    if not user_conf['storage']['datasets']:
+        exclude_tasks += ['dataset_download']
 
     # If storage credentials not provided, remove all storage-related tasks
     rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
     if not all(rclone.values()):
-        exclude_tasks += ['storagetask', 'storagecleanup', 'zenododownload']
+        exclude_tasks += ['storagetask', 'storagecleanup', 'dataset_download']
 
     tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
 
