@@ -236,6 +236,7 @@ def get_cluster_stats_bg():
         node = Nomad.node.get_node(n['ID'])
         n_stats = {k: 0 for k in resources}
         n_stats['name'] = node['Name']
+        n_stats['eligibility'] = node['SchedulingEligibility']
         n_stats['jobs_num'] = 0
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
@@ -321,6 +322,17 @@ def get_cluster_stats_bg():
                         n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
+
+    # Keep ineligible nodes, but set (used=total) for all resources
+    # We don't remove the node altogether because jobs might still be running there
+    # and we want to show them in the stats
+    for datacenter in stats['datacenters'].values():
+        for n_stats in datacenter['nodes'].values():
+            if n_stats['eligibility'] == 'ineligible':
+                for r in ['cpu', 'gpu', 'ram', 'disk']:
+                    n_stats[f'{r}_total'] = n_stats[f'{r}_used']
+                for g_stats in n_stats['gpu_models'].values():
+                    g_stats[f'gpu_total'] = n_stats[f'gpu_used']
 
     # Ignore datacenters with no nodes
     for k, v in stats['datacenters'].copy().items():
