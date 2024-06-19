@@ -193,7 +193,7 @@ def get_cluster_stats(
     """
 
     global cluster_stats
-    stats = cluster_stats
+    stats = copy.deepcopy(cluster_stats)
 
     namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
 
