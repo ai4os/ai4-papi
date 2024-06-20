@@ -210,6 +210,7 @@ def get_cluster_stats_bg():
     """
 
     resources = [
+        'jobs_num',
         'cpu_total',
         'cpu_used',
         'gpu_total',
@@ -224,7 +225,7 @@ def get_cluster_stats_bg():
         'datacenters' : datacenters,  # aggregated datacenter usage
         'cluster': {k: 0 for k in resources},  # aggregated cluster usage
         }
-    stats['cluster']['gpu_models'] = []
+    stats['cluster']['gpu_models'] = {}
 
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
@@ -236,6 +237,7 @@ def get_cluster_stats_bg():
         node = Nomad.node.get_node(n['ID'])
         n_stats = {k: 0 for k in resources}
         n_stats['name'] = node['Name']
+        n_stats['eligibility'] = node['SchedulingEligibility']
         n_stats['jobs_num'] = 0
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
@@ -311,11 +313,27 @@ def get_cluster_stats_bg():
                 if res['Devices']:
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
-                    n_stats['gpu_used'] += gpu_num
-                    gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
-                    n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
+
+                    # Sometime the node fails and GPUs are not detected [1].
+                    # In that case, avoid counting that GPU in the stats.
+                    # [1]: https://docs.ai4os.eu/en/latest/user/others/faq.html#my-gpu-just-disappeared-from-my-deployment
+                    if n_stats['gpu_models']:
+                        n_stats['gpu_used'] += gpu_num
+                        gpu_stats[gpu['Name']]['gpu_used'] += gpu_num
+                        n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
+
+    # Keep ineligible nodes, but set (used=total) for all resources
+    # We don't remove the node altogether because jobs might still be running there
+    # and we want to show them in the stats
+    for datacenter in stats['datacenters'].values():
+        for n_stats in datacenter['nodes'].values():
+            if n_stats['eligibility'] == 'ineligible':
+                for r in ['cpu', 'gpu', 'ram', 'disk']:
+                    n_stats[f'{r}_total'] = n_stats[f'{r}_used']
+                for g_stats in n_stats['gpu_models'].values():
+                    g_stats[f'gpu_total'] = n_stats[f'gpu_used']
 
     # Ignore datacenters with no nodes
     for k, v in stats['datacenters'].copy().items():
@@ -326,10 +344,25 @@ def get_cluster_stats_bg():
     for dc_stats in stats['datacenters'].values():
         for n_stats in dc_stats['nodes'].values():
             for k, v in n_stats.items():
-                if k not in ['name', 'jobs_num']:
-                    stats['cluster'][k] += v
 
-    stats['cluster']['gpu_models'] = gpu_stats
+                # Ignore keys
+                if k in ['name', 'eligibility']:
+                    continue
+
+                # Aggregate nested gpu_models dict
+                elif k == 'gpu_models':
+                    for k1, v1 in v.items():
+                        model_stats = stats['cluster']['gpu_models'].get(
+                            k1,
+                            {'gpu_total': 0, 'gpu_used': 0,}  # init value
+                        )
+                        for k2, v2 in v1.items():
+                            model_stats[k2] += v2
+                        stats['cluster']['gpu_models'][k1] = model_stats
+
+                # Aggregate other resources
+                else:
+                    stats['cluster'][k] += v
 
     # Set the new shared variable
     global cluster_stats
