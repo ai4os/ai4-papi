@@ -39,6 +39,16 @@ job "tool-fl-${JOB_UUID}" {
     value     = "${NAMESPACE}"
   }
 
+  # Try to deploy iMagine jobs on nodes that are iMagine-exclusive
+  # In this way, we leave AI4EOSC nodes for AI4EOSC users and for iMagine users only
+  # when iMagine nodes are fully booked.
+  affinity {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "ai4eosc"
+    weight    = -50  # anti-affinity for ai4eosc clients
+  }
+
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
   affinity {
