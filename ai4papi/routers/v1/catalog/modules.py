@@ -1,10 +1,9 @@
 import configparser
 from copy import deepcopy
-import re
 import types
 
 from cachetools import cached, TTLCache
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 import requests
 
 from ai4papi import quotas, nomad
@@ -12,26 +11,20 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_list(self):
-    """
-    Retrieve a list of *all* modules.
-
-    This is implemented in a separate function as many functions from this router
-    are using this function, so we need to avoid infinite recursions.
-    """
-
-    gitmodules_url = "https://raw.githubusercontent.com/deephdc/deep-oc/master/.gitmodules"
+def get_items(self):
+    gitmodules_url = "https://raw.githubusercontent.com/ai4os-hub/modules-catalog/master/.gitmodules"
     r = requests.get(gitmodules_url)
 
     cfg = configparser.ConfigParser()
     cfg.read_string(r.text)
 
-    # Convert 'submodule "DEEP-OC-..."' --> 'deep-oc-...'
-    modules = [
-        re.search(r'submodule "(.*)"', s).group(1).lower() for s in cfg.sections()
-        ]
+    modules = {}
+    for section in cfg.sections():
+        items = dict(cfg.items(section))
+        key = items.pop('path').lower()
+        items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
+        modules[key] = items
 
     return modules
 
@@ -41,22 +34,31 @@ def get_config(
     item_name: str,
     vo: str,
     ):
-    """
-    Returns the default configuration (dict) for creating a deployment
-    for a specific module. It is prefilled with the appropriate
-    docker image and the available docker tags.
-    """
-    #TODO: We are not checking if module exists in the marketplace because
-    # we are treating each route as independent. In the future, this can
-    # be done as an API call to the other route.
+    # Check if module exists
+    modules = self.get_items()
+    if item_name not in modules.keys():
+        raise HTTPException(
+            status_code=400,
+            detail=f"{item_name} is not an available module.",
+            )
 
+    # Retrieve module configuration
     conf = deepcopy(papiconf.MODULES['user']['full'])
 
+    # Retrieve module metadata
+    metadata = self.get_metadata(item_name)
+
+    # Parse docker registry
+    registry = metadata['sources']['docker_registry_repo']
+    repo, image = registry.split('/')[:2]
+    if repo not in ['deephdc', 'ai4oshub']:
+        repo = 'ai4oshub'
+
     # Fill with correct Docker image
-    conf["general"]["docker_image"]["value"] = f"deephdc/{item_name}"
+    conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
     # Add available Docker tags
-    tags = retrieve_docker_tags(item_name)
+    tags = retrieve_docker_tags(image=image, repo=repo)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
@@ -80,9 +82,8 @@ def get_config(
     return conf
 
 
-
 Modules = Catalog()
-Modules.get_list = types.MethodType(get_list, Modules)
+Modules.get_items  = types.MethodType(get_items, Modules)
 Modules.get_config = types.MethodType(get_config, Modules)
 
 

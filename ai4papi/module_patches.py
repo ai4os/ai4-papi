@@ -38,6 +38,7 @@ def patch_nextcloud_mount(
         "DEEP-OC-speech-to-text-tf",
     ]
     modules = [f'deephdc/{m.lower()}' for m in modules]
+    # TODO: this will need to be updated to ai4os-hub
 
     if docker_image in modules:
         task['Env']['RCLONE_CONTIMEOUT'] = '1s'
