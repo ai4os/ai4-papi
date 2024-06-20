@@ -217,7 +217,7 @@ def get_cluster_stats(
             for k, v in n_stats.items():
 
                 # Ignore keys
-                if k in ['name', 'namespaces']:
+                if k in ['name', 'namespaces', 'eligibility']:
                     continue
 
                 # Aggregate nested gpu_models dict
@@ -273,6 +273,7 @@ def get_cluster_stats_bg():
         node = Nomad.node.get_node(n['ID'])
         n_stats = {k: 0 for k in resources}
         n_stats['name'] = node['Name']
+        n_stats['eligibility'] = node['SchedulingEligibility']
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
@@ -347,10 +348,26 @@ def get_cluster_stats_bg():
                 if res['Devices']:
                     gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0]
                     gpu_num = len(gpu['DeviceIDs']) if gpu else 0
-                    n_stats['gpu_used'] += gpu_num
-                    n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
+
+                    # Sometimes the node fails and GPUs are not detected [1].
+                    # In that case, avoid counting that GPU in the stats.
+                    # [1]: https://docs.ai4os.eu/en/latest/user/others/faq.html#my-gpu-just-disappeared-from-my-deployment
+                    if n_stats['gpu_models']:
+                        n_stats['gpu_used'] += gpu_num
+                        n_stats['gpu_models'][gpu['Name']]['gpu_used'] += gpu_num
             else:
                 continue
+
+    # Keep ineligible nodes, but set (used=total) for all resources
+    # We don't remove the node altogether because jobs might still be running there
+    # and we want to show them in the stats
+    for datacenter in stats['datacenters'].values():
+        for n_stats in datacenter['nodes'].values():
+            if n_stats['eligibility'] == 'ineligible':
+                for r in ['cpu', 'gpu', 'ram', 'disk']:
+                    n_stats[f'{r}_total'] = n_stats[f'{r}_used']
+                for g_stats in n_stats['gpu_models'].values():
+                    g_stats['gpu_total'] = n_stats['gpu_used']
 
     # Set the new shared variable
     global cluster_stats
