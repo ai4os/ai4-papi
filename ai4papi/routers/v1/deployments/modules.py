@@ -249,8 +249,6 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
-            'DATASET_DOI': user_conf['storage']['datasets'][0]['doi'],  #TODO: change this to allow downloading more than one dataset
-            'DATASET_FORCE_PULL': str(user_conf['storage']['datasets'][0]['force_pull']).lower(),
         }
     )
 
@@ -275,17 +273,22 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
 
-    # Remove tasks that weren't configured
-    exclude_tasks = []
-
-    # If dataset DOI not provided, remove dataset download task
-    if not user_conf['storage']['datasets']:
-        exclude_tasks += ['dataset_download']
-
     # If storage credentials not provided, remove all storage-related tasks
     rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
     if not all(rclone.values()):
-        exclude_tasks += ['storagetask', 'storagecleanup', 'dataset_download']
+        exclude_tasks = ['storagetask', 'storagecleanup', 'dataset_download']
+    else:
+        # If datasets provided, replicate 'dataset_download' task as many times as needed
+        if user_conf['storage']['datasets']:
+            download_task = [t for t in tasks if t['Name'] == 'dataset_download'][0]
+            for i, dataset in enumerate(user_conf['storage']['datasets']):
+                t = deepcopy(download_task)
+                t['Env']['DOI'] = dataset['doi']
+                t['Env']['FORCE_PULL'] = dataset['doi']
+                t['Name'] = f'dataset_download_{i}'
+                tasks.append(t)
+        # Always exclude initial 'dataset_download' task, as it is used as template
+        exclude_tasks = ['dataset_download']
 
     tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
 
