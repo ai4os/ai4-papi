@@ -59,7 +59,9 @@ def _zenodo_proxy(
     # To avoid security issues, only allow a subset of Zenodo API (to avoid users
     # using *our* Zenodo token to update any record)
     allowed_routes = [
+        '^communities',
         '^communities/[a-zA-Z0-9-]+/records*$',
+        '^records/[0-9]+',
         '^records/[0-9]+/versions*$',
         ]
     allowed = False
