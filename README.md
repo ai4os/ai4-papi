@@ -21,10 +21,10 @@ The API is currently deployed here:
 * [production API](https://api.cloud.ai4eosc.eu/docs) (`master` branch)
 * [development API](https://api.dev.ai4eosc.eu/docs) (`dev` branch)
 
-Images of both API are accessible in [our private Harbor](https://registry.services.ai4os.eu/ai4os/ai4-papi) and [Dockerhub](https://hub.docker.com/repository/docker/ignacioheredia/ai4-papi/).
-<!---
-TODO: replace with AI4EOSC Dockerhub account
--->
+Images of both API are accessible in the project's Harbor registry:
+
+* `registry.services.ai4os.eu/ai4os/ai4-papi:prod`
+* `registry.services.ai4os.eu/ai4os/ai4-papi:dev`
 
 The Dashboards pointing to those APIs are respectively:
 
@@ -81,7 +81,7 @@ To deploy the API, the are several options:
 
 4. From Dockerhub
    ```bash
-   docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 ignacioheredia/ai4-papi:prod
+   docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 registry.services.ai4os.eu/ai4os/ai4-papi:prod
    ```
 
 5. Building from our [Dockerfile](./docker/Dockerfile).
@@ -204,6 +204,21 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
 
 * `/v1/deployments/`: (🔒)
    deploy modules/tools in the platform to perform trainings
+
+* `/v1/stats/deployments/`: (🔒)
+  retrieve usage stats for users and overall platform.
+
+  <details>
+  <summary>Requirements</summary>
+
+  For this you need to declare a ENV variable with the path of the Nomad cluster
+  logs repo:
+  ```bash
+  export ACCOUNTING_PTH="/your/custom/path/ai4-accounting"
+  ```
+  It will serve the contents of the `ai4-accounting/summaries` folder.
+  </details>
+
 
 <details>
 <summary>The API methods can also be accessed by interacting directly with

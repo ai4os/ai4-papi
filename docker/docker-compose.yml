@@ -7,6 +7,7 @@ services:
         restart: always
         environment:
             - NOMAD_ADDR=https://193.146.75.221:4646
+            - ACCOUNTING_PTH=/home/ai4-accounting
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
             - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting
@@ -20,6 +21,7 @@ services:
         restart: always
         environment:
             - NOMAD_ADDR=https://193.146.75.221:4646
+            - ACCOUNTING_PTH=/home/ai4-accounting
         volumes:
             - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
             - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting
