@@ -79,3 +79,9 @@ for tool_path in tool_list:
             'values': yml[1],
         }
     }
+
+# Try-me endpoints
+nmd = load_nomad_job(paths['conf'] / 'try_me' / 'nomad.hcl')
+TRY_ME = {
+    'nomad': nmd,
+}
