@@ -89,6 +89,23 @@ configuration:
         'Federated Averaging', # fedavg
         'Federated Optimization', # fedprox
         'Federated Optimization with Adam', # fedadam
+        'Federated Median', # fedmedian
+        'Federated Averaging with Momentum', # fedavgm
         'Adaptive Federated Optimization', # fedopt
         'Adaptive Federated Optimization using Yogi', # fedyogi
       ]
+
+  mu:
+    name: Mu
+    value: 1
+    description: TODO
+
+  fl:
+    name: fl
+    value: 1
+    description: TODO
+
+  momentum:
+    name: Momentum
+    value: 1
+    description: TODO

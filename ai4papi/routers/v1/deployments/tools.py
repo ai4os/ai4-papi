@@ -251,6 +251,9 @@ def create_deployment(
             'FEDERATED_METRIC': user_conf['configuration']['metric'],
             'FEDERATED_MIN_CLIENTS': user_conf['configuration']['min_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+            'MU_FEDPROX': user_conf['configuration']['mu'],
+            'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
+            'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
         }
     )
 
