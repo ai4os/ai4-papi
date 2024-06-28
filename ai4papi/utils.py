@@ -147,24 +147,25 @@ def validate_conf(conf):
     """
     Validate user configuration
     """
+    # TODO: temporarily disable checks
 
-    # Check datasets_info list
-    for d in conf['storage']['datasets']:
+    # # Check datasets_info list
+    # for d in conf['storage']['datasets']:
 
-        # Validate DOI
-        # ref: https://stackoverflow.com/a/48524047/18471590
-        pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
-        if not re.match(pattern, d['doi'], re.IGNORECASE):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid DOI."
-                )
+    #     # Validate DOI
+    #     # ref: https://stackoverflow.com/a/48524047/18471590
+    #     pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
+    #     if not re.match(pattern, d['doi'], re.IGNORECASE):
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail="Invalid DOI."
+    #             )
 
-        # Check force pull parameter
-        if not isinstance(d['force_pull'], bool):
-            raise HTTPException(
-                status_code=400,
-                detail="Force pull should be bool."
-                )
+    #     # Check force pull parameter
+    #     if not isinstance(d['force_pull'], bool):
+    #         raise HTTPException(
+    #             status_code=400,
+    #             detail="Force pull should be bool."
+    #             )
 
     return conf
