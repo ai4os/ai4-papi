@@ -13,28 +13,28 @@ import ai4papi.nomad.common as nomad
 
 
 router = APIRouter(
-    prefix="/modules",
-    tags=["Modules deployments"],
+    prefix="/nomad",
+    tags=["Inferences temporal deployments"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
 
 
 @router.get("/")
-def get_deployments(
+def get_inferences(
     vos: Union[Tuple, None] = Query(default=None),
     full_info: bool = Query(default=False),
     authorization=Depends(security),
     ):
     """
-    Returns a list of all deployments belonging to a user.
+    Returns a list of all temporal deployments belonging to a user.
 
     Parameters:
-    * **vo**: Virtual Organizations from where you want to retrieve your deployments.
-      If no vo is provided, it will retrieve the deployments of all VOs.
-    * **full_info**: retrieve the full information of each deployment.
+    * **vo**: Virtual Organizations from where you want to retrieve your temporal deployments.
+      If no vo is provided, it will retrieve the temporal deployments of all VOs.
+    * **full_info**: retrieve the full information of each temporal deployment.
       Disabled by default, as it will increase latency too much if there are many
-      deployments.
+      temporal deployments.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -51,19 +51,19 @@ def get_deployments(
             detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}."
             )
 
-    user_jobs = []
+    inferences = []
     for vo in vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
-            name='userjob'
+            name='inference'
         )
 
         # Retrieve info for jobs in namespace
         for j in jobs:
             try:
-                job_info = get_deployment(
+                job_info = get_inference(
                     vo=vo,
                     deployment_uuid=j['ID'],
                     full_info=full_info,
@@ -76,31 +76,31 @@ def get_deployments(
             except Exception as e:  # unexpected error
                 raise(e)
 
-            user_jobs.append(job_info)
+            inferences.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j['submit_time'] for j in user_jobs]
+    # Sort temporal deployments by creation date
+    seq = [j['submit_time'] for j in inferences]
     args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    sorted_jobs = [inferences[i] for i in args]
 
     return sorted_jobs
 
 
 @router.get("/{deployment_uuid}")
-def get_deployment(
+def get_inference(
     vo: str,
     deployment_uuid: str,
     full_info: bool = Query(default=True),
     authorization=Depends(security),
     ):
     """
-    Retrieve the info of a specific deployment.
+    Retrieve the info of a specific temporal deployment.
     Format outputs to a Nomad-independent format to be used by the Dashboard
 
     Parameters:
-    * **vo**: Virtual Organization from where you want to retrieve your deployment
-    * **deployment_uuid**: uuid of deployment to gather info about
-    * **full_info**: retrieve the full information of that deployment (may increase
+    * **vo**: Virtual Organization from where you want to retrieve your temporal deployment
+    * **deployment_uuid**: uuid of temporal deployment to gather info about
+    * **full_info**: retrieve the full information of that temporal deployment (may increase
       latency)
 
     Returns a dict with info
@@ -119,7 +119,7 @@ def get_deployment(
         full_info=full_info,
     )
 
-    # Check the deployment is indeed a module
+    # Check the temporal deployment is indeed a module
     tool_list = papiconf.TOOLS.keys()
     module_name = re.search(
             '/(.*):',  # remove dockerhub account and tag
@@ -135,51 +135,25 @@ def get_deployment(
 
 
 @router.post("/")
-def create_deployment(
+def create_inference(
     vo: str,
-    conf: Union[dict, None] = None,
     authorization=Depends(security),
     ):
     """
-    Submit a deployment to Nomad.
+    Submit a temporal deployment to Nomad.
 
     Parameters:
-    * **vo**: Virtual Organization where you want to create your deployment
-    * **conf**: configuration dict of the deployment to be submitted.
-    For example:
-    ```
-    {
-        "general":{
-            "docker_image": "deephdc/deep-oc-image-classification-tf",
-            "service": "deepaas"
-        },
-        "hardware": {
-            "cpu_num": 4
-        }
-    }
-    ```
-    If only a partial configuration is submitted, the remaining will be filled with
-    [default args](https://github.com/AI4EOSC/ai4-papi/blob/master/etc/userconf.yaml)
-
+    * **vo**: Virtual Organization where you want to create your temporal deployment
+    
     Returns a dict with status
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    # Load module configuration
-    nomad_conf = deepcopy(papiconf.MODULES['nomad'])
-    user_conf = deepcopy(papiconf.MODULES['user']['values'])
-
-    # Update values conf in case we received a submitted conf
-    if conf is not None:
-        user_conf = utils.update_values_conf(
-            submitted=conf,
-            reference=user_conf,
-        )
-
-    # Utils validate conf
-    user_conf = utils.validate_conf(user_conf)
+    # Load inference configuration
+    nomad_conf = deepcopy(papiconf.INFERENCES['nomad'])
+    user_conf = deepcopy(papiconf.INFERENCES['user']['values'])
 
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(
@@ -188,7 +162,7 @@ def create_deployment(
     )
 
     # Check if the provided configuration is within the user quotas
-    deployments = get_deployments(
+    deployments = get_inferences(
         vos=[vo],
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
@@ -274,24 +248,9 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
 
-    # If storage credentials not provided, remove all storage-related tasks
-    rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
-    if not all(rclone.values()):
-        exclude_tasks = ['storagetask', 'storagecleanup', 'dataset_download']
-    else:
-        # If datasets provided, replicate 'dataset_download' task as many times as needed
-        if user_conf['storage']['datasets']:
-            download_task = [t for t in tasks if t['Name'] == 'dataset_download'][0]
-            for i, dataset in enumerate(user_conf['storage']['datasets']):
-                t = deepcopy(download_task)
-                t['Env']['DOI'] = dataset['doi']
-                t['Env']['FORCE_PULL'] = dataset['doi']
-                t['Name'] = f'dataset_download_{i}'
-                tasks.append(t)
-        # Always exclude initial 'dataset_download' task, as it is used as template
-        exclude_tasks = ['dataset_download']
-
-    tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
+    # If storage credentials not provided, remove storage-related tasks
+    if not all(user_conf['storage'].values()):
+        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
@@ -300,17 +259,17 @@ def create_deployment(
 
 
 @router.delete("/{deployment_uuid}")
-def delete_deployment(
+def delete_inference(
     vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
     ):
     """
-    Delete a deployment. Users can only delete their own deployments.
+    Delete a temporal deployment. Users can only delete their own deployments.
 
     Parameters:
-    * **vo**: Virtual Organization where your deployment is located
-    * **deployment_uuid**: uuid of deployment to delete
+    * **vo**: Virtual Organization where your temporal deployment is located
+    * **deployment_uuid**: uuid of temporal deployment to delete
 
     Returns a dict with status
     """
@@ -318,7 +277,7 @@ def delete_deployment(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    # Delete deployment
+    # Delete temporal deployment
     r = nomad.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
