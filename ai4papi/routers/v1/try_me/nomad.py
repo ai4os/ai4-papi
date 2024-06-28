@@ -68,6 +68,25 @@ def create_deployment(
     return r
 
 
-# TODO: implement a get method to retrieve endpoint
-# This is implemented in a separate method because we cannot know what is the final
-# endpoint before knowing in which datacenter it has landed
+@router.get("/{deployment_uuid}")
+def get_deployment(
+    deployment_uuid: str,
+    ):
+    """
+    This function is used mainly to be able to retrieve the endpoint of the try_me job.
+    We cannot return the endpoint when creating the job, because the final endpoint will
+    on which datacenter the job ends up landing.
+
+    Parameters:
+    * **deployment_uuid**: uuid of deployment to gather info about
+
+    Returns a dict with info
+    """
+    job = nomad.get_deployment(
+        deployment_uuid=deployment_uuid,
+        namespace="ai4eosc",
+        owner="",  # try-me endpoints have no owner
+        full_info=True,
+    )
+
+    return job

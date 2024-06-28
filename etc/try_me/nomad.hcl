@@ -9,12 +9,21 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "usertest-${JOB_UUID}" {
-  namespace = "default"
+job "userjob-${JOB_UUID}" {
+  namespace = "ai4eosc"     # try-me jobs are always deployed in ai4eosc
   type      = "service"
   region    = "global"
   id        = "${JOB_UUID}"
-  priority  = "0"  # "Try-me" jobs have low priority
+  priority  = "0"           # try-me jobs have low priority
+
+  # Try-me jobs have no owner
+  meta {
+    owner       = ""
+    owner_name  = ""
+    owner_email = ""
+    title       = ""
+    description = ""
+  }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
@@ -24,7 +33,8 @@ job "usertest-${JOB_UUID}" {
     value     = "gpu"
     weight    = -50  # anti-affinity for GPU clients
   }
-  #TODO: *force* CPU for try-me deployments
+  #TODO: *force* CPU for try-me deployments.
+  # Wait until we move to federated cluster because this will be easier to implement.
 
   # Avoid rescheduling the job on **other** nodes during a network cut
   # Command not working due to https://github.com/hashicorp/nomad/issues/16515
@@ -44,19 +54,19 @@ job "usertest-${JOB_UUID}" {
 
     network {
 
-      port "ide" {
+      port "ui" {
         to = 8888  # -1 will assign random port
       }
 
     }
 
     service {
-      name = "${JOB_UUID}-api"
-      port = "api"
+      name = "${JOB_UUID}-ui"
+      port = "ui"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-api.tls=true",
-        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${DOMAIN}`, `www.api-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${DOMAIN}`, `www.ui-${DOMAIN}`)",
       ]
     }
 
@@ -67,14 +77,16 @@ job "usertest-${JOB_UUID}" {
     task "usertask" {
       // Task configured by the user
 
+      # TODO: kill after 10 mins and do *not* restart
+
       driver = "docker"
 
       config {
         force_pull = true
         image      = "${DOCKER_IMAGE}:latest"
-        command    = "curl"
-        args       = ["-s", "https://raw.githubusercontent.com/ai4os/deepaas_ui/nomad/nomad.sh", "|", "bash"]
-        ports      = ["ide"]
+        command    = "sh"
+        args       = ["-c", "curl https://raw.githubusercontent.com/ai4os/deepaas_ui/nomad/nomad.sh | bash"]
+        ports      = ["ui"]
         shm_size   = 500000000  # 500MB
         memory_hard_limit = 1000  # 1GB
       }
