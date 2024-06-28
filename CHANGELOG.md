@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.2.0](https://github.com/ai4os/ai4-papi/compare/v1.1.0...v1.2.0) (2024-06-28)
+
+
+### Features
+
+* add support for downloading datasets ([#53](https://github.com/ai4os/ai4-papi/issues/53)) ([55f6b77](https://github.com/ai4os/ai4-papi/commit/55f6b77272a9ab6877c834391c702f76aa34c014))
+* better tag sorting for dev env ([feb2883](https://github.com/ai4os/ai4-papi/commit/feb28836d2dd9226f91e61a194d698a6432542e4))
+* module migration to `ai4os-hub` ([#51](https://github.com/ai4os/ai4-papi/issues/51)) ([87473e0](https://github.com/ai4os/ai4-papi/commit/87473e05055c95f9344907f53ab944ef57050fe7))
+* **stats:** account for ineligible nodes ([6560a10](https://github.com/ai4os/ai4-papi/commit/6560a105b62f8e297b4d12ab0f4aed194a48ebb8))
+* **stats:** properly aggregate cluster resources ([fd00d14](https://github.com/ai4os/ai4-papi/commit/fd00d1482e676b9f75d5e0c12ea10e4821e54be0))
+
+
+### Bug Fixes
+
+* better catch exception ([4133723](https://github.com/ai4os/ai4-papi/commit/4133723d8c42cea649d616499d6db1187254296c))
+* reenable dataset checks ([#54](https://github.com/ai4os/ai4-papi/issues/54)) ([af9e8eb](https://github.com/ai4os/ai4-papi/commit/af9e8eb68ebb7942fa97482bac417ab5d0d1d0d4))
+* **stats:** account for failing GPU nodes ([93a1608](https://github.com/ai4os/ai4-papi/commit/93a1608c8db877b692f431ec4482de62076fd131))
+* **stats:** move stat in to if loop ([c056894](https://github.com/ai4os/ai4-papi/commit/c05689445c5df3a70af52ce037db9fee9f066255))
+* temporarily disable DOI checks ([d6a1599](https://github.com/ai4os/ai4-papi/commit/d6a1599a2418b2650e68d38d41a96e0d59ae636d))
+
+
+### Documentation
+
+* update README ([30133ba](https://github.com/ai4os/ai4-papi/commit/30133ba3940e53a049d703b8563fe21f8fffa815))
+
 ## [1.1.0](https://github.com/ai4os/ai4-papi/compare/v1.0.0...v1.1.0) (2024-05-15)
 
 
