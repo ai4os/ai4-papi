@@ -1,0 +1,20 @@
+# OSCAR service definition
+
+log_level: CRITICAL
+alpine: False
+cluster_id: ${CLUSTER_ID}
+name: ${NAME}
+image: ${IMAGE}
+cpu: "${CPU}"  # has to be string
+memory: ${MEMORY}Mi
+vo: ${VO}
+allowed_users: ${ALLOWED_USERS}
+environment: ${ENV_VARS}
+script: |-
+   #!/bin/bash
+   mv $INPUT_FILE_PATH "$INPUT_FILE_PATH.${TYPE}"
+   INPUT_FILE_PATH="$INPUT_FILE_PATH.${TYPE}"
+   FILE_NAME=`basename "$INPUT_FILE_PATH"`
+   OUTPUT_FILE="$TMP_OUTPUT_DIR"/"$FILE_NAME"
+   echo 'SCRIPT: Invoked deepaas-cli command.'
+   deepaas-cli --deepaas_method_output $OUTPUT_FILE predict --files $INPUT_FILE_PATH

@@ -45,3 +45,19 @@ lb:  # load balancer, Traefik
     vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
+
+oscar:
+
+  clusters:
+
+    vo.ai4eosc.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
+
+    vo.imagine-ai.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
+
+    training.egi.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
