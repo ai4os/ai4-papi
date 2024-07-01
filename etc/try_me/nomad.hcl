@@ -11,7 +11,7 @@ replacing Nomad values
 
 job "userjob-${JOB_UUID}" {
   namespace = "ai4eosc"     # try-me jobs are always deployed in ai4eosc
-  type      = "service"
+  type      = "batch"       # try-me jobs should not be redeployed when exit_code=0
   region    = "global"
   id        = "${JOB_UUID}"
   priority  = "0"           # try-me jobs have low priority
@@ -36,21 +36,13 @@ job "userjob-${JOB_UUID}" {
   #TODO: *force* CPU for try-me deployments.
   # Wait until we move to federated cluster because this will be easier to implement.
 
-  # Avoid rescheduling the job on **other** nodes during a network cut
-  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
+  # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
   reschedule {
     attempts  = 0
     unlimited = false
   }
 
   group "usergroup" {
-
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
 
     network {
 
@@ -75,9 +67,7 @@ job "userjob-${JOB_UUID}" {
     }
 
     task "usertask" {
-      // Task configured by the user
-
-      # TODO: kill after 10 mins and do *not* restart
+      # Task configured by the user
 
       driver = "docker"
 
@@ -91,12 +81,23 @@ job "userjob-${JOB_UUID}" {
         memory_hard_limit = 1000  # 1GB
       }
 
+      env {
+        DURATION = "10m"  # try-me job killed after 10 mins (with exit_code=0)
+        UI_PORT  = 8888
+      }
+
       resources {
-        cores  = 1
-        memory = 1000  # 1GB
+        cores      = 1
+        memory     = 1000  # 1GB
         memory_max = 1000  # 1GB
       }
-    }
 
+      # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
+      restart {
+        attempts = 0
+        mode     = "fail"
+      }
+
+    }
   }
 }
