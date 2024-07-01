@@ -75,11 +75,17 @@ configuration:
     value: 'accuracy'
     description: Metric that will be used for monitoring and validating the process. It will be aggregated according with the different clients. More than one metric can be included.
 
-  min_clients:
-    name: Minimal number of clients
+  min_fit_clients:
+    name: Number of minimum clients (fit)
     value: 2
     range: [2, null]
-    description: Number of minimum clients that must be connected with the server and ready to train the models for starting the process.
+    description: Minimum number of clients required for training the model.
+
+  min_available_clients:
+    name: Number of minumum clients (available)
+    value: 2
+    range: [2, null]
+    description: Minimum number of clients required in the FL process.
 
   strategy:
     name: Federated aggregation strategy
@@ -98,14 +104,17 @@ configuration:
   mu:
     name: Mu
     value: 1
-    description: TODO
+    range: [0, null]
+    description: In the FedProx strategy, weight of the proximal term used in the optimization.
 
   fl:
-    name: fl
+    name: Learning rate
     value: 1
-    description: TODO
+    range: [0, null]
+    description: In the FedAvgM strategy, server-side learning rate for the optimization.
 
   momentum:
     name: Momentum
-    value: 1
-    description: TODO
+    value: 0
+    range: [0, null]
+    description: In the FedAvgM strategy, server-side momentum factor.
