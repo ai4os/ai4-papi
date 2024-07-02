@@ -89,16 +89,16 @@ configuration:
 
   strategy:
     name: Federated aggregation strategy
-    value: 'Federated Averaging'
+    value: 'Federated Averaging (FedAvg)'
     description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/deephdc/federated-server" target="_blank">Check the different options with their references.</a>
     options: [
-        'Federated Averaging', # fedavg
-        'Federated Optimization', # fedprox
-        'Federated Optimization with Adam', # fedadam
-        'Federated Median', # fedmedian
-        'Federated Averaging with Momentum', # fedavgm
-        'Adaptive Federated Optimization', # fedopt
-        'Adaptive Federated Optimization using Yogi', # fedyogi
+        'Federated Averaging (FedAvg)', # fedavg
+        'FedProx strategy (FedProx)', # fedprox
+        'Federated Optimization with Adam (FedAdam)', # fedadam
+        'Federated Median (FedMedian)', # fedmedian
+        'Federated Averaging with Momentum (FedAvgM)', # fedavgm
+        'Adaptive Federated Optimization (FedOpt)', # fedopt
+        'Adaptive Federated Optimization using Yogi (FedYogi)', # fedyogi
       ]
 
   mu:
