@@ -110,12 +110,16 @@ job "userjob-${JOB_UUID}" {
       }
 
       env {
-        VAULT_TOKEN           = "${VAULT_TOKEN}"
-        jupyterPASSWORD       = "${JUPYTER_PASSWORD}"
-        FEDERATED_ROUNDS      = "${FEDERATED_ROUNDS}"
-        FEDERATED_METRIC      = "${FEDERATED_METRIC}"
-        FEDERATED_MIN_CLIENTS = "${FEDERATED_MIN_CLIENTS}"
-        FEDERATED_STRATEGY    = "${FEDERATED_STRATEGY}"
+        VAULT_TOKEN                     = "${VAULT_TOKEN}"
+        jupyterPASSWORD                 = "${JUPYTER_PASSWORD}"
+        FEDERATED_ROUNDS                = "${FEDERATED_ROUNDS}"
+        FEDERATED_METRIC                = "${FEDERATED_METRIC}"
+        FEDERATED_MIN_FIT_CLIENTS       = "${FEDERATED_MIN_FIT_CLIENTS}"
+        FEDERATED_MIN_AVAILABLE_CLIENTS = "${FEDERATED_MIN_AVAILABLE_CLIENTS}"
+        FEDERATED_STRATEGY              = "${FEDERATED_STRATEGY}"
+        MU_FEDPROX                      = "${MU_FEDPROX}"
+        FEDAVGM_SERVER_FL               = "${FEDAVGM_SERVER_FL}"
+        FEDAVGM_SERVER_MOMENTUM         = "${FEDAVGM_SERVER_MOMENTUM}"
       }
 
       resources {
