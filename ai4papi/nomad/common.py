@@ -262,7 +262,7 @@ def get_deployment(
                     r = session.get(v, timeout=2)
                     if r.status_code == 200:
                         info['active_endpoints'].append(k)
-                except requests.exceptions.Timeout:
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
                     continue
 
         # Disable access to endpoints if there is a network cut

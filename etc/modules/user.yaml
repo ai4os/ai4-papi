@@ -112,3 +112,8 @@ storage:
   rclone_password:
     name: RCLONE user password
     value: ''
+
+  datasets:
+    name: Info of the datasets you want to download
+    value: []
+    description: Each element in the list should be a dict containing "doi" and "force_pull" keys. It requires the definition of all RCLONE variables.
