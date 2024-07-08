@@ -99,12 +99,18 @@ job "userjob-${JOB_UUID}" {
     task "storagetask" {
       // Running task in charge of mounting storage
 
+      lifecycle {
+        hook    = "prestart"
+        sidecar = true
+      }
+
       driver = "docker"
 
       config {
-        image   = "ignacioheredia/ai4-docker-storage"
+        force_pull = true
+        image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
         privileged = true
-        volumes = [
+        volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
       }
@@ -124,6 +130,36 @@ job "userjob-${JOB_UUID}" {
         cpu    = 50        # minimum number of CPU MHz is 2
         memory = 2000
       }
+    }
+
+    task "dataset_download" {
+      // Download a dataset to the Nextcloud-mounted storage
+
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "registry.services.ai4os.eu/ai4os/docker-zenodo:latest"
+        volumes    = [
+          "/nomad-storage/${JOB_UUID}:/storage:shared",
+        ]
+      }
+
+      env {
+        DOI = "${DATASET_DOI}"
+        FORCE_PULL = "${DATASET_FORCE_PULL}"
+      }
+
+      resources {
+        cpu    = 50
+        memory = 2000
+      }
+
     }
 
     task "usertask" {
