@@ -177,6 +177,9 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
+
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(
         conf=user_conf,
@@ -270,9 +273,24 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
 
-    # If storage credentials not provided, remove storage-related tasks
-    if not all(user_conf['storage'].values()):
-        tasks[:] = [t for t in tasks if t['Name'] not in {'storagetask', 'storagecleanup'}]
+    # If storage credentials not provided, remove all storage-related tasks
+    rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
+    if not all(rclone.values()):
+        exclude_tasks = ['storagetask', 'storagecleanup', 'dataset_download']
+    else:
+        # If datasets provided, replicate 'dataset_download' task as many times as needed
+        if user_conf['storage']['datasets']:
+            download_task = [t for t in tasks if t['Name'] == 'dataset_download'][0]
+            for i, dataset in enumerate(user_conf['storage']['datasets']):
+                t = deepcopy(download_task)
+                t['Env']['DOI'] = dataset['doi']
+                t['Env']['FORCE_PULL'] = dataset['doi']
+                t['Name'] = f'dataset_download_{i}'
+                tasks.append(t)
+        # Always exclude initial 'dataset_download' task, as it is used as template
+        exclude_tasks = ['dataset_download']
+
+    tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
