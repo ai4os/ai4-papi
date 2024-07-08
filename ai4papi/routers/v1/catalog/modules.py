@@ -4,6 +4,7 @@ import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
+from natsort import natsorted
 import requests
 
 from ai4papi import quotas, nomad
@@ -62,8 +63,17 @@ def get_config(
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
 
-    # Use VS Code (Coder OSS) in the development container
-    if item_name == 'deep-oc-generic-dev':
+    # Custom conf for development environment
+    if item_name == 'ai4os-dev-env':
+
+        # For dev-env, order the tags in "Z-A" order instead of "newest"
+        # This is done because builds are done in parallel, so "newest" is meaningless
+        # (Z-A + natsort) allows to show more recent semver first
+        tags = natsorted(tags)[::-1]
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
+
+        # Use VS Code (Coder OSS) in the development container
         conf["general"]["service"]["value"] = 'vscode'
         conf["general"]["service"]["options"].insert(0, 'vscode')
         conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
