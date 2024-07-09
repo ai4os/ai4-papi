@@ -24,6 +24,13 @@ job "tool-fl-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
+  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  constraint {
+    attribute = "${meta.status}"
+    operator  = "regexp"
+    value     = "ready"
+  }
+
   # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
   constraint {
     attribute = "${meta.compute}"
