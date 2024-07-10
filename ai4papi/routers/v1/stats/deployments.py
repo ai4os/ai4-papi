@@ -282,7 +282,8 @@ def get_cluster_stats_bg():
             - int(node['Attributes']['unique.storage.bytesfree'])) \
             / 2**20
         n_stats['gpu_models'] = {}
-        n_stats['namespaces'] = node['Meta']['namespace']
+        n_stats['namespaces'] = node['Meta'].get('namespace', '')
+        n_stats['status'] = node['Meta'].get('status', '')
 
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
