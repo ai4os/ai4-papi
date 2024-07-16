@@ -6,7 +6,6 @@ import re
 from fastapi import HTTPException
 import requests
 
-
 # Persistent requests session for faster requests
 session = requests.Session()
 
