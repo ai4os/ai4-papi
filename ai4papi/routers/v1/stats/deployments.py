@@ -217,7 +217,7 @@ def get_cluster_stats(
             for k, v in n_stats.items():
 
                 # Ignore keys
-                if k in ['name', 'namespaces', 'eligibility']:
+                if k in ['name', 'namespaces', 'eligibility', 'status']:
                     continue
 
                 # Aggregate nested gpu_models dict
