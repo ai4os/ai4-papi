@@ -28,7 +28,6 @@ class Service(BaseModel):
     image: str
     cpu: NonNegativeInt = 2
     memory: NonNegativeInt = 3000
-    input_type: str
     allowed_users: List[str] = []  # no additional users by default
     title: str = ''
 
@@ -43,7 +42,6 @@ class Service(BaseModel):
                     "image": "deephdc/deep-oc-image-classification-tf",
                     "cpu": 2,
                     "memory": 3000,
-                    "input_type": "str",
                     "allowed_users": []
                 }
             ]
@@ -125,7 +123,6 @@ def make_service_definition(svc_conf, vo):
             'IMAGE': svc_conf.image,
             'CPU': svc_conf.cpu,
             'MEMORY': svc_conf.memory,
-            'TYPE': svc_conf.input_type,
             'ALLOWED_USERS': svc_conf.allowed_users,
             'VO': vo,
             'ENV_VARS': {

@@ -18,7 +18,6 @@ that ENV variable.'
 # Test service
 service = oscar.Service(
     image='deephdc/deep-oc-image-classification-tf',
-    input_type='str',
     cpu=2,
 )
 
