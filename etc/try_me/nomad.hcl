@@ -36,20 +36,21 @@ job "userjob-${JOB_UUID}" {
   #TODO: *force* CPU for try-me deployments.
   # Wait until we move to federated cluster because this will be easier to implement.
 
-  # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
-  reschedule {
-    attempts  = 0
-    unlimited = false
-  }
-
   group "usergroup" {
 
+    # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
+    reschedule {
+      attempts  = 0
+      unlimited = false
+    }
+
     network {
-
       port "ui" {
-        to = 8888  # -1 will assign random port
+        to = 80  # -1 will assign random port
       }
-
+      port "api" {
+        to = 5000  # -1 will assign random port
+      }
     }
 
     service {
@@ -61,6 +62,7 @@ job "userjob-${JOB_UUID}" {
         "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${DOMAIN}`, `www.ui-${DOMAIN}`)",
       ]
     }
+    #TODO: adapt for federated cluster
 
     ephemeral_disk {
       size = 300  # MB
@@ -69,21 +71,22 @@ job "userjob-${JOB_UUID}" {
     task "usertask" {
       # Task configured by the user
 
+      # Run as a prestart task to make sure deepaas has already launched when launching the deepaas UI
+      lifecycle {
+        hook    = "prestart"
+        sidecar = true
+      }
+
       driver = "docker"
 
       config {
         force_pull = true
         image      = "${DOCKER_IMAGE}:latest"
-        command    = "sh"
-        args       = ["-c", "curl https://raw.githubusercontent.com/ai4os/deepaas_ui/nomad/nomad.sh | bash"]
-        ports      = ["ui"]
+        command    = "deep-start"
+        args       = ["--deepaas"]
+        ports      = ["api"]
         shm_size   = 500000000  # 500MB
         memory_hard_limit = 1000  # 1GB
-      }
-
-      env {
-        DURATION = "10m"  # try-me job killed after 10 mins (with exit_code=0)
-        UI_PORT  = 8888
       }
 
       resources {
@@ -92,12 +95,39 @@ job "userjob-${JOB_UUID}" {
         memory_max = 1000  # 1GB
       }
 
-      # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
+    }
+
+    task "ui" {
+      # DEEPaaS UI
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui"
+        ports      = ["ui"]
+        shm_size   = 250000000   # 250MB
+        memory_hard_limit = 500  # MB
+      }
+
+      env {
+        DURATION = "10m"  # kill job after 10 mins
+        UI_PORT  = 80
+      }
+
+      resources {
+        cpu        = 500  # MHz
+        memory     = 500  # MB
+        memory_max = 500  # MB
+      }
+
+      # Do not try to restart a try-me job if it raises error (module incompatible with Gradio UI)
       restart {
         attempts = 0
         mode     = "fail"
       }
 
     }
+
   }
 }
