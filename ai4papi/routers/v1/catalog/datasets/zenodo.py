@@ -124,6 +124,8 @@ def zenodo_proxy(
     _ = auth.get_user_info(token=authorization.credentials)
 
     # Convert params to frozenset
+    if params is None:
+        params = {}
     fparams = frozenset(params.items())
 
     return _zenodo_proxy(api_route, fparams)
