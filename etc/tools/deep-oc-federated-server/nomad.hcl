@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "userjob-${JOB_UUID}" {
+job "tool-fl-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -22,6 +22,38 @@ job "userjob-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
+  }
+
+  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  constraint {
+    attribute = "${meta.status}"
+    operator  = "regexp"
+    value     = "ready"
+  }
+
+  # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
+  constraint {
+    attribute = "${meta.compute}"
+    operator  = "="
+    value     = "true"
+  }
+
+  # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
+  # because Nomad does not allow a node to belong to several node pools)
+  constraint {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "${NAMESPACE}"
+  }
+
+  # Try to deploy iMagine jobs on nodes that are iMagine-exclusive
+  # In this way, we leave AI4EOSC nodes for AI4EOSC users and for iMagine users only
+  # when iMagine nodes are fully booked.
+  affinity {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "ai4eosc"
+    weight    = -50  # anti-affinity for ai4eosc clients
   }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
@@ -68,7 +100,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-fedserver.tls=true",
-        "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver-${DOMAIN}`, `www.fedserver-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
         "traefik.http.services.${JOB_UUID}-fedserver.loadbalancer.server.scheme=h2c",  # grpc support
       ]
     }
@@ -79,7 +111,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${DOMAIN}`, `www.monitor-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -89,7 +121,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ide.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${DOMAIN}`, `www.ide-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -97,7 +129,7 @@ job "userjob-${JOB_UUID}" {
       size = ${DISK}
     }
 
-    task "usertask" {
+    task "main" {
       driver = "docker"
 
       # Use default command defined in the Dockerfile
@@ -107,6 +139,9 @@ job "userjob-${JOB_UUID}" {
         ports      = ["fedserver", "monitor", "ide"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
+        storage_opt = {
+          size = "${DISK}M"
+        }
       }
 
       env {

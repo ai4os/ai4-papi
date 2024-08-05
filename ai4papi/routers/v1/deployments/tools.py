@@ -60,6 +60,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
+            prefix='tool',
         )
 
         # Retrieve info for jobs in namespace
@@ -122,15 +123,10 @@ def get_deployment(
     )
 
     # Check the deployment is indeed a tool
-    tool_list = papiconf.TOOLS.keys()
-    tool_name = re.search(
-            '/(.*):',  # remove dockerhub account and tag
-            job['docker_image'],
-            ).group(1)
-    if tool_name not in tool_list:
+    if not job['name'].startswith('tool'):
         raise HTTPException(
             status_code=400,
-            detail="This deployment is a module, not a tool.",
+            detail="This deployment is not a tool.",
             )
 
     return job
@@ -201,13 +197,23 @@ def create_deployment(
     else:
         priority = 50
 
-    # Generate a domain for user-app and check nothing is running there
-    domain = utils.generate_domain(
+    # Remove non-compliant characters from hostname
+    base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
+    hostname = utils.safe_hostname(
         hostname=user_conf['general']['hostname'],
-        base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
         job_uuid=job_uuid,
     )
-    utils.check_domain(domain)
+
+    #TODO: reenable custom hostname, when we are able to parse all node metadata
+    # (domain key) to build the true domain
+    hostname = job_uuid
+
+    # # Check the hostname is available in all data-centers
+    # # (we don't know beforehand where the job will land)
+    # #TODO: make sure this does not break if the datacenter is unavailable
+    # #TODO: disallow custom hostname, pain in the ass, slower deploys
+    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
+    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
     # Create a default secret for the Federated Server
     _ = ai4secrets.create_secret(
@@ -237,7 +243,8 @@ def create_deployment(
             'OWNER_EMAIL': auth_info['email'],
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
-            'DOMAIN': domain,
+            'BASE_DOMAIN': base_domain,
+            'HOSTNAME': hostname,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
             'CPU_NUM': user_conf['hardware']['cpu_num'],
@@ -262,7 +269,7 @@ def create_deployment(
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
     tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='usertask'][0]
+    usertask = [t for t in tasks if t['Name']=='main'][0]
 
     # Launch `deep-start` compatible service if needed
     service = user_conf['general']['service']

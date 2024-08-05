@@ -57,6 +57,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
             owner=auth_info['id'],
+            prefix='module',
         )
 
         # Retrieve info for jobs in namespace
@@ -119,15 +120,10 @@ def get_deployment(
     )
 
     # Check the deployment is indeed a module
-    tool_list = papiconf.TOOLS.keys()
-    module_name = re.search(
-            '/(.*):',  # remove dockerhub account and tag
-            job['docker_image'],
-            ).group(1)
-    if module_name in tool_list:
+    if not job['name'].startswith('module'):
         raise HTTPException(
             status_code=400,
-            detail="This deployment is a tool, not a module.",
+            detail="This deployment is not a module.",
             )
 
     return job
@@ -207,19 +203,23 @@ def create_deployment(
     else:
         priority = 50
 
-    # Generate a domain for user-app and check nothing is running there
-    domain = utils.generate_domain(
+    # Remove non-compliant characters from hostname
+    base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
+    hostname = utils.safe_hostname(
         hostname=user_conf['general']['hostname'],
-        base_domain=papiconf.MAIN_CONF['lb']['domain'][vo],
         job_uuid=job_uuid,
     )
-    utils.check_domain(domain)
 
-    #TODO: remove when we solve disk issues
-    # For now on we fix disk here because, if not fixed, jobs are not being deployed
-    # (ie. "resource disk exhausted").
-    # In any case, this limit is useless because it has not yet been passed to docker
-    user_conf['hardware']['disk'] = 500
+    #TODO: reenable custom hostname, when we are able to parse all node metadata
+    # (domain key) to build the true domain
+    hostname = job_uuid
+
+    # # Check the hostname is available in all data-centers
+    # # (we don't know beforehand where the job will land)
+    # #TODO: make sure this does not break if the datacenter is unavailable
+    # #TODO: disallow custom hostname, pain in the ass, slower deploys
+    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
+    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
@@ -232,7 +232,8 @@ def create_deployment(
             'OWNER_EMAIL': auth_info['email'],
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
-            'DOMAIN': domain,
+            'BASE_DOMAIN': base_domain,
+            'HOSTNAME': hostname,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
             'SERVICE': user_conf['general']['service'],
@@ -256,7 +257,7 @@ def create_deployment(
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
     tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='usertask'][0]
+    usertask = [t for t in tasks if t['Name']=='main'][0]
 
     # Apply patches if needed
     usertask = module_patches.patch_nextcloud_mount(

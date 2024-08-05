@@ -87,7 +87,7 @@ def get_config(
     )
 
     # Fill with available GPU models in the cluster
-    models = nomad.common.get_gpu_models()
+    models = nomad.common.get_gpu_models(vo)
     if models:
         conf["hardware"]["gpu_type"]["options"] += models
 
