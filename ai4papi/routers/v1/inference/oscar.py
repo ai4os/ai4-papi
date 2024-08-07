@@ -188,6 +188,10 @@ def get_services_list(
         if not (s.get('allowed_users', None) or public):
             continue
 
+        # Retrieve only services launched by PAPI
+        if not s.get('name', '').startswith('ai4papi-'):
+            continue
+
         # Keep only services that belong to vo
         if vo not in s.get('vo', []):
             continue
