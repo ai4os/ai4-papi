@@ -2,6 +2,7 @@
 Manage OSCAR clusters to create and execute services.
 """
 from copy import deepcopy
+from datetime import datetime
 from functools import wraps
 import json
 from typing import List
@@ -133,6 +134,7 @@ def make_service_definition(svc_conf, vo):
             'ENV_VARS': {
                 'Variables':{
                     'PAPI_TITLE': svc_conf.title,
+                    'PAPI_CREATED': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 },
             },
         }
