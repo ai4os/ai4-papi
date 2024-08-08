@@ -14,7 +14,7 @@ from oscar_python.client import Client
 from pydantic import BaseModel, NonNegativeInt
 import requests
 
-from ai4papi import auth
+from ai4papi import auth, name_generator
 from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
 
 
@@ -114,6 +114,11 @@ def get_client_from_auth(token, vo):
 
 
 def make_service_definition(svc_conf, vo):
+
+    # If no title provided, generate a moby-style random one
+    if not svc_conf.title:
+        svc_conf.title = name_generator.get_random_name()
+
     # Create service definition
     service = deepcopy(OSCAR_TMPL)  # init from template
     service = service.safe_substitute(
