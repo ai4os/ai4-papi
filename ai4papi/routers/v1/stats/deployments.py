@@ -304,7 +304,7 @@ def get_cluster_stats_bg():
         nodes_dc[n['ID']] = n['Datacenter']
 
     # Get aggregated usage stats for each node
-    namespaces = ['default', 'ai4eosc', 'imagine', 'tutorials']
+    namespaces = ['default'] + list(papiconf.MAIN_CONF['nomad']['namespaces'].values())
 
     for namespace in namespaces:
         jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')
