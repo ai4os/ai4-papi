@@ -15,6 +15,7 @@ auth:
     - https://dashboard.cloud.ai4eosc.eu
     - https://dashboard-stage.cloud.ai4eosc.eu
 
+    - https://ai4life.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
     - http://localhost:8080
 
@@ -28,6 +29,7 @@ auth:
 
     - vo.ai4eosc.eu
     - vo.imagine-ai.eu
+    - vo.ai4life.eu
     - training.egi.eu  # this membership lasts only 1 month
 
 nomad:
@@ -36,6 +38,7 @@ nomad:
 
     vo.ai4eosc.eu: ai4eosc
     vo.imagine-ai.eu: imagine
+    vo.ai4life.eu: ai4life
     training.egi.eu: tutorials
 
 lb:  # load balancer, Traefik
@@ -44,4 +47,5 @@ lb:  # load balancer, Traefik
 
     vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
+    vo.ai4life.eu: deployments.cloud.ai4eosc.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
