@@ -1,3 +1,4 @@
+---
 # OSCAR service definition
 
 log_level: CRITICAL
@@ -11,69 +12,88 @@ vo: ${VO}
 allowed_users: ${ALLOWED_USERS}
 environment: ${ENV_VARS}
 script: |-
-   echo "[*] Using DEEPaaS version $(deepaas-run --version)"
-   echo "[*] Using Python version $(python3 --version)"
-   python - << EOF
-   import json
-   import base64
-   import string
-   import random
-   import os
-   from subprocess import run, PIPE
+  echo "[*] Using DEEPaaS version $(deepaas-run --version)"
+  echo "[*] Using Python version $(python3 --version)"
 
-   # Read input file
-   run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
-   FILE_PATH=os.getenv("INPUT_FILE_PATH")+".json"
+  python -u - << EOF
 
-   DEEPAAS_CLI_VERSION=[2,3,1]
-   STR_VERSION='2.3.1'
-   DEEPAAS_CLI_VCOMMAND=['deepaas-cli', '--version']
+  import base64
+  import json
+  import os
+  import random
+  import string
+  import subprocess
 
-   DEEPAAS_CLI_COMMAND=['deepaas-cli', 'predict']
-   OSCAR_FILES="oscar-files"
 
-   def check_deepaas_version():
-      v = run(DEEPAAS_CLI_VCOMMAND, stdout=PIPE)
-      version = v.stdout.decode("utf-8").strip('\n').split(".")
-      if len(version) > 3: version.pop()
-      for i, ver in enumerate(version):
-         if int(ver) < DEEPAAS_CLI_VERSION[i]:
-               print(f"Error: 'deepaas-cli' version must be >={STR_VERSION}. Current version is: {print_version(version)}")
-               exit(1)
+  # Check the DEEPaaS version
+  def compare_versions(version1, version2):
+      """
+      Returns 1 if v1>v2
+      Returns 0 if v1==v2
+      Returns -1 if v1<v2
+      """
 
-   def print_version(version):
-      return '.'.join(version)
+      # Split the version strings into lists of integers
+      v1_components = list(map(int, version1.split(".")))
+      v2_components = list(map(int, version2.split(".")))
 
-   def add_arg(key, value):
-      DEEPAAS_CLI_COMMAND.append("--"+key)
-      DEEPAAS_CLI_COMMAND.append(value)
+      # Compare each component
+      for v1, v2 in zip(v1_components, v2_components):
+          if v1 < v2:
+              return -1
+          elif v1 > v2:
+              return 1
 
-   def decode_b64(filename, data):
-      with open(filename, "wb") as f:
-         f.write(base64.b64decode(data))
+      # If all components are equal, compare the lengths of the version lists
+      if len(v1_components) < len(v2_components):
+          return -1
+      elif len(v1_components) > len(v2_components):
+          return 1
+      else:
+          return 0
 
-   def parse_files(files):
-         for file in files:
-                  rnd_str = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
-                  filename=''.join(["tmp-file-", rnd_str, ".", file["file_format"]])
-                  add_arg(file["key"], filename)
-                  decode_b64(filename, file["data"])
 
-   # Check the deepaas-cli version
-   check_deepaas_version()
+  required = "2.4.0"  # minimum required DEEPaaS version  #TODO: fix this version properly
+  out = subprocess.run(["deepaas-cli", "--version"], stdout=subprocess.PIPE)
+  current = out.stdout.decode("utf-8").split(" ")[0].split("-")[0]
 
-   # Process input
-   with open(FILE_PATH, "r") as f:
-   params = json.loads(f.read())
+  if compare_versions(required, current) == 1:
+      print(f"Error: DEEPaaS version must be >={required}. Current version is: {current}")
+      exit(1)
 
-   for k, v in params.items():
+  # Read input file with params and create the command
+  subprocess.run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
+  FILE_PATH = os.getenv("INPUT_FILE_PATH") + ".json"
+  with open(FILE_PATH, "r") as f:
+      params = json.loads(f.read())
+
+  # Create the DEEPaaS predict command
+  DEEPAAS_CLI_COMMAND = ["deepaas-cli", "predict"]
+
+  for k, v in params.items():
+
       # If param is 'oscar-files' decode the array of files
       if k == "oscar-files":
-         parse_files(v)
-      else:
-         if isinstance(v, int): 
-               v = str(v)
-         add_arg(k, v)
-   run(DEEPAAS_CLI_COMMAND)
+          for file in v:
+              rnd_str = "".join(random.choice(string.ascii_lowercase) for i in range(5))
+              filename = "".join(["tmp-file-", rnd_str, ".", file["file_format"]])
+              k, v = file["key"], filename
 
-   EOF
+              print("[*] Processing file: ", filename)
+              with open(filename, "wb") as f:
+                  f.write(base64.b64decode(file["data"]))
+
+              # Add the arg to the command
+              DEEPAAS_CLI_COMMAND += [f"--{k}", v]
+
+      else:
+          if isinstance(v, int) or isinstance(v, float):
+              v = str(v)
+
+          # Add the arg to the command
+          DEEPAAS_CLI_COMMAND += [f"--{k}", v]
+
+  print(f"[*] Final command: {' '.join(DEEPAAS_CLI_COMMAND)}")
+  subprocess.run(DEEPAAS_CLI_COMMAND)
+
+  EOF
