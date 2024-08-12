@@ -1,10 +1,10 @@
 from copy import deepcopy
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from ai4papi import utils
+from ai4papi import auth
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 import ai4papi.nomad.common as nomad
@@ -21,6 +21,7 @@ security = HTTPBearer()
 @router.post("/")
 def create_deployment(
     module_name: str,
+    authorization=Depends(security),
     ):
     """
     Submit a try-me deployment to Nomad.
@@ -31,6 +32,9 @@ def create_deployment(
 
     Returns a string with the endpoint to access the API.
     """
+    # Retrieve authenticated user info
+    auth_info = auth.get_user_info(token=authorization.credentials)
+
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
     docker_image = meta['sources']['docker_registry_repo']
@@ -54,7 +58,9 @@ def create_deployment(
     nomad_conf = nomad_conf.safe_substitute(
         {
             'JOB_UUID': job_uuid,
-            'DOMAIN': domain,
+            'OWNER': auth_info['id'],
+            'OWNER_NAME': auth_info['name'],
+            'OWNER_EMAIL': auth_info['email'],
             'DOCKER_IMAGE': docker_image,
         }
     )
@@ -71,6 +77,7 @@ def create_deployment(
 @router.get("/{deployment_uuid}")
 def get_deployment(
     deployment_uuid: str,
+    authorization=Depends(security),
     ):
     """
     This function is used mainly to be able to retrieve the endpoint of the try_me job.
@@ -82,10 +89,13 @@ def get_deployment(
 
     Returns a dict with info
     """
+    # Retrieve authenticated user info
+    auth_info = auth.get_user_info(token=authorization.credentials)
+
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace="ai4eosc",
-        owner="",  # try-me endpoints have no owner
+        owner=auth_info['id'],
         full_info=True,
     )
 

@@ -16,11 +16,10 @@ job "userjob-${JOB_UUID}" {
   id        = "${JOB_UUID}"
   priority  = "0"           # try-me jobs have low priority
 
-  # Try-me jobs have no owner
   meta {
-    owner       = ""
-    owner_name  = ""
-    owner_email = ""
+    owner       = "${OWNER}"  # user-id from OIDC
+    owner_name  = "${OWNER_NAME}"
+    owner_email = "${OWNER_EMAIL}"
     title       = ""
     description = ""
   }
