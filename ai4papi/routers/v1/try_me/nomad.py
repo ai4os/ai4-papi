@@ -1,12 +1,13 @@
 from copy import deepcopy
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
+from ai4papi.routers.v1.stats.deployments import get_cluster_stats
 import ai4papi.nomad.common as nomad
 
 
@@ -61,6 +62,40 @@ def create_deployment(
 
     # Convert template to Nomad conf
     nomad_conf = nomad.load_job_conf(nomad_conf)
+
+    # Check that at least 20% of the candidate node resources (CPU nodes belonging to
+    # ai4eosc) are free, to avoid impacting too much on our real users.
+    # We check for every resource metric (cpu, disk, ram)
+    stats = get_cluster_stats(vo='vo.ai4eosc.eu')
+    resources = ['cpu', 'ram', 'disk']
+    keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
+    status = {k: 0 for k in keys}
+
+    for _, datacenter  in stats['datacenters'].items():
+        for _, node in datacenter['nodes'].items():
+            for k in keys:
+                status[k] += node[k]
+    for r in resources:
+        if status[f"{r}_used"] / status[f"{r}_total"] > 0.8:
+            raise HTTPException(
+                status_code=503,
+                detail="Sorry, but there seem to be no resources available right " \
+                    "now to test the module. Please try later.",
+                )
+
+    # Check that the user hasn't too many "try-me" jobs currently running
+    jobs = nomad.get_deployments(
+        namespace="ai4eosc",  # (!) try-me jobs are always deployed in "ai4eosc"
+        owner=auth_info['id'],
+        prefix="try",
+    )
+    if len(jobs) > 2:
+        raise HTTPException(
+            status_code=503,
+            detail="Sorry, but you seem to be currently running two `Try-me` environments already." \
+                "Before launching a new one, you will need to wait till one of your " \
+                "existing environments gets automatically deleted (ca. 10 min)."
+            )
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
