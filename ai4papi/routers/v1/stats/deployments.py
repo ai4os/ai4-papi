@@ -335,8 +335,8 @@ def get_cluster_stats_bg():
                 n_stats['jobs_num'] += 1
 
             #TODO: we are ignoring resources consumed by other tasks
-            if 'usertask' in a['AllocatedResources']['Tasks']:
-                res = a['AllocatedResources']['Tasks']['usertask']
+            if 'main' in a['AllocatedResources']['Tasks']:
+                res = a['AllocatedResources']['Tasks']['main']
 
                 # cpu
                 if res['Cpu']['ReservedCores']:
