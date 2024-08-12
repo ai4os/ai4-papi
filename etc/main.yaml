@@ -55,8 +55,8 @@ oscar:
       cluster_id: oscar-ai4eosc-cluster
 
     vo.imagine-ai.eu:
-      endpoint: https://inference.cloud.ai4eosc.eu
-      cluster_id: oscar-ai4eosc-cluster
+      endpoint:  https://inference-walton.cloud.imagine-ai.eu
+      cluster_id: oscar-imagine-cluster
 
     training.egi.eu:
       endpoint: https://inference.cloud.ai4eosc.eu
