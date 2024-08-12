@@ -193,6 +193,12 @@ def get_cluster_stats(
     """
 
     global cluster_stats
+    if not cluster_stats:
+        # If PAPI is used as a package, cluster_stats will be None, as the background
+        # computation of `get_cluster_stats_bg()` is only started when PAPI is launched
+        # with uvicorn.
+        # So if None, we need to initialize it
+        cluster_stats = get_cluster_stats_bg()
     stats = copy.deepcopy(cluster_stats)
 
     namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
