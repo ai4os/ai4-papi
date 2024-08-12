@@ -277,10 +277,6 @@ def get_cluster_stats_bg():
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
-        n_stats['disk_used'] = \
-            ( int(node['Attributes']['unique.storage.bytestotal']) \
-            - int(node['Attributes']['unique.storage.bytesfree'])) \
-            / 2**20
         n_stats['gpu_models'] = {}
         n_stats['namespaces'] = node['Meta'].get('namespace', '')
         n_stats['status'] = node['Meta'].get('status', '')
@@ -344,6 +340,13 @@ def get_cluster_stats_bg():
 
                 # ram
                 n_stats['ram_used'] += res['Memory']['MemoryMB']
+
+                # disk
+                # Note: In theory we can get the total disk used in a node looking at the
+                # metadata (ie. "unique.storage.bytesfree"). But that gave us the disk that
+                # is actually used. But we are instead interested on the disk that is reserved
+                # by users (regardless of whether they are actually using it).
+                n_stats['disk_used'] += a['AllocatedResources']['Shared']['DiskMB']
 
                 # gpu
                 if res['Devices']:
