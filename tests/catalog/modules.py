@@ -6,7 +6,7 @@ modules_list = list(Modules.get_items().keys())
 
 assert isinstance(modules_list, list)
 assert 'dogs-breed-detector' in modules_list
-assert 'deep-oc-federated-server' not in modules_list
+assert 'ai4os-federated-server' not in modules_list
 
 # List filtered modules
 modules_list2 = Modules.get_filtered_list(

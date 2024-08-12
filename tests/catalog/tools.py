@@ -5,7 +5,7 @@ from ai4papi.routers.v1.catalog.tools import Tools
 tools_list = list(Tools.get_items().keys())
 
 assert isinstance(tools_list, list)
-assert 'deep-oc-federated-server' in tools_list
+assert 'ai4os-federated-server' in tools_list
 assert 'dogs-breed-detector' not in tools_list
 
 # List filtered tools
@@ -16,7 +16,7 @@ tools_list2 = Tools.get_filtered_list(
     not_tags_any=None,
 )
 assert isinstance(tools_list2, list)
-assert 'deep-oc-federated-server' in tools_list
+assert 'ai4os-federated-server' in tools_list
 
 # Get tools summaries
 tools_sum = Tools.get_summary(
