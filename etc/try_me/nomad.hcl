@@ -9,8 +9,8 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "userjob-${JOB_UUID}" {
-  namespace = "ai4eosc"     # try-me jobs are always deployed in ai4eosc
+job "try-${JOB_UUID}" {
+  namespace = "${NAMESPACE}"
   type      = "batch"       # try-me jobs should not be redeployed when exit_code=0
   region    = "global"
   id        = "${JOB_UUID}"
@@ -24,26 +24,47 @@ job "userjob-${JOB_UUID}" {
     description = ""
   }
 
-  # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
-  # overloading GPU clients with CPU-only jobs.
-  affinity {
-    attribute = "${node.unique.name}"
+  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  constraint {
+    attribute = "${meta.status}"
     operator  = "regexp"
-    value     = "gpu"
-    weight    = -50  # anti-affinity for GPU clients
+    value     = "ready"
   }
-  #TODO: *force* CPU for try-me deployments.
-  # Wait until we move to federated cluster because this will be easier to implement.
+
+  # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
+  constraint {
+    attribute = "${meta.compute}"
+    operator  = "="
+    value     = "true"
+  }
+
+  # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
+  # because Nomad does not allow a node to belong to several node pools)
+  constraint {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "${NAMESPACE}"
+  }
+
+  # Force that try-me jobs land in CPU-only nodes to avoid impacting the GPU trainings
+  # of our real users
+  constraint {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "cpu"
+  }
 
   group "usergroup" {
 
-    # Do not try to restart a try-me job if it raised an error (eg. module incompatible with Gradio UI)
+    # Do not try to restart a try-me job if it raised an error (eg. module incompatible
+    # with Gradio UI)
     reschedule {
       attempts  = 0
       unlimited = false
     }
 
     network {
+
       port "ui" {
         to = 80  # -1 will assign random port
       }
@@ -58,17 +79,15 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ui.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${DOMAIN}`, `www.ui-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
-    #TODO: adapt for federated cluster
 
     ephemeral_disk {
       size = 300  # MB
     }
 
-    task "usertask" {
-      # Task configured by the user
+    task "main" { # DEEPaaS API
 
       # Run as a prestart task to make sure deepaas has already launched when launching the deepaas UI
       lifecycle {
@@ -96,8 +115,7 @@ job "userjob-${JOB_UUID}" {
 
     }
 
-    task "ui" {
-      # DEEPaaS UI
+    task "ui" { # DEEPaaS UI (Gradio)
 
       driver = "docker"
 

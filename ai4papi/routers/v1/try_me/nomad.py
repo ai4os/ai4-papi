@@ -38,7 +38,6 @@ def create_deployment(
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
     docker_image = meta['sources']['docker_registry_repo']
-    # docker_image = "deephdc/image-classification-tf"  # todo: remove
 
     # Load module configuration
     nomad_conf = deepcopy(papiconf.TRY_ME['nomad'])
@@ -46,21 +45,16 @@ def create_deployment(
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
-    # Generate a domain for user-app and check nothing is running there
-    domain = utils.generate_domain(
-        hostname='',
-        base_domain=papiconf.MAIN_CONF['lb']['domain']['vo.ai4eosc.eu'],
-        job_uuid=job_uuid,
-    )
-    utils.check_domain(domain)
-
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
             'JOB_UUID': job_uuid,
+            'NAMESPACE': 'ai4eosc',  # (!) try-me jobs are always deployed in "ai4eosc"
             'OWNER': auth_info['id'],
             'OWNER_NAME': auth_info['name'],
             'OWNER_EMAIL': auth_info['email'],
+            'BASE_DOMAIN': papiconf.MAIN_CONF['lb']['domain']['vo.ai4eosc.eu'],  # idem
+            'HOSTNAME': job_uuid,
             'DOCKER_IMAGE': docker_image,
         }
     )
@@ -94,7 +88,7 @@ def get_deployment(
 
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
-        namespace="ai4eosc",
+        namespace="ai4eosc",  # (!) try-me jobs are always deployed in "ai4eosc"
         owner=auth_info['id'],
         full_info=True,
     )
