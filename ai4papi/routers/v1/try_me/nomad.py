@@ -128,4 +128,7 @@ def get_deployment(
         full_info=True,
     )
 
+    # Rewrite main endpoint, otherwise it automatically selects DEEPaaS API
+    job['main_endpoint'] = 'ui'
+
     return job
