@@ -1,5 +1,4 @@
 from copy import deepcopy
-import re
 import secrets
 import types
 from types import SimpleNamespace
@@ -12,6 +11,7 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
+from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
 
 
@@ -135,6 +135,7 @@ def get_deployment(
 @router.post("/")
 def create_deployment(
     vo: str,
+    tool_name: str,
     conf: Union[dict, None] = None,
     authorization=Depends(security),
     ):
@@ -165,11 +166,12 @@ def create_deployment(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
-    # Retrieve toolname from configuration, else deploy first tool in the list
-    try:
-        tool_name = conf["general"]["docker_image"].split('/')[1]  # deephdc/*
-    except Exception:
-        tool_name = list(papiconf.TOOLS.keys())[0]
+    # Check tool_ID
+    if tool_name not in Tools_catalog.get_items().keys():
+        raise HTTPException(
+            status_code=400,
+            detail="This ID does not correspond to an available tool.",
+            )
 
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]['nomad'])
@@ -183,10 +185,12 @@ def create_deployment(
         )
 
     # Check if the provided configuration is within the job quotas
-    quotas.check_jobwise(
-        conf=user_conf,
-        vo=vo,
-    )
+    # Skip this check with CVAT because it does not have a "hardware" section in the conf
+    if tool_name not in ['ai4-cvat']:
+        quotas.check_jobwise(
+            conf=user_conf,
+            vo=vo,
+        )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
@@ -215,67 +219,106 @@ def create_deployment(
     # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
     #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
-    # Create a default secret for the Federated Server
-    _ = ai4secrets.create_secret(
-        vo=vo,
-        secret_path=f"deployments/{job_uuid}/federated/default",
-        secret_data={'token': secrets.token_hex()},
-        authorization=SimpleNamespace(
-            credentials=authorization.credentials,
-        ),
-    )
+    # Deploy a Federated server
+    if tool_name == 'ai4os-federated-server':
 
-    # Create a Vault token so that the deployment can access the Federated secret
-    vault_token = ai4secrets.create_vault_token(
-        jwt=authorization.credentials,
-        issuer=auth_info['issuer'],
-        ttl='365d',  # 1 year expiration date
-    )
+        # Create a default secret for the Federated Server
+        _ = ai4secrets.create_secret(
+            vo=vo,
+            secret_path=f"deployments/{job_uuid}/federated/default",
+            secret_data={'token': secrets.token_hex()},
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
 
-    # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
-        {
-            'JOB_UUID': job_uuid,
-            'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-            'PRIORITY': priority,
-            'OWNER': auth_info['id'],
-            'OWNER_NAME': auth_info['name'],
-            'OWNER_EMAIL': auth_info['email'],
-            'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
-            'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
-            'BASE_DOMAIN': base_domain,
-            'HOSTNAME': hostname,
-            'DOCKER_IMAGE': user_conf['general']['docker_image'],
-            'DOCKER_TAG': user_conf['general']['docker_tag'],
-            'CPU_NUM': user_conf['hardware']['cpu_num'],
-            'RAM': user_conf['hardware']['ram'],
-            'DISK': user_conf['hardware']['disk'],
-            'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
-            # Limit at 50% of RAM memory, in bytes
-            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'VAULT_TOKEN': vault_token,
-            'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
-            'FEDERATED_METRIC': user_conf['configuration']['metric'],
-            'FEDERATED_MIN_FIT_CLIENTS': user_conf['configuration']['min_fit_clients'],
-            'FEDERATED_MIN_AVAILABLE_CLIENTS': user_conf['configuration']['min_available_clients'],
-            'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
-            'MU_FEDPROX': user_conf['configuration']['mu'],
-            'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
-            'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
-        }
-    )
+        # Create a Vault token so that the deployment can access the Federated secret
+        vault_token = ai4secrets.create_vault_token(
+            jwt=authorization.credentials,
+            issuer=auth_info['issuer'],
+            ttl='365d',  # 1 year expiration date
+        )
 
-    # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                'JOB_UUID': job_uuid,
+                'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+                'PRIORITY': priority,
+                'OWNER': auth_info['id'],
+                'OWNER_NAME': auth_info['name'],
+                'OWNER_EMAIL': auth_info['email'],
+                'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+                'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+                'BASE_DOMAIN': base_domain,
+                'HOSTNAME': hostname,
+                'DOCKER_IMAGE': user_conf['general']['docker_image'],
+                'DOCKER_TAG': user_conf['general']['docker_tag'],
+                'CPU_NUM': user_conf['hardware']['cpu_num'],
+                'RAM': user_conf['hardware']['ram'],
+                'DISK': user_conf['hardware']['disk'],
+                'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
+                'VAULT_TOKEN': vault_token,
+                'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
+                'FEDERATED_METRIC': user_conf['configuration']['metric'],
+                'FEDERATED_MIN_FIT_CLIENTS': user_conf['configuration']['min_fit_clients'],
+                'FEDERATED_MIN_AVAILABLE_CLIENTS': user_conf['configuration']['min_available_clients'],
+                'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
+                'MU_FEDPROX': user_conf['configuration']['mu'],
+                'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
+                'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
+            }
+        )
 
-    tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='main'][0]
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    # Launch `deep-start` compatible service if needed
-    service = user_conf['general']['service']
-    if service in ['deepaas', 'jupyter', 'vscode']:
-        usertask['Config']['command'] = 'deep-start'
-        usertask['Config']['args'] = [f'--{service}']
+        tasks = nomad_conf['TaskGroups'][0]['Tasks']
+        usertask = [t for t in tasks if t['Name']=='main'][0]
+
+        # Launch `deep-start` compatible service if needed
+        service = user_conf['general']['service']
+        if service in ['deepaas', 'jupyter', 'vscode']:
+            usertask['Config']['command'] = 'deep-start'
+            usertask['Config']['args'] = [f'--{service}']
+
+    # Deploy a CVAT tool
+    elif tool_name == 'ai4-cvat':
+
+        # Enforce all rclone vars are defined
+        rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
+        if not all(rclone.values()):
+            raise HTTPException(
+                status_code=400,
+                detail="You must fill all RCLONE-related variables.",
+                )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                'JOB_UUID': job_uuid,
+                'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+                'PRIORITY': priority,
+                'OWNER': auth_info['id'],
+                'OWNER_NAME': auth_info['name'],
+                'OWNER_EMAIL': auth_info['email'],
+                'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+                'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+                'BASE_DOMAIN': base_domain,
+                'HOSTNAME': hostname,
+                'CVAT_PASSWORD': user_conf['general']['cvat_password'],
+                'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
+                'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
+                'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
+                'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
+                'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+                }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

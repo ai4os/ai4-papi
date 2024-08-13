@@ -166,7 +166,7 @@ def get_deployment(
         info['main_endpoint'] = service2endpoint[service]
 
     except Exception:  # return first endpoint
-        info['main_endpoint'] = list(info['endpoints'].values())[0]
+        info['main_endpoint'] = list(info['endpoints'].keys())[0]
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(

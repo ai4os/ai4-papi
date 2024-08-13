@@ -24,18 +24,23 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 
 import configparser
 import json
-import re
 from typing import Tuple, Union
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
 import requests
 
+import ai4papi.conf as papiconf
+
 
 class Catalog:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, repo: str) -> None:
+        """
+        Parameters:
+        * repo: Github repo where the catalog is hosted (via git submodules)
+        """
+        self.repo = repo
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -55,8 +60,26 @@ class Catalog:
         This is implemented in a separate function as many functions from this router
         are using this function, so we need to avoid infinite recursions.
         """
-        return {}
+        gitmodules_url = f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
+        r = requests.get(gitmodules_url)
 
+        cfg = configparser.ConfigParser()
+        cfg.read_string(r.text)
+
+        modules = {}
+        for section in cfg.sections():
+            items = dict(cfg.items(section))
+            key = items.pop('path').lower()
+            items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
+            modules[key] = items
+
+        # In the case of the tools repo, make sure to remove any tool that is not yet
+        # supported by PAPI (use the ^ operator to only keep common items)
+        if 'tool' in self.repo:
+            for tool_name in papiconf.TOOLS.keys() ^ modules.keys():
+                _ = modules.pop(tool_name)
+
+        return modules
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_filtered_list(
