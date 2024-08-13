@@ -262,7 +262,7 @@ These are the configuration files the API uses:
 * `etc/main_conf.yaml`: main configuration file of the API
 * `etc/modules`: configuration files for standard modules
 * `etc/tools`: configuration files for tools
-  - `deep-oc-federated-server`: federated server
+  - `ai4os-federated-server`: federated server
 
 The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.
