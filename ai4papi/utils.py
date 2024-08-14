@@ -1,14 +1,20 @@
 """
 Miscellaneous utils
 """
+from datetime import datetime
+import os
 import re
 
+from cachetools import cached, TTLCache
 from fastapi import HTTPException
 import requests
 
 
 # Persistent requests session for faster requests
 session = requests.Session()
+
+# Retrieve tokens for better rate limit
+github_token = os.environ.get('PAPI_GITHUB_TOKEN', None)
 
 
 def safe_hostname(
@@ -164,3 +170,33 @@ def validate_conf(conf):
                 )
 
     return conf
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+def get_github_info(owner, repo):
+    """
+    Retrieve information from a Github repo
+    """
+    # Retrieve information from Github API
+    url = f"https://api.github.com/repos/{owner}/{repo}"
+    headers = {'Authorization': f'token {github_token}'} if github_token else {}
+    r = session.get(url, headers=headers)
+
+    # Parse the information
+    out = {}
+    if r.ok:
+        repo_data = r.json()
+        out['created'] = datetime.strptime(
+            repo_data['created_at'],
+            "%Y-%m-%dT%H:%M:%SZ",
+            ).date().strftime("%Y-%m-%d")  # keep only the date
+        out['updated'] = datetime.strptime(
+            repo_data['updated_at'],
+            "%Y-%m-%dT%H:%M:%SZ",
+            ).date().strftime("%Y-%m-%d")
+        out['license'] = repo_data['license']['spdx_id']
+        # out['stars'] = repo_data['stargazers_count']
+    else:
+        print(f'Failed to parse Github repo: {owner}/{repo}')
+
+    return out
