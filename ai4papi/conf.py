@@ -4,6 +4,7 @@ Manage configurations of the API.
 
 from pathlib import Path
 from string import Template
+import subprocess
 
 import yaml
 
@@ -79,3 +80,19 @@ for tool_path in tool_list:
             'values': yml[1],
         }
     }
+
+
+# Retrieve git info from PAPI, to show current version in the docs
+papi_commit = subprocess.run(
+    ['git', 'log', '-1', '--format=%H'],
+    stdout=subprocess.PIPE,
+    text=True,
+    cwd=main_path,
+    ).stdout.strip()
+papi_branch = subprocess.run(
+    ['git', 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+    stdout=subprocess.PIPE,
+    text=True,
+    cwd=main_path,
+    ).stdout.strip()
+papi_branch = papi_branch.split('/')[-1]  # remove the "origin/" part
