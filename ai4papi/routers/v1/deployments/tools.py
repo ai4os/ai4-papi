@@ -137,6 +137,13 @@ def get_deployment(
     tool_id = papiconf.tools_nomad2id.get(nomad_name, '')
     job['tool_name'] = tool_id
 
+    # Additional checks
+    if tool_id == 'ai4-cvat':
+        # Remove useless endpoints (they all point to same url)
+        ignore = ['server', 'grafana']
+        job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
+        job['endpoints'] = {k: v for k, v in job['endpoints'].items() if k not in ignore}
+
     return job
 
 
