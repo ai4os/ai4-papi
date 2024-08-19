@@ -287,6 +287,14 @@ def create_deployment(
     # Deploy a CVAT tool
     elif tool_name == 'ai4-cvat':
 
+        # Enforce defining CVAT username and password
+        cvat = {k: v for k, v in user_conf['general'].items() if k.startswith('cvat')}
+        if not all(cvat.values()):
+            raise HTTPException(
+                status_code=400,
+                detail="You must fill all CVAT-related variables.",
+                )
+
         # Enforce all rclone vars are defined
         rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
         if not all(rclone.values()):
@@ -308,6 +316,7 @@ def create_deployment(
                 'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
                 'BASE_DOMAIN': base_domain,
                 'HOSTNAME': hostname,
+                'CVAT_USERNAME': user_conf['general']['cvat_username'],
                 'CVAT_PASSWORD': user_conf['general']['cvat_password'],
                 'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
                 'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],

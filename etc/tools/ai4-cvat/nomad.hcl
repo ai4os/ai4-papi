@@ -70,7 +70,7 @@ job "tool-cvat-${JOB_UUID}" {
     server_image                       = "registry.services.ai4os.eu/ai4os/ai4-cvat-server"
     su_username                        = "admin"
     su_password                        = "${CVAT_PASSWORD}"
-    su_email                           = "${OWNER_EMAIL}"
+    su_email                           = "${CVAT_USERNAME}"
 
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
     RCLONE_CONFIG_RSHARE_TYPE          = "webdav"

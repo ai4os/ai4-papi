@@ -27,6 +27,11 @@ general:
     value: ''
     description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
+  cvat_username:
+    name: CVAT username
+    value: ''
+    description: Select a username (or email) for your CVAT instance.
+
   cvat_password:
     name: CVAT password
     value: ''
