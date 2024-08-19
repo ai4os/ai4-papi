@@ -1,4 +1,5 @@
 from copy import deepcopy
+import re
 import secrets
 import types
 from types import SimpleNamespace
@@ -128,6 +129,13 @@ def get_deployment(
             status_code=400,
             detail="This deployment is not a tool.",
             )
+
+    # Add an additional field with the tool type
+    # We map name from Nomad job to tool ID
+    match = re.search(r'tool-(.*?)-[a-f0-9-]{36}', job['name'])
+    nomad_name = match.group(1) if match else ''
+    tool_id = papiconf.tools_nomad2id.get(nomad_name, '')
+    job['tool_name'] = tool_id
 
     return job
 
