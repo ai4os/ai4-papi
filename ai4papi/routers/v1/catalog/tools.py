@@ -46,7 +46,7 @@ def get_config(
     metadata = self.get_metadata(item_name)
 
     # Parse docker registry
-    registry = metadata['sources']['docker_registry_repo']
+    registry = metadata['links']['docker_image']
     repo, image = registry.split('/')[:2]
     if repo not in ['deephdc', 'ai4oshub']:
         repo = 'ai4oshub'

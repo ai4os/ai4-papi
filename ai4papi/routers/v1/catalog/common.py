@@ -23,9 +23,9 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
 import configparser
-import json
 import re
 from typing import Tuple, Union
+import yaml
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
@@ -82,7 +82,10 @@ class Catalog:
         * `*image` matches all tags _ending_ with "image"
         * `*image*` matches all tags _containing_ the substring "image"
 
-
+        #TODO: with the new metadata, there are now several tag-like fields (tags,
+        tasks, categories, libraries, datatype, etc). If we want to keep allowing
+        filter modules by tags we should allow filtering by all these fields.
+        Otherwise we can remove the filtering option and breaks backwards compatibility.
         """
         # Retrieve all modules
         modules = list(self.get_items().keys())
@@ -123,7 +126,7 @@ class Catalog:
             fmodules = []
             for m in modules:
                 mtags = set(
-                    self.get_metadata(m)['keywords']
+                    self.get_metadata(m)['tags']
                 )
 
                 conditions = []
@@ -162,8 +165,8 @@ class Catalog:
         not_tags_any: Union[Tuple, None] = Query(default=None),
         ):
         """
-        Retrieve a list of all items' basic metadata
-        (name, title, summary, keywords), optionally filtering items by tags.
+        Retrieve a list of all items' basic metadata, optionally filtering items by tags.
+        Basic metadata is everything except lengthier fields (ie. description, links)
 
         The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
         * `tags`: Items that contain all of the specified tags
@@ -177,7 +180,7 @@ class Catalog:
         * `*image*` matches all tags _containing_ the substring "image"
         """
         summary = []
-        keys = ['title', 'summary', 'keywords']
+        ignore = ['description', 'links']
         modules = self.get_filtered_list(
             tags=tags,
             tags_any=tags_any,
@@ -191,7 +194,7 @@ class Catalog:
                 # Avoid breaking the whole method if failing to retrieve a module
                 print(f'Error retrieving metadata: {m}')
                 continue
-            meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
+            meta = {k: v for k, v in meta1.items() if k not in ignore}  # filter keys
             meta['name'] = m
             summary.append(meta)
         return summary
@@ -207,7 +210,7 @@ class Catalog:
         tags = []
         for m in self.get_items().keys():
             meta = self.get_metadata(m)
-            tags += meta['keywords']
+            tags += meta['tags']
         tags = sorted(set(tags))
         return tags
 
@@ -233,31 +236,43 @@ class Catalog:
         # all the Dashboard
         branch = items[item_name].get("branch", "master")
         url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
-        metadata_url = f"{url}/{branch}/metadata.json"
+        metadata_url = f"{url}/{branch}/ai4-metadata.yml"
         try:
             r = requests.get(metadata_url)
-            metadata = json.loads(r.text)
+            if not r.ok:
+                raise Exception(f"Error retrieving metadata ({r.status_code})")
+            metadata = yaml.safe_load(r.text)
         except Exception:
             print(f'Error parsing metadata: {item_name}')
             metadata = {
+                "metadata_version": "2.0.0",
                 "title": item_name,
                 "summary": "",
-                "description": [
-                    "The metadata of this module could not be retrieved probably due to a ",
-                    "JSON formatting error from the module maintainer."
-                ],
-                "keywords": [],
+                "description": \
+                    "The metadata of this module could not be retrieved probably " \
+                    "due to a missing/faulty YAML file in the module's repo.",
+                "doi": "",
                 "license": "",
-                "date_creation": "",
-                "sources": {
-                    "dockerfile_repo": f"https://github.com/ai4oshub/{item_name}",
-                    "docker_registry_repo": f"ai4os-hub/{item_name}",
-                    "code": "",
-                }
+                "dates": {
+                    "created": "",
+                    "updated": "",
+                    },
+                "links": {
+                    "documentation": "",
+                    "source_code": f"https://github.com/ai4oshub/{item_name}",
+                    "docker_image": f"ai4os-hub/{item_name}",
+                    "ai4_template": "",
+                    "dataset": "",
+                    "weights": "",
+                    "citation": "",
+                    "base_model": "",
+                },
+                "tags": [],
+                "tasks": [],
+                "categories": [],
+                "libraries": [],
+                "data-type": [],
             }
-
-        # Format "description" field nicely for the Dashboards Markdown parser
-        metadata["description"] = "\n".join(metadata["description"])
 
         # Replace some fields with the info gathered from Github
         pattern = r'github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$'
@@ -266,8 +281,9 @@ class Catalog:
             owner, repo = match.group(1), match.group(2)
             gh_info = utils.get_github_info(owner, repo)
 
-            metadata['date_creation'] = gh_info.get('created', '')
-            # metadata['updated'] = gh_info.get('updated', '')
+            metadata.setdefault('dates', {})
+            metadata['dates']['created'] = gh_info.get('created', '')
+            metadata['dates']['updated'] = gh_info.get('updated', '')
             metadata['license'] = gh_info.get('license', '')
         else:
             print(f"Failed to parse owner/repo in {items[item_name]['url']}")
