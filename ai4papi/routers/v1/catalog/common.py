@@ -27,6 +27,7 @@ import re
 from typing import Tuple, Union
 import yaml
 
+import ai4_metadata
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
 import requests
@@ -237,22 +238,46 @@ class Catalog:
         branch = items[item_name].get("branch", "master")
         url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
         metadata_url = f"{url}/{branch}/ai4-metadata.yml"
-        try:
-            r = requests.get(metadata_url)
-            if not r.ok:
-                raise Exception(f"Error retrieving metadata ({r.status_code})")
-            metadata = yaml.safe_load(r.text)
-        except Exception:
-            print(f'Error parsing metadata: {item_name}')
+
+        error = None
+        # Try to retrieve the metadata from Github
+        r = requests.get(metadata_url)
+        if not r.ok:
+            error = \
+                "The metadata of this module could not be retrieved because the " \
+                "module is lacking a metadata file (`ai4-metadata.yml`)."
+        else:
+            # Try to load the YML file
+            try:
+                metadata = yaml.safe_load(r.text)
+            except Exception:
+                metadata = None
+                error = \
+                    "The metadata of this module could not be retrieved because the " \
+                    "metadata file is badly formatted (`ai4-metadata.yml`)."
+
+            # Since we are loading the metadata directly from the repo main branch,
+            # we cannot know if they have successfully passed or not the Jenkins
+            # validation. So we have to validate them, just in case we have naughty users.
+            if metadata:
+                try:
+                    schema = open(ai4_metadata.get_schema("2.0.0"), "r")
+                    ai4_metadata.validate.validate(instance=metadata, schema_file=schema)
+                except Exception:
+                    error = \
+                        "The metadata of this module has failed to comply with the " \
+                        "specifications of the AI4EOSC Platform (see the " \
+                        "[metadata validator](https://github.com/ai4os/ai4-metadata))."
+
+        # If any of the previous steps raised an error, load a metadata placeholder
+        if error:
+            print(f"  Error: {error}")
             metadata = {
                 "metadata_version": "2.0.0",
                 "title": item_name,
                 "summary": "",
-                "description": \
-                    "The metadata of this module could not be retrieved probably " \
-                    "due to a missing/faulty YAML file in the module's repo.",
+                "description": error,
                 "doi": "",
-                "license": "",
                 "dates": {
                     "created": "",
                     "updated": "",
@@ -267,7 +292,7 @@ class Catalog:
                     "citation": "",
                     "base_model": "",
                 },
-                "tags": [],
+                "tags": ["invalid metadata"],
                 "tasks": [],
                 "categories": [],
                 "libraries": [],
