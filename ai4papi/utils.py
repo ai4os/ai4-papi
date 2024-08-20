@@ -194,7 +194,7 @@ def get_github_info(owner, repo):
             repo_data['updated_at'],
             "%Y-%m-%dT%H:%M:%SZ",
             ).date().strftime("%Y-%m-%d")
-        out['license'] = repo_data['license']['spdx_id']
+        out['license'] = (repo_data['license'] or {}).get('spdx_id', '')
         # out['stars'] = repo_data['stargazers_count']
     else:
         print(f'Failed to parse Github repo: {owner}/{repo}')
