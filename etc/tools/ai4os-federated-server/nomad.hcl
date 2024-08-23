@@ -59,10 +59,10 @@ job "tool-fl-${JOB_UUID}" {
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
   affinity {
-    attribute = "${node.unique.name}"
+    attribute = "${meta.tags}"
     operator  = "regexp"
-    value     = "gpu"
-    weight    = -50  # anti-affinity for GPU clients
+    value     = "cpu"
+    weight    = 50
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut

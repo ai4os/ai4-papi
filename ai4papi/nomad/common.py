@@ -336,30 +336,29 @@ def delete_deployment(
 
     Returns a dict with status
     """
-    # Check the deployment exists
-    try:
-        j = Nomad.job.get_job(
-            id_=deployment_uuid,
-            namespace=namespace,
-            )
-    except exceptions.URLNotFoundNomadException:
-        raise HTTPException(
-            status_code=400,
-            detail="No deployment exists with this uuid.",
-            )
+    # Retrieve the deployment information. Under-the-hood it checks that:
+    # - the job indeed exists
+    # - the owner does indeed own the job
+    info = get_deployment(
+        deployment_uuid=deployment_uuid,
+        namespace=namespace,
+        owner=owner,
+        full_info=False,
+        )
 
-    # Check job does belong to owner
-    if j['Meta'] and owner != j['Meta'].get('owner', ''):
-        raise HTTPException(
-            status_code=400,
-            detail="You are not the owner of that deployment.",
-            )
+    # If job is in "queued" status, allow deleting with purge.
+    # Most of the time, when a job is in this status, it is due to a platform error.
+    # It gets stuck and cannot be deleted without purge
+    if info['status'] == 'queued':
+        purge = True
+    else:
+        purge = False
 
     # Delete deployment
     Nomad.job.deregister_job(
         id_=deployment_uuid,
         namespace=namespace,
-        purge=False,
+        purge=purge,
         )
 
     return {'status': 'success'}

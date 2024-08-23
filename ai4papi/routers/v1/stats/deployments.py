@@ -193,6 +193,12 @@ def get_cluster_stats(
     """
 
     global cluster_stats
+    if not cluster_stats:
+        # If PAPI is used as a package, cluster_stats will be None, as the background
+        # computation of `get_cluster_stats_bg()` is only started when PAPI is launched
+        # with uvicorn.
+        # So if None, we need to initialize it
+        cluster_stats = get_cluster_stats_bg()
     stats = copy.deepcopy(cluster_stats)
 
     namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
@@ -277,10 +283,6 @@ def get_cluster_stats_bg():
         n_stats['cpu_total'] = int(node['Attributes']['cpu.numcores'])
         n_stats['ram_total'] = int(node['Attributes']['memory.totalbytes']) / 2**20
         n_stats['disk_total'] = int(node['Attributes']['unique.storage.bytestotal']) / 2**20
-        n_stats['disk_used'] = \
-            ( int(node['Attributes']['unique.storage.bytestotal']) \
-            - int(node['Attributes']['unique.storage.bytesfree'])) \
-            / 2**20
         n_stats['gpu_models'] = {}
         n_stats['namespaces'] = node['Meta'].get('namespace', '')
         n_stats['status'] = node['Meta'].get('status', '')
@@ -335,8 +337,8 @@ def get_cluster_stats_bg():
                 n_stats['jobs_num'] += 1
 
             #TODO: we are ignoring resources consumed by other tasks
-            if 'usertask' in a['AllocatedResources']['Tasks']:
-                res = a['AllocatedResources']['Tasks']['usertask']
+            if 'main' in a['AllocatedResources']['Tasks']:
+                res = a['AllocatedResources']['Tasks']['main']
 
                 # cpu
                 if res['Cpu']['ReservedCores']:
@@ -344,6 +346,13 @@ def get_cluster_stats_bg():
 
                 # ram
                 n_stats['ram_used'] += res['Memory']['MemoryMB']
+
+                # disk
+                # Note: In theory we can get the total disk used in a node looking at the
+                # metadata (ie. "unique.storage.bytesfree"). But that gave us the disk that
+                # is actually used. But we are instead interested on the disk that is reserved
+                # by users (regardless of whether they are actually using it).
+                n_stats['disk_used'] += a['AllocatedResources']['Shared']['DiskMB']
 
                 # gpu
                 if res['Devices']:

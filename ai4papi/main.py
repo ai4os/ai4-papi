@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import fastapi
 import uvicorn
 
-from ai4papi.conf import MAIN_CONF, paths
+from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from fastapi.responses import FileResponse
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
@@ -39,7 +39,11 @@ description = (
     "This work is co-funded by [AI4EOSC](https://ai4eosc.eu/) project that has "
     "received funding from the European Union's Horizon Europe 2022 research and "
     "innovation programme under agreement No 101058593"
+    "<br><br>"
 
+    "PAPI version:"
+    f"[`ai4-papi/{papi_branch}@{papi_commit[:5]}`]"
+    f"(https://github.com/ai4os/ai4-papi/tree/{papi_commit})"
 )
 
 @asynccontextmanager

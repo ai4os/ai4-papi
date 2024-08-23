@@ -12,14 +12,16 @@ from .common import Catalog, retrieve_docker_tags
 @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
 def get_items(self):
     # Set default branch manually (because we are not yet reading this from submodules)
+    # TODO: start reading from submodules (only accept the submodules that have been
+    # integrated in papiconf.TOOLS)
     tools_branches= {
-        'deep-oc-federated-server': 'main',
+        'ai4os-federated-server': 'main',
     }
 
     tools = {}
     for k in papiconf.TOOLS.keys():
         tools[k] = {
-            'url': f'https://github.com/deephdc/{k}',  #TODO: this will need to be updated
+            'url': f'https://github.com/ai4os/{k}',
             'branch': tools_branches[k],
         }
 

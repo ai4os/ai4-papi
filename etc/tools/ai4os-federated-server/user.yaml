@@ -27,7 +27,7 @@ general:
 
   docker_image:
     name: Docker image
-    value: 'deephdc/deep-oc-federated-server'
+    value: 'ai4oshub/ai4os-federated-server'
     description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
 
   docker_tag:
@@ -90,7 +90,7 @@ configuration:
   strategy:
     name: Federated aggregation strategy
     value: 'Federated Averaging (FedAvg)'
-    description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/deephdc/federated-server" target="_blank">Check the different options with their references.</a>
+    description: Aggregation function or strategy that will be applied for aggregating the models received from the clients. <a href="https://github.com/ai4os/ai4os-federated-server" target="_blank">Check the different options with their references.</a>
     options: [
         'Federated Averaging (FedAvg)', # fedavg
         'FedProx strategy (FedProx)', # fedprox
