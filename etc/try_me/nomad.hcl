@@ -121,7 +121,7 @@ job "try-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui"
+        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui:latest"
         ports      = ["ui"]
         shm_size   = 250000000   # 250MB
         memory_hard_limit = 500  # MB
