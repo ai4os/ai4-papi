@@ -112,6 +112,14 @@ job "try-${JOB_UUID}" {
         memory     = 2000  # 2GB
         memory_max = 2000  # 2GB
       }
+
+      # Do not try to restart a try-me job if it failis to launch deepaas
+      # This is usually due to the fact that the Docker image took too long to download
+      # and failed with error: `Failed to pull `ai4oshub/...`: context deadline` exceeded
+      # Restarting in the same node won't fix the connectivity issues
+      restart {
+        attempts = 0
+        mode     = "fail"
       }
 
     }
