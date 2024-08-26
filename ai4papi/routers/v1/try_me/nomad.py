@@ -89,10 +89,10 @@ def create_deployment(
         owner=auth_info['id'],
         prefix="try",
     )
-    if len(jobs) > 2:
+    if len(jobs) >= 2:
         raise HTTPException(
             status_code=503,
-            detail="Sorry, but you seem to be currently running two `Try-me` environments already." \
+            detail="Sorry, but you seem to be currently running two `Try-me` environments already. " \
                 "Before launching a new one, you will need to wait till one of your " \
                 "existing environments gets automatically deleted (ca. 10 min)."
             )
