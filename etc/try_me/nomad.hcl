@@ -103,14 +103,15 @@ job "try-${JOB_UUID}" {
         command    = "deep-start"
         args       = ["--deepaas"]
         ports      = ["api"]
-        shm_size   = 500000000  # 500MB
-        memory_hard_limit = 1000  # 1GB
+        shm_size   = 1000000000  # 1GB
+        memory_hard_limit = 2000  # 2GB
       }
 
       resources {
         cores      = 1
-        memory     = 1000  # 1GB
-        memory_max = 1000  # 1GB
+        memory     = 2000  # 2GB
+        memory_max = 2000  # 2GB
+      }
       }
 
     }
