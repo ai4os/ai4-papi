@@ -40,10 +40,11 @@ def get_config(
         conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Modify the resources limits for a given user or VO
-    conf["hardware"] = quotas.limit_resources(
-        item_name=item_name,
-        vo=vo,
-    )
+    if conf.get("hardware", None):
+        conf["hardware"] = quotas.limit_resources(
+            item_name=item_name,
+            vo=vo,
+        )
 
     return conf
 
