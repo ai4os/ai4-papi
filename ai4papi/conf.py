@@ -83,7 +83,7 @@ for tool_path in tool_list:
 # For tools, map the Nomad job name prefixes to tool IDs
 tools_nomad2id = {
     'fl': 'ai4os-federated-server',
-    'cvat': 'ai4-cvat',
+    'cvat': 'ai4os-cvat',
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():

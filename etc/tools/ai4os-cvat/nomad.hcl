@@ -30,8 +30,13 @@ To avoid too much disruption, I'm only changing this inside the service field
 To avoid too much disruption, I'm only changing this in the "main" task (parameter `image`)
 - ${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom} --> registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS
 
-[1]: https://github.com/ai4os/ai4-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
+[1]: https://github.com/ai4os/ai4os-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
 [2]: https://stackoverflow.com/a/56957750/18471590
+
+Note:
+In several part of the job we use the old name of the repo (ai4os/ai4-cvat) which
+should redirect fine to the new repo name (ai4os/ai4os-cvat)
+But it is important nevertheless to keep it in mind, just in case.
 
 */
 

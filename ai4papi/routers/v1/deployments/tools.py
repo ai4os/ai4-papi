@@ -138,7 +138,7 @@ def get_deployment(
     job['tool_name'] = tool_id
 
     # Additional checks
-    if tool_id == 'ai4-cvat':
+    if tool_id == 'ai4os-cvat':
         # Remove useless endpoints (they all point to same url)
         ignore = ['server', 'grafana']
         job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
@@ -201,7 +201,7 @@ def create_deployment(
 
     # Check if the provided configuration is within the job quotas
     # Skip this check with CVAT because it does not have a "hardware" section in the conf
-    if tool_name not in ['ai4-cvat']:
+    if tool_name not in ['ai4os-cvat']:
         quotas.check_jobwise(
             conf=user_conf,
             vo=vo,
@@ -300,7 +300,7 @@ def create_deployment(
             usertask['Config']['args'] = [f'--{service}']
 
     # Deploy a CVAT tool
-    elif tool_name == 'ai4-cvat':
+    elif tool_name == 'ai4os-cvat':
 
         # Enforce defining CVAT username and password
         cvat = {k: v for k, v in user_conf['general'].items() if k.startswith('cvat')}
