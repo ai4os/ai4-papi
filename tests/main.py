@@ -9,6 +9,7 @@ Nomad (ie. after launching)
 
 #TODO: move to proper testing package
 #TODO: rename test script: modules --> test_modules
+#TODO: add spinners
 
 import catalog.modules
 import catalog.tools

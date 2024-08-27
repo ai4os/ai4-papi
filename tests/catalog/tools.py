@@ -33,23 +33,27 @@ tools_tags = Tools.get_tags()
 assert isinstance(tools_tags, list)
 assert 'docker' in tools_tags
 
-# Explore an individual tool
-tool_name = tools_list[0]
+# Explore individual tools
+# Contrary than for modules, we do this for all tools because tool configurations are
+# particular for each tool
+for tool_name in tools_list:
 
-# Get tool config
-tool_conf = Tools.get_config(
-    item_name=tool_name,
-    vo='vo.ai4eosc.eu',
-)
-assert isinstance(tool_conf, dict)
-assert 'general' in tool_conf.keys()
+    print(f'  - Testing {tool_name}')
 
-# Get tool metadata
-tool_meta = Tools.get_metadata(
-    item_name=tool_name,
-)
-assert isinstance(tool_meta, dict)
-assert 'title' in tool_meta.keys()
+    # Get tool config
+    tool_conf = Tools.get_config(
+        item_name=tool_name,
+        vo='vo.ai4eosc.eu',
+    )
+    assert isinstance(tool_conf, dict)
+    assert 'general' in tool_conf.keys()
+
+    # Get tool metadata
+    tool_meta = Tools.get_metadata(
+        item_name=tool_name,
+    )
+    assert isinstance(tool_meta, dict)
+    assert 'title' in tool_meta.keys()
 
 #TODO: we should not be able to get config or metadata for a module_name
 
