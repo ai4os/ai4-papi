@@ -107,6 +107,8 @@ job "try-${JOB_UUID}" {
         memory_hard_limit = 2000  # 2GB
       }
 
+      # (!) Keep in mind that if a module works locally but isn't working in Nomad,
+      # the reason is likely that these resources are too low and the module freezes
       resources {
         cores      = 1
         memory     = 2000  # 2GB
