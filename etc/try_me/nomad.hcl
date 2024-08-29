@@ -31,13 +31,6 @@ job "try-${JOB_UUID}" {
     value     = "ready"
   }
 
-  # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
-  constraint {
-    attribute = "${meta.compute}"
-    operator  = "="
-    value     = "true"
-  }
-
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
   # because Nomad does not allow a node to belong to several node pools)
   constraint {
@@ -46,12 +39,12 @@ job "try-${JOB_UUID}" {
     value     = "${NAMESPACE}"
   }
 
-  # Force that try-me jobs land in CPU-only nodes to avoid impacting the GPU trainings
-  # of our real users
+  # Force that try-me jobs land in "tryme" nodes (that are the ones that have the docker
+  # images pre-fetched for fast deployment)
   constraint {
     attribute = "${meta.tags}"
     operator  = "regexp"
-    value     = "cpu"
+    value     = "tryme"
   }
 
   group "usergroup" {

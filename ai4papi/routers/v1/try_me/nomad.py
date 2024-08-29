@@ -63,8 +63,8 @@ def create_deployment(
     # Convert template to Nomad conf
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    # Check that at least 20% of the candidate node resources (CPU nodes belonging to
-    # ai4eosc) are free, to avoid impacting too much on our real users.
+    # Check that the target node (ie. tag='tryme') resources are available because
+    # these jobs cannot be left queueing
     # We check for every resource metric (cpu, disk, ram)
     stats = get_cluster_stats(vo='vo.ai4eosc.eu')
     resources = ['cpu', 'ram', 'disk']
@@ -73,10 +73,11 @@ def create_deployment(
 
     for _, datacenter  in stats['datacenters'].items():
         for _, node in datacenter['nodes'].items():
-            for k in keys:
-                status[k] += node[k]
+            if 'tryme' in node['tags']:
+                for k in keys:
+                    status[k] += node[k]
     for r in resources:
-        if status[f"{r}_used"] / status[f"{r}_total"] > 0.8:
+        if status[f"{r}_used"] / status[f"{r}_total"] > 0.95:
             raise HTTPException(
                 status_code=503,
                 detail="Sorry, but there seem to be no resources available right " \

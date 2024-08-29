@@ -223,7 +223,7 @@ def get_cluster_stats(
             for k, v in n_stats.items():
 
                 # Ignore keys
-                if k in ['name', 'namespaces', 'eligibility', 'status']:
+                if k in ['name', 'namespaces', 'eligibility', 'status', 'tags']:
                     continue
 
                 # Aggregate nested gpu_models dict
@@ -286,6 +286,7 @@ def get_cluster_stats_bg():
         n_stats['gpu_models'] = {}
         n_stats['namespaces'] = node['Meta'].get('namespace', '')
         n_stats['status'] = node['Meta'].get('status', '')
+        n_stats['tags'] = node['Meta'].get('tags', '')
 
         if n['NodeResources']['Devices']:
             for devices in n['NodeResources']['Devices']:
