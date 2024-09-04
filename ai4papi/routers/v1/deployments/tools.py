@@ -141,8 +141,9 @@ def get_deployment(
     if tool_id == 'ai4os-cvat':
         # Remove useless endpoints (they all point to same url)
         ignore = ['server', 'grafana']
-        job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
         job['endpoints'] = {k: v for k, v in job['endpoints'].items() if k not in ignore}
+        if job['active_endpoints']:
+            job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
 
     return job
 
