@@ -287,9 +287,9 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        rclone mkdir $REMOTE_PATH/data
-        rclone mkdir $REMOTE_PATH/db
-        rclone mkdir $REMOTE_PATH/share
+        rclone mkdir -p $REMOTE_PATH/data
+        rclone mkdir -p $REMOTE_PATH/db
+        rclone mkdir -p $REMOTE_PATH/share
         rclone mount $REMOTE_PATH/data $LOCAL_PATH/data --uid 1000 --gid 1000 --dir-perms 0750 --allow-non-empty --allow-other --vfs-cache-mode full &
         rclone mount $REMOTE_PATH/db $LOCAL_PATH/db --uid 70 --gid 70 --dir-perms 0700 --allow-non-empty --allow-other --vfs-cache-mode full &
         rclone mount $REMOTE_PATH/share $LOCAL_PATH/share --uid 1000 --gid 1000 --dir-perms 0750 --allow-non-empty --allow-other --vfs-cache-mode full
