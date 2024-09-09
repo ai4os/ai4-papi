@@ -313,6 +313,10 @@ class Catalog:
         else:
             print(f"Failed to parse owner/repo in {items[item_name]['url']}")
 
+        # Add Jenkins CI/CD links
+        metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/AI4OS-hub/job/{item_name}/job/{branch}/"
+        metadata['links']['cicd_badge'] = f"https://jenkins.services.ai4os.eu/buildStatus/icon?job=AI4OS-hub/{item_name}/{branch}"
+
         return metadata
 
     def get_config(
