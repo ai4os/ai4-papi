@@ -150,24 +150,37 @@ def validate_conf(conf):
     """
     Validate user configuration
     """
+    # Check that the Dockerhub image belongs either to "deephdc" or "ai4oshub"
+    # or that it points to our Harbor instance (eg. CVAT)
+    image = conf.get('general', {}).get('docker_image')
+    if image:
+        if image.split('/')[0] not in ["deephdc", "ai4oshub", "registry.services.ai4os.eu"]:
+            raise HTTPException(
+                status_code=400,
+                detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
+                DockerHub organizations or be hosted in the project's Harbor."
+                )
+
     # Check datasets_info list
-    for d in conf['storage']['datasets']:
+    datasets = conf.get('storage', {}).get('datasets')
+    if datasets:
+        for d in datasets:
 
-        # Validate DOI
-        # ref: https://stackoverflow.com/a/48524047/18471590
-        pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
-        if not re.match(pattern, d['doi'], re.IGNORECASE):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid DOI."
-                )
+            # Validate DOI
+            # ref: https://stackoverflow.com/a/48524047/18471590
+            pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
+            if not re.match(pattern, d['doi'], re.IGNORECASE):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid DOI."
+                    )
 
-        # Check force pull parameter
-        if not isinstance(d['force_pull'], bool):
-            raise HTTPException(
-                status_code=400,
-                detail="Force pull should be bool."
-                )
+            # Check force pull parameter
+            if not isinstance(d['force_pull'], bool):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Force pull should be bool."
+                    )
 
     return conf
 
