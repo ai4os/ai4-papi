@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "userjob-${JOB_UUID}" {
+job "module-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -24,13 +24,45 @@ job "userjob-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
+  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  constraint {
+    attribute = "${meta.status}"
+    operator  = "regexp"
+    value     = "ready"
+  }
+
+  # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
+  constraint {
+    attribute = "${meta.compute}"
+    operator  = "="
+    value     = "true"
+  }
+
+  # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
+  # because Nomad does not allow a node to belong to several node pools)
+  constraint {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "${NAMESPACE}"
+  }
+
+  # Try to deploy iMagine jobs on nodes that are iMagine-exclusive
+  # In this way, we leave AI4EOSC nodes for AI4EOSC users and for iMagine users only
+  # when iMagine nodes are fully booked.
+  affinity {
+    attribute = "${meta.namespace}"
+    operator  = "regexp"
+    value     = "ai4eosc"
+    weight    = -50  # anti-affinity for ai4eosc clients
+  }
+
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
   affinity {
-    attribute = "${node.unique.name}"
+    attribute = "${meta.tags}"
     operator  = "regexp"
-    value     = "gpu"
-    weight    = -50  # anti-affinity for GPU clients
+    value     = "cpu"
+    weight    = 50
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut
@@ -68,7 +100,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-api.tls=true",
-        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${DOMAIN}`, `www.api-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -78,7 +110,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${DOMAIN}`, `www.monitor-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -88,7 +120,7 @@ job "userjob-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ide.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${DOMAIN}`, `www.ide-${DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -96,7 +128,7 @@ job "userjob-${JOB_UUID}" {
       size = ${DISK}
     }
 
-    task "storagetask" {
+    task "storage_mount" {
       // Running task in charge of mounting storage
 
       lifecycle {
@@ -162,7 +194,7 @@ job "userjob-${JOB_UUID}" {
 
     }
 
-    task "usertask" {
+    task "main" {
       // Task configured by the user (deepaas, jupyter, vscode)
 
       driver = "docker"
@@ -178,6 +210,9 @@ job "userjob-${JOB_UUID}" {
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
+        storage_opt = {
+          size = "${DISK}M"
+        }
       }
 
       env {
@@ -209,7 +244,7 @@ job "userjob-${JOB_UUID}" {
       }
     }
 
-    task "storagecleanup" {
+    task "storage_cleanup" {
       // Unmount empty storage folder and delete it from host
 
       lifecycle {

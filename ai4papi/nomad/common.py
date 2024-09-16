@@ -17,6 +17,7 @@ import nomad
 from nomad.api import exceptions
 import requests
 
+import ai4papi.conf as papiconf
 import ai4papi.nomad.patches as nomad_patches
 
 
@@ -42,13 +43,14 @@ session = requests.Session()
 def get_deployments(
     namespace: str,
     owner: str,
+    prefix: str = "",
     ):
     """
     Returns a list of all deployments belonging to a user, in a given namespace.
     """
     job_filter = \
         'Status != "dead" and ' + \
-        'Name matches "^userjob" and ' + \
+        f'Name matches "^{prefix}" and ' + \
         'Meta is not empty and ' + \
         f'Meta.owner == "{owner}"'
     jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
@@ -95,6 +97,7 @@ def get_deployment(
     # Create job info dict
     info = {
         'job_ID': j['ID'],
+        'name': j['Name'],
         'status': '',  # do not use j['Status'] as misleading
         'owner': j['Meta']['owner'],
         'title': j['Meta']['title'],
@@ -114,7 +117,7 @@ def get_deployment(
 
     # Retrieve tasks
     tasks = j['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name'] == 'usertask'][0]
+    usertask = [t for t in tasks if t['Name'] == 'main'][0]
 
     # Retrieve Docker image
     info['docker_image'] = usertask['Config']['image']
@@ -165,17 +168,6 @@ def get_deployment(
     except Exception:  # return first endpoint
         info['main_endpoint'] = list(info['endpoints'].values())[0]
 
-    # Add active endpoints
-    if full_info:
-        info['active_endpoints'] = []
-        for k, v in info['endpoints'].items():
-            try:
-                r = session.get(v, timeout=2)
-                if r.status_code == 200:
-                    info['active_endpoints'].append(k)
-            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-                continue
-
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
         id_=j['ID'],
@@ -225,11 +217,12 @@ def get_deployment(
         elif a['ClientStatus'] == 'unknown':
             info['status'] = 'down'
         else:
+            # This status can be for example: "complete", "failed"
             info['status'] = a['ClientStatus']
 
         # Add error messages if needed
         if info['status'] == 'failed':
-            info['error_msg'] = a['TaskStates']['usertask']['Events'][0]['Message']
+            info['error_msg'] = a['TaskStates']['main']['Events'][0]['Message']
 
             # Replace with clearer message
             if info['error_msg'] == 'Docker container exited with non-zero exit code: 1':
@@ -245,12 +238,8 @@ def get_deployment(
                 "the network is restored and you should be able to fully recover " \
                 "your deployment."
 
-        # Disable access to endpoints if there is a network cut
-        if info['status'] == 'down' and info['active_endpoints']:
-            info['active_endpoints'] = []
-
         # Add resources
-        res = a['AllocatedResources']['Tasks']['usertask']
+        res = a['AllocatedResources']['Tasks']['main']
         gpu = [d for d in res['Devices'] if d['Type'] == 'gpu'][0] if res['Devices'] else None
         cpu_cores = res['Cpu']['ReservedCores']
         info['resources'] = {
@@ -260,6 +249,26 @@ def get_deployment(
             'memory_MB': res['Memory']['MemoryMB'],
             'disk_MB': a['AllocatedResources']['Shared']['DiskMB'],
         }
+
+        # Retrieve the node the jobs landed at in order to properly fill the endpoints
+        n = Nomad.node.get_node(a['NodeID'])
+        for k, v in info['endpoints'].items():
+            info['endpoints'][k] = v.replace('${meta.domain}', n['Meta']['domain'])
+
+        # Add active endpoints
+        if full_info:
+            info['active_endpoints'] = []
+            for k, v in info['endpoints'].items():
+                try:
+                    r = session.get(v, timeout=2)
+                    if r.status_code == 200:
+                        info['active_endpoints'].append(k)
+                except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+                    continue
+
+        # Disable access to endpoints if there is a network cut
+        if info['status'] == 'down' and info['active_endpoints']:
+            info['active_endpoints'] = []
 
     elif evals:
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
@@ -328,42 +337,47 @@ def delete_deployment(
 
     Returns a dict with status
     """
-    # Check the deployment exists
-    try:
-        j = Nomad.job.get_job(
-            id_=deployment_uuid,
-            namespace=namespace,
-            )
-    except exceptions.URLNotFoundNomadException:
-        raise HTTPException(
-            status_code=400,
-            detail="No deployment exists with this uuid.",
-            )
+    # Retrieve the deployment information. Under-the-hood it checks that:
+    # - the job indeed exists
+    # - the owner does indeed own the job
+    info = get_deployment(
+        deployment_uuid=deployment_uuid,
+        namespace=namespace,
+        owner=owner,
+        full_info=False,
+        )
 
-    # Check job does belong to owner
-    if j['Meta'] and owner != j['Meta'].get('owner', ''):
-        raise HTTPException(
-            status_code=400,
-            detail="You are not the owner of that deployment.",
-            )
+    # If job is in stuck status, allow deleting with purge.
+    # Most of the time, when a job is in this status, it is due to a platform error.
+    # It gets stuck and cannot be deleted without purge
+    if info['status'] in ['queued', 'complete', 'failed', 'error', 'down'] :
+        purge = True
+    else:
+        purge = False
 
     # Delete deployment
     Nomad.job.deregister_job(
         id_=deployment_uuid,
         namespace=namespace,
-        purge=False,
+        purge=purge,
         )
 
     return {'status': 'success'}
 
 
-def get_gpu_models():
+@cached(cache=TTLCache(maxsize=1024, ttl=1*60*60))
+def get_gpu_models(vo):
     """
-    Retrieve available GPU models in the cluster.
+    Retrieve available GPU models in the cluster, filtering nodes by VO.
     """
     gpu_models = set()
     nodes = Nomad.nodes.get_nodes(resources=True)
     for node in nodes:
+        # Discard nodes that don't belong to the requested VO
+        meta = Nomad.node.get_node(node['ID'])['Meta']
+        if papiconf.MAIN_CONF['nomad']['namespaces'][vo] not in meta['namespace']:
+            continue
+
         # Discard GPU models of nodes that are not eligible
         if node['SchedulingEligibility'] != 'eligible':
             continue

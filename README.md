@@ -199,6 +199,9 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
   **Notes**: The catalog caches results for up to 6 hours to improve UX (see
   [doctring](./ai4papi/routers/v1/modules.py)).
 
+* `/v1/try_me/`:
+   endpoint where anyone can deploy a short-lived container to try a module
+
 * `/v1/deployments/`: (🔒)
    deploy modules/tools in the platform to perform trainings
 
@@ -262,7 +265,7 @@ These are the configuration files the API uses:
 * `etc/main_conf.yaml`: main configuration file of the API
 * `etc/modules`: configuration files for standard modules
 * `etc/tools`: configuration files for tools
-  - `deep-oc-federated-server`: federated server
+  - `ai4os-federated-server`: federated server
 
 The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.

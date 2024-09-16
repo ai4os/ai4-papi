@@ -6,7 +6,7 @@ modules_list = list(Modules.get_items().keys())
 
 assert isinstance(modules_list, list)
 assert 'dogs-breed-detector' in modules_list
-assert 'deep-oc-federated-server' not in modules_list
+assert 'ai4os-federated-server' not in modules_list
 
 # List filtered modules
 modules_list2 = Modules.get_filtered_list(
@@ -16,7 +16,7 @@ modules_list2 = Modules.get_filtered_list(
     not_tags_any=None,
 )
 assert isinstance(modules_list2, list)
-assert 'deep-oc-generic-dev' in modules_list2
+assert 'ai4os-dev-env' in modules_list2
 
 # Get modules summaries
 modules_sum = Modules.get_summary(

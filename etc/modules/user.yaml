@@ -9,6 +9,16 @@
 #  options: restricted set of values that the parameter can take (optional)
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
+# CPU/RAM limits are based on the current have GPU flavours we (IFCA) have deployed:
+# * g13-gpuib-8-86:
+#     - 8 GPUs Nvidia Tesla T4
+#     - 86 VCPUs --> ~9.6 cores / gpu (reserving 10% for the node)
+#     - 351 GB RAM --> ~40 GB / gpu (reserving 10% for the node)
+# * g12-gpuib-2-64:
+#     - 2 GPUs Nvidia Tesla V100
+#     - 64 VCPUs --> ~28 cores / gpu (reserving 10% for the node)
+#     - 127 GB RAM --> ~57 GB / gpu (reserving 10% for the node)
+
 general:
 
   title:
@@ -69,12 +79,12 @@ hardware:
   ram:
     name: RAM memory (in MB)
     value: 8000
-    range: [2000, 25000]
+    range: [2000, 40000]
 
   disk:
     name: Disk memory (in MB)
     value: 10000
-    range: [1000, 20000]
+    range: [1000, 50000]
 
 storage:
 
