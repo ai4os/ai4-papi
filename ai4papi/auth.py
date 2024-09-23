@@ -51,40 +51,16 @@ def get_user_info(token):
             detail="Invalid token",
             )
 
-    # Check scopes
-    # Scope can appear if non existent if user doesn't belong to any VO,
-    # even if scope was requested in token.
-    # VO do not need to be one of the project's (this is next check), but we can still
-    # add the project VOs in the project detail.
-    if user_infos.get('eduperson_entitlement') is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Check that (1) you enabled the `eduperson_entitlement` scope for" \
-                   "your token, and (2) you belong to at least one Virtual " \
-                   f"Organization supported by the project: {MAIN_CONF['auth']['VO']}",
-            )
-
-    # Parse Virtual Organizations manually from URNs
-    # If more complexity is need in the future, check https://github.com/oarepo/urnparse
+    # Retrieve VOs the user belongs to
+    # VOs can be empty if the user does not belong to any VO, or the
+    # 'eduperson_entitlement wasn't correctly retrieved from the token
     vos = []
-    for i in user_infos.get('eduperson_entitlement'):
+    for i in user_infos.get('eduperson_entitlement', []):
+        # Parse Virtual Organizations manually from URNs
+        # If more complexity is need in the future, check https://github.com/oarepo/urnparse
         ent_i = re.search(r"group:(.+?):", i)
         if ent_i:  # your entitlement has indeed a group `tag`
             vos.append(ent_i.group(1))
-
-    # Filter VOs to keep only the ones relevant to us
-    vos = set(vos).intersection(
-        set(MAIN_CONF['auth']['VO'])
-    )
-    vos = sorted(vos)
-
-    # Check if VOs is empty after filtering
-    if not vos:
-        raise HTTPException(
-            status_code=401,
-            detail="You should belong to at least one of the Virtual Organizations " \
-                   f"supported by the project: {MAIN_CONF['auth']['VO']}.",
-            )
 
     # Generate user info dict
     for k in ['sub', 'iss', 'name', 'email']:
@@ -114,5 +90,5 @@ def check_vo_membership(
     if requested_vo not in user_vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organization does not match with any of your available VOs: {user_vos}."
+            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}."
             )
