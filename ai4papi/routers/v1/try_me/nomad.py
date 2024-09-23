@@ -77,7 +77,9 @@ def create_deployment(
                 for k in keys:
                     status[k] += node[k]
     for r in resources:
-        if status[f"{r}_total"] == 0 or status[f"{r}_used"] / status[f"{r}_total"] > 0.95:
+        if status[f"{r}_total"] == 0 or status[f"{r}_used"] / status[f"{r}_total"] > 0.85:
+            # We cut of somehow earlier than 100% because we are only accounting for
+            # cores consumed in "main" task. But UI task is also consuming resources.
             raise HTTPException(
                 status_code=503,
                 detail="Sorry, but there seem to be no resources available right " \
