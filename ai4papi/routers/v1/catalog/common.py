@@ -27,7 +27,7 @@ import re
 from typing import Tuple, Union
 import yaml
 
-import ai4_metadata
+import ai4_metadata.validate
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
 import requests
