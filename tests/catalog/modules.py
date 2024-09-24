@@ -16,7 +16,7 @@ modules_list2 = Modules.get_filtered_list(
     not_tags_any=None,
 )
 assert isinstance(modules_list2, list)
-assert 'deep-oc-generic-dev' in modules_list2
+assert 'ai4os-dev-env' in modules_list2
 
 # Get modules summaries
 modules_sum = Modules.get_summary(

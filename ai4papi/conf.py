@@ -81,6 +81,15 @@ for tool_path in tool_list:
         }
     }
 
+# OSCAR template
+with open(paths['conf'] / 'oscar.yaml', 'r') as f:
+    OSCAR_TMPL = Template(f.read())
+
+# Try-me endpoints
+nmd = load_nomad_job(paths['conf'] / 'try_me' / 'nomad.hcl')
+TRY_ME = {
+    'nomad': nmd,
+}
 
 # Retrieve git info from PAPI, to show current version in the docs
 papi_commit = subprocess.run(

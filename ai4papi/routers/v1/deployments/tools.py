@@ -182,6 +182,9 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
+
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(
         conf=user_conf,

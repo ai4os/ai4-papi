@@ -228,7 +228,7 @@ class Catalog:
         items = self.get_items()
         if item_name not in items.keys():
             raise HTTPException(
-                status_code=400,
+                status_code=404,
                 detail=f"Item {item_name} not in catalog: {list(items.keys())}",
                 )
 
