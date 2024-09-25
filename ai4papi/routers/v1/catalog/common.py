@@ -166,8 +166,8 @@ class Catalog:
             # validation. So we have to validate them, just in case we have naughty users.
             if metadata:
                 try:
-                    schema = open(ai4_metadata.get_schema("2.0.0"), "r")
-                    ai4_metadata.validate.validate(instance=metadata, schema_file=schema)
+                    schema = ai4_metadata.get_schema("2.0.0")
+                    ai4_metadata.validate.validate(instance=metadata, schema=schema)
                 except Exception:
                     error = \
                         "The metadata of this module has failed to comply with the " \
