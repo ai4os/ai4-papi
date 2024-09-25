@@ -22,7 +22,6 @@ ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hasha
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
-import configparser
 import re
 from typing import Tuple, Union
 import yaml
@@ -70,92 +69,16 @@ class Catalog:
         not_tags_any: Union[Tuple, None] = Query(default=None),
         ):
         """
-        Retrieve a list of all items, optionally filtering by tags.
+        Retrieve a list of all items.
 
-        The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
-        * `tags`: Items that contain all of the specified tags
-        * `tags-any`: Items that contain at least one of the specified tags
-        * `not-tags`: Items that do not contain exactly all of the specified tags
-        * `not-tags-any`: Items that do not contain any one of the specified tags
-
-        You can also use wildcards:
-        * `image*` matches all tags _starting_ with "image"
-        * `*image` matches all tags _ending_ with "image"
-        * `*image*` matches all tags _containing_ the substring "image"
-
-        #TODO: with the new metadata, there are now several tag-like fields (tags,
-        tasks, categories, libraries, datatype, etc). If we want to keep allowing
-        filter modules by tags we should allow filtering by all these fields.
-        Otherwise we can remove the filtering option and breaks backwards compatibility.
+        Tag-related fields are kept to avoid breaking backward-compatibility but
+        aren't actually serving any purpose.
         """
         # Retrieve all modules
         modules = list(self.get_items().keys())
         # (!): without list(...) FastAPI throws weird error
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
-        if any([tags, tags_any, not_tags, not_tags_any]):  # apply filtering
-
-            # Move to tag dict for easier manipulation (wildcard substitution)
-            td = {
-                'tags': tags if tags else [],
-                'tags_any': tags_any if tags_any else [],
-                'not_tags': not_tags if not_tags else [],
-                'not_tags_any': not_tags_any if not_tags_any else [],
-            }
-
-            # Replace the wildcards with actual tags
-            all_tags = self.get_tags()
-            for k, v in td.items():
-
-                new_tags = []
-                for i in v:
-                    matched_tags = None
-                    if i.startswith('*') and i.endswith('*'):
-                        matched_tags = [j for j in all_tags if (i[1:-1] in j)]
-                    elif i.startswith('*'):
-                        matched_tags = [j for j in all_tags if j.endswith(i[1:])]
-                    elif i.endswith('*'):
-                        matched_tags = [j for j in all_tags if j.startswith(i[:-1])]
-
-                    if matched_tags:
-                        new_tags += matched_tags
-                    else:
-                        new_tags.append(i)
-
-                td[k] = new_tags
-
-            # Filter modules
-            fmodules = []
-            for m in modules:
-                mtags = set(
-                    self.get_metadata(m)['tags']
-                )
-
-                conditions = []
-                if td['tags']:
-                    conditions.append(
-                        len(mtags.intersection(td['tags'])) == len(td['tags'])
-                    )
-                if td['tags_any']:
-                    conditions.append(
-                        len(mtags.intersection(td['tags_any'])) != 0
-                    )
-                if td['not_tags']:
-                    conditions.append(
-                        len(mtags.intersection(td['not_tags'])) != len(td['not_tags'])
-                    )
-                if td['not_tags_any']:
-                    conditions.append(
-                        len(mtags.intersection(td['not_tags_any'])) == 0
-                    )
-
-                if all(conditions):
-                    fmodules.append(m)
-
-            return fmodules
-
-        else:  # no filtering applied
-            return modules
-
+        return modules
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_summary(
@@ -166,28 +89,14 @@ class Catalog:
         not_tags_any: Union[Tuple, None] = Query(default=None),
         ):
         """
-        Retrieve a list of all items' basic metadata, optionally filtering items by tags.
-        Basic metadata is everything except lengthier fields (ie. description, links)
+        Retrieve a list of all items' basic metadata.
 
-        The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
-        * `tags`: Items that contain all of the specified tags
-        * `tags-any`: Items that contain at least one of the specified tags
-        * `not-tags`: Items that do not contain exactly all of the specified tags
-        * `not-tags-any`: Items that do not contain any one of the specified tags
-
-        You can also use wildcards:
-        * `image*` matches all tags _starting_ with "image"
-        * `*image` matches all tags _ending_ with "image"
-        * `*image*` matches all tags _containing_ the substring "image"
+        Tag-related fields are kept to avoid breaking backward-compatibility but
+        aren't actually serving any purpose.
         """
+        modules = self.get_filtered_list()
         summary = []
-        ignore = ['description', 'links']
-        modules = self.get_filtered_list(
-            tags=tags,
-            tags_any=tags_any,
-            not_tags=not_tags,
-            not_tags_any=not_tags_any,
-            )
+        ignore = ['description', 'links']  # don't send this info to decrease latency
         for m in modules:
             try:
                 meta1 = self.get_metadata(m)
@@ -201,19 +110,15 @@ class Catalog:
         return summary
 
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_tags(
         self,
         ):
         """
         Retrieve a list of all the existing tags.
+        Now deprecated, kept to avoid breaking backward-compatibility.
+        Returns an empty list.
         """
-        tags = []
-        for m in self.get_items().keys():
-            meta = self.get_metadata(m)
-            tags += meta['tags']
-        tags = sorted(set(tags))
-        return tags
+        return []
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
