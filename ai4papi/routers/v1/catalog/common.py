@@ -217,8 +217,6 @@ class Catalog:
             metadata['dates']['created'] = gh_info.get('created', '')
             metadata['dates']['updated'] = gh_info.get('updated', '')
             metadata['license'] = gh_info.get('license', '')
-        else:
-            print(f"   [Error] Failed to parse Github: {items[item_name]['url']}")
 
         # Add Jenkins CI/CD links
         metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/AI4OS-hub/job/{item_name}/job/{branch}/"

@@ -210,6 +210,7 @@ def get_github_info(owner, repo):
         out['license'] = (repo_data['license'] or {}).get('spdx_id', '')
         # out['stars'] = repo_data['stargazers_count']
     else:
-        print(f'Failed to parse Github repo: {owner}/{repo}')
+        msg = "API rate limit exceeded" if r.status_code == 403 else ""
+        print(f'  [Error] Failed to parse Github repo info: {msg}')
 
     return out
