@@ -4,6 +4,7 @@ Manage configurations of the API.
 
 from pathlib import Path
 from string import Template
+import subprocess
 
 import yaml
 
@@ -88,3 +89,28 @@ tools_nomad2id = {
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():
         raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
+
+# OSCAR template
+with open(paths['conf'] / 'oscar.yaml', 'r') as f:
+    OSCAR_TMPL = Template(f.read())
+
+# Try-me endpoints
+nmd = load_nomad_job(paths['conf'] / 'try_me' / 'nomad.hcl')
+TRY_ME = {
+    'nomad': nmd,
+}
+
+# Retrieve git info from PAPI, to show current version in the docs
+papi_commit = subprocess.run(
+    ['git', 'log', '-1', '--format=%H'],
+    stdout=subprocess.PIPE,
+    text=True,
+    cwd=main_path,
+    ).stdout.strip()
+papi_branch = subprocess.run(
+    ['git', 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
+    stdout=subprocess.PIPE,
+    text=True,
+    cwd=main_path,
+    ).stdout.strip()
+papi_branch = papi_branch.split('/')[-1]  # remove the "origin/" part

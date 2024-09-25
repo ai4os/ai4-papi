@@ -43,10 +43,7 @@ def get_config(
     conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Custom conf for development environment
-    if item_name == 'ai4os-dev-env' or item_name == 'deep-oc-generic-dev':
-        #TODO: remove second condition when 'deep-oc-generic-dev' is removed from the
-        # modules catalog
-
+    if item_name == 'ai4os-dev-env':
         # For dev-env, order the tags in "Z-A" order instead of "newest"
         # This is done because builds are done in parallel, so "newest" is meaningless
         # (Z-A + natsort) allows to show more recent semver first

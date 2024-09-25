@@ -200,6 +200,9 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
+
     # Check if the provided configuration is within the job quotas
     # Skip this check with CVAT because it does not have a "hardware" section in the conf
     if tool_name not in ['ai4os-cvat']:
