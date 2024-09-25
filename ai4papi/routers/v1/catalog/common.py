@@ -129,6 +129,8 @@ class Catalog:
         """
         Get the item's full metadata.
         """
+        print(f"Retrieving metadata from {item_name}")
+
         # Check if item is in the items list
         items = self.get_items()
         if item_name not in items.keys():
@@ -176,7 +178,7 @@ class Catalog:
 
         # If any of the previous steps raised an error, load a metadata placeholder
         if error:
-            print(f"  Error: {error}")
+            print(f"  [Error] {error}")
             metadata = {
                 "metadata_version": "2.0.0",
                 "title": item_name,
@@ -216,7 +218,7 @@ class Catalog:
             metadata['dates']['updated'] = gh_info.get('updated', '')
             metadata['license'] = gh_info.get('license', '')
         else:
-            print(f"Failed to parse owner/repo in {items[item_name]['url']}")
+            print(f"   [Error] Failed to parse Github: {items[item_name]['url']}")
 
         # Add Jenkins CI/CD links
         metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/AI4OS-hub/job/{item_name}/job/{branch}/"
