@@ -24,6 +24,7 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 
 import configparser
 import json
+import re
 from typing import Tuple, Union
 
 from cachetools import cached, TTLCache

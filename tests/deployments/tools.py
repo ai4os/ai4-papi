@@ -21,6 +21,7 @@ that ENV variable.'
 # Create tool
 rcreate = tools.create_deployment(
     vo='vo.ai4eosc.eu',
+    tool_name='ai4os-federated-server',
     conf={},
     authorization=SimpleNamespace(
         credentials=token
