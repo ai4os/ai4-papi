@@ -503,10 +503,10 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
           #!/bin/bash
-          CLICKHOUSE_DB="$${CLICKHOUSE_DB:-cvat}";
-          clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $${CLICKHOUSE_DB};"
+          CLICKHOUSE_DB="$$$${CLICKHOUSE_DB:-cvat}";
+          clickhouse-client --query "CREATE DATABASE IF NOT EXISTS $$$${CLICKHOUSE_DB};"
           echo "
-          CREATE TABLE IF NOT EXISTS $${CLICKHOUSE_DB}.events
+          CREATE TABLE IF NOT EXISTS $$$${CLICKHOUSE_DB}.events
           (
               \`scope\` String NOT NULL,
               \`obj_name\` String NULL,
