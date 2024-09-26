@@ -274,7 +274,7 @@ def get_deployment(
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
         info['status'] = 'error'
-        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
+        info['error_msg'] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
         # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."

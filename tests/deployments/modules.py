@@ -29,6 +29,8 @@ rcreate = modules.create_deployment(
 assert isinstance(rcreate, dict)
 assert 'job_ID' in rcreate.keys()
 
+time.sleep(0.2)  # Nomad takes some time to allocate deployment
+
 # Retrieve that module
 rdep = modules.get_deployment(
     vo='vo.ai4eosc.eu',
@@ -40,6 +42,7 @@ rdep = modules.get_deployment(
 assert isinstance(rdep, dict)
 assert 'job_ID' in rdep.keys()
 assert rdep['job_ID']==rcreate['job_ID']
+assert rdep['status']!='error'
 
 # Retrieve all modules
 rdeps = modules.get_deployments(
@@ -50,6 +53,7 @@ rdeps = modules.get_deployments(
 )
 assert isinstance(rdeps, list)
 assert any([d['job_ID']==rcreate['job_ID'] for d in rdeps])
+assert all([d['job_ID']!='error' for d in rdeps])
 
 # Check that we cannot retrieve that module from tools
 # This should break!
@@ -79,9 +83,10 @@ rdel = modules.delete_deployment(
         credentials=token
     ),
 )
-time.sleep(3)  # Nomad takes some time to delete
 assert isinstance(rdel, dict)
 assert 'status' in rdel.keys()
+
+time.sleep(3)  # Nomad takes some time to delete
 
 # Check module no longer exists
 rdeps3 = modules.get_deployments(
