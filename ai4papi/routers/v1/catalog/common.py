@@ -191,8 +191,8 @@ class Catalog:
                     },
                 "links": {
                     "documentation": "",
-                    "source_code": f"https://github.com/ai4oshub/{item_name}",
-                    "docker_image": f"ai4os-hub/{item_name}",
+                    "source_code": f"https://github.com/ai4os-hub/{item_name}",
+                    "docker_image": f"ai4oshub/{item_name}",
                     "ai4_template": "",
                     "dataset": "",
                     "weights": "",
