@@ -56,7 +56,7 @@ hardware:
   ram:
     name: RAM memory (in MB)
     value: 2000
-    range: [2000, 4000]
+    range: [2000, 8000]
 
   disk:
     name: Disk memory (in MB)
