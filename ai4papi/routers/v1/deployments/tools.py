@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import datetime
 import re
 import secrets
 import types
@@ -323,6 +324,13 @@ def create_deployment(
                 )
 
         # Replace the Nomad job template
+        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        job_title = re.sub(
+            r'[<>:"/\\|?* ]',
+            '_',
+            user_conf['general']['title'][:45],
+            )  # make title foldername-friendly
+
         nomad_conf = nomad_conf.safe_substitute(
             {
                 'JOB_UUID': job_uuid,
@@ -337,6 +345,8 @@ def create_deployment(
                 'HOSTNAME': hostname,
                 'CVAT_USERNAME': user_conf['general']['cvat_username'],
                 'CVAT_PASSWORD': user_conf['general']['cvat_password'],
+                'RESTORE_FROM': user_conf['general']['cvat_backup'],
+                'BACKUP_NAME': f'{current_date}_{job_title}',
                 'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
                 'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
                 'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],

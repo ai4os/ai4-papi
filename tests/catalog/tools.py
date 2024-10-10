@@ -1,5 +1,21 @@
+
+import os
+from types import SimpleNamespace
+
 from ai4papi.routers.v1.catalog.tools import Tools
 
+
+# Retrieve EGI token (not generated on the fly in case the are rate limiting issues
+# if too many queries)
+token = os.getenv('TMP_EGI_TOKEN')
+if not token:
+    raise Exception(
+'Please remember to set a token as ENV variable before executing \
+the tests! \n\n \
+   export TMP_EGI_TOKEN="$(oidc-token egi-checkin)" \n\n \
+If running from VScode make sure to launch `code` from that terminal so it can access \
+that ENV variable.'
+        )
 
 # List tools
 tools_list = list(Tools.get_items().keys())
@@ -40,10 +56,19 @@ for tool_name in tools_list:
 
     print(f'  - Testing {tool_name}')
 
+    if tool_name == 'ai4os-cvat':
+        extra = {'storage_name': 'share.services.ai4os.eu'}
+    else:
+        extra = {}
+
     # Get tool config
     tool_conf = Tools.get_config(
         item_name=tool_name,
         vo='vo.ai4eosc.eu',
+        additional_info=extra,
+        authorization=SimpleNamespace(
+            credentials=token
+        ),
     )
     assert isinstance(tool_conf, dict)
     assert 'general' in tool_conf.keys()

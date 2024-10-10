@@ -62,6 +62,8 @@ job "tool-cvat-${JOB_UUID}" {
     cvat_version_custom                = "-AI4OS"
     cvat_hostname                      = "${meta.domain}-${BASE_DOMAIN}"
     job_uuid                           = "${JOB_UUID}"
+    restore_from                       = "${RESTORE_FROM}"
+    backup_name                        = "${BACKUP_NAME}"
 
     grafana_clickhouse_plugin_version  = "3.3.0"
     smokescreen_opts                   = ""

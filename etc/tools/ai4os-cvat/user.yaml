@@ -37,6 +37,12 @@ general:
     value: ''
     description: Select a password for your CVAT instance.
 
+  cvat_backup:
+    name: CVAT backups
+    value: ''
+    options: ['']
+    description: CVAT backup where to restore from
+
 storage:
 
   rclone_conf:

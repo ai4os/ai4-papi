@@ -30,6 +30,10 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # ENV FORWARDED_ALLOW_IPS="*"
 ENV FORWARDED_ALLOW_IPS=172.16.44.228
 
+# Install rclone (for checking backups in CVAT)
+RUN curl -O https://downloads.rclone.org/v1.62.2/rclone-v1.62.2-linux-amd64.deb \
+    && apt install ./rclone-v1.62.2-linux-amd64.deb
+
 # Install API
 WORKDIR /home/ai4-papi
 COPY . .
