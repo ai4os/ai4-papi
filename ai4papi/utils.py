@@ -185,7 +185,8 @@ def validate_conf(conf):
     return conf
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+#TODO: temporarily parse every 24hrs (instead of 6hrs) to reduce a bit the latency
+@cached(cache=TTLCache(maxsize=1024, ttl=24*60*60))
 def get_github_info(owner, repo):
     """
     Retrieve information from a Github repo
