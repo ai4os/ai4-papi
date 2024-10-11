@@ -194,6 +194,37 @@ job "module-${JOB_UUID}" {
 
     }
 
+    task "email-notification" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        image = "registry.services.ai4os.eu/ai4os/docker-mail:client"
+      }
+
+      env {
+        NUM_DAYS="7"  # if the job takes more than this to deploy, then we notify the users
+        DATE="${TODAY}"  # when the job was created by the user
+        DEST="${OWNER_EMAIL}"
+        BODY="Dear ${OWNER_NAME}, \n\nyour deployment \"${TITLE}\", created on ${TODAY}, is now ready to use. \nYou can access it at the ${PROJECT_NAME} Dashboard. \nRemember to delete the deployment in case you no longer need it! \n\nRegards, \n\n[The AI4EOSC Support Team]"
+        SUBJECT="[AI4EOSC Support] Your job is ready! 🚀️"
+        MAILING_TOKEN="${MAILING_TOKEN}"
+      }
+
+      resources {
+        cores  = 1
+      }
+
+      restart {
+        attempts = 0
+        mode     = "fail"
+      }
+    }
+
     task "main" {
       // Task configured by the user (deepaas, jupyter, vscode)
 

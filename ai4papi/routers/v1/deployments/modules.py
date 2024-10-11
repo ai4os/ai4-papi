@@ -1,4 +1,6 @@
 from copy import deepcopy
+import datetime
+import os
 import re
 import types
 from typing import Tuple, Union
@@ -249,6 +251,9 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+            'MAILING_TOKEN': os.getenv("MAILING_TOKEN", default=""),
+            'PROJECT_NAME': papiconf.MAIN_CONF['nomad']['namespaces'][vo].upper(),
+            'TODAY': str(datetime.date.today()),
         }
     )
 
