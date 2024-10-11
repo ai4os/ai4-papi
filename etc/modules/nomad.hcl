@@ -209,10 +209,10 @@ job "module-${JOB_UUID}" {
       env {
         NUM_DAYS="7"  # if the job takes more than this to deploy, then we notify the users
         DATE="${TODAY}"  # when the job was created by the user
-        DEST="${OWNER_EMAIL}"
-        BODY="Dear ${OWNER_NAME}, \n\nyour deployment \"${TITLE}\", created on ${TODAY}, is now ready to use. \nYou can access it at the ${PROJECT_NAME} Dashboard. \nRemember to delete the deployment in case you no longer need it! \n\nRegards, \n\n[The AI4EOSC Support Team]"
-        SUBJECT="[AI4EOSC Support] Your job is ready! 🚀️"
         MAILING_TOKEN="${MAILING_TOKEN}"
+        DEST="${OWNER_EMAIL}"
+        SUBJECT="[AI4EOSC Support] Your job is ready! 🚀️"
+        BODY="Dear ${OWNER_NAME}, \n\nyour deployment \"${TITLE}\", created on ${TODAY}, is now ready to use. \nYou can access it at the ${PROJECT_NAME} Dashboard. \nRemember to delete the deployment in case you no longer need it! \n\nRegards, \n\n[The AI4EOSC Support Team]"
       }
 
       resources {
