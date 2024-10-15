@@ -14,7 +14,7 @@ main_path = Path(__file__).parent.absolute()
 paths = {
     "conf": main_path.parent / "etc",
     "media": main_path / "media",
-    }
+}
 
 # Load main API configuration
 with open(paths['conf'] / 'main.yaml', 'r') as f:
@@ -43,13 +43,9 @@ def load_yaml_conf(fpath):
         conf_values[group_name] = {}
         for k, v in params.items():
             if 'name' not in v.keys():
-                raise Exception(
-                    f"Parameter {k} needs to have a name."
-                )
+                raise Exception(f"Parameter {k} needs to have a name.")
             if 'value' not in v.keys():
-                raise Exception(
-                    f"Parameter {k} needs to have a value."
-                )
+                raise Exception(f"Parameter {k} needs to have a value.")
             conf_values[group_name][k] = v['value']
 
     return conf_full, conf_values
@@ -63,7 +59,7 @@ MODULES = {
     'user': {
         'full': yml[0],
         'values': yml[1],
-    }
+    },
 }
 
 # Tools
@@ -78,7 +74,7 @@ for tool_path in tool_list:
         'user': {
             'full': yml[0],
             'values': yml[1],
-        }
+        },
     }
 
 # OSCAR template
@@ -91,17 +87,23 @@ TRY_ME = {
     'nomad': nmd,
 }
 
+# Snapshot endpoints
+nmd = load_nomad_job(paths['conf'] / 'snapshots' / 'nomad.hcl')
+SNAPSHOTS = {
+    'nomad': nmd,
+}
+
 # Retrieve git info from PAPI, to show current version in the docs
 papi_commit = subprocess.run(
     ['git', 'log', '-1', '--format=%H'],
     stdout=subprocess.PIPE,
     text=True,
     cwd=main_path,
-    ).stdout.strip()
+).stdout.strip()
 papi_branch = subprocess.run(
     ['git', 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'],
     stdout=subprocess.PIPE,
     text=True,
     cwd=main_path,
-    ).stdout.strip()
+).stdout.strip()
 papi_branch = papi_branch.split('/')[-1]  # remove the "origin/" part

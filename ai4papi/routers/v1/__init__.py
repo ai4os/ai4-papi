@@ -1,6 +1,6 @@
 import fastapi
 
-from . import catalog, deployments, inference, secrets, stats, try_me
+from . import catalog, deployments, inference, secrets, stats, try_me, snapshots
 
 
 app = fastapi.APIRouter()
@@ -10,6 +10,8 @@ app.include_router(inference.app)
 app.include_router(secrets.router)
 app.include_router(stats.app)
 app.include_router(try_me.app)
+app.include_router(snapshots.app)
+
 
 
 @app.get(
