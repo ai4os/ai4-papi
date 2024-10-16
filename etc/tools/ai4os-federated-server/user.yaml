@@ -126,7 +126,7 @@ configuration:
 
   noise_mult:
     name: Noise multiplier
-    value: 0.5
+    value: 1
     range: [0.1, null]
     description: Noise multiplier for the Gaussian mechanism.
 
