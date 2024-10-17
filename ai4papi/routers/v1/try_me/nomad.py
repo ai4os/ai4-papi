@@ -38,7 +38,7 @@ def create_deployment(
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
-    docker_image = meta['sources']['docker_registry_repo']
+    docker_image = meta['links']['docker_image']
 
     # Load module configuration
     nomad_conf = deepcopy(papiconf.TRY_ME['nomad'])
