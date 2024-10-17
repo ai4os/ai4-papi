@@ -113,6 +113,7 @@ def get_deployment(
 @router.post("/")
 def create_deployment(
     module_name: str,
+    title: str = Query(default=""),
     authorization=Depends(security),
     ):
     """
@@ -139,6 +140,7 @@ def create_deployment(
         {
             'JOB_UUID': job_uuid,
             'NAMESPACE': NAMESPACE,
+            'TITLE': title[:45],
             'OWNER': auth_info['id'],
             'OWNER_NAME': auth_info['name'],
             'OWNER_EMAIL': auth_info['email'],
