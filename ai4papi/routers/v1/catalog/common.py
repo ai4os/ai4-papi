@@ -176,6 +176,18 @@ class Catalog:
                         "specifications of the AI4EOSC Platform (see the " \
                         "[metadata validator](https://github.com/ai4os/ai4-metadata))."
 
+                # Make sure the repo belongs to one of supported orgs
+                pattern = r"https:\/\/github\.com\/([^\/]+)\/"
+                match = re.search(pattern, metadata['links']['source_code'])
+                if match:
+                    github_org = match.group(1)
+                else:
+                    github_org = None
+                    error = \
+                        "This module belongs to a Github organization not supported by " \
+                        "the project. If you are the developer of this module, please " \
+                        "check the \"source_code\" link in your metadata."
+
         # If any of the previous steps raised an error, load a metadata placeholder
         if error:
             print(f"  [Error] {error}")
@@ -219,6 +231,10 @@ class Catalog:
             metadata['license'] = gh_info.get('license', '')
 
         # Add Jenkins CI/CD links
+        if github_org:
+            metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
+            metadata['links']['cicd_badge'] = f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+
         # Add DockerHub
         # TODO: when the migration is finished, we have to generate the url from the module name
         # (ie. ignore the value coming from the metadata)
