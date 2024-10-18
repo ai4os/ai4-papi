@@ -268,8 +268,7 @@ def create_deployment(
             'DP': user_conf['configuration']['dp'],
             'NOISE_MULT': user_conf['configuration']['noise_mult'],
             'SAMPLED_CLIENTS': user_conf['configuration']['sampled_clients'],
-            'CLIP_NORM': user_conf['configuration']['clip_norm'],
-            'LR_NORM': user_conf['configuration']['lr_norm']
+            'CLIP_NORM': user_conf['configuration']['clip_norm']
         }
     )
 

@@ -141,9 +141,3 @@ configuration:
     value: 0.1
     range: [0.1, null]
     description: Threshold value for the clipping.
-
-  lr_norm:
-    name: Learning rate
-    value: 0.2
-    range: [0.1, null]
-    description: Learning rate for the clipping norm.
