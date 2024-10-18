@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.3.0](https://github.com/ai4os/ai4-papi/compare/v1.2.0...v1.3.0) (2024-10-18)
+
+
+### Features
+
+* add current PAPI branch+commit in the docs' description ([c5bca42](https://github.com/ai4os/ai4-papi/commit/c5bca42e326d0d01288c9e7895ff6d23179a2d16))
+* add email notification when slow deployment times ([#60](https://github.com/ai4os/ai4-papi/issues/60)) ([22b066c](https://github.com/ai4os/ai4-papi/commit/22b066c253cc09cb2992bfe875134a2d4e369fbf))
+* add support for OSCAR services ([#25](https://github.com/ai4os/ai4-papi/issues/25)) ([5954569](https://github.com/ai4os/ai4-papi/commit/5954569dc7abcf128a466205cd6cd0188bc1ad6c))
+* be conservative with tryme resource cap ([4026f7a](https://github.com/ai4os/ai4-papi/commit/4026f7af1000a6caf0af291b0f30715a4dab7448))
+* **catalog:** point FL server to new repo ([d5075cc](https://github.com/ai4os/ai4-papi/commit/d5075cc008640ac54013936eacca7453af1921aa))
+* enforce docker image to belong to either `deephdc` or `ai4oshub` DockerHub orgs (or our Harbor) ([78fe123](https://github.com/ai4os/ai4-papi/commit/78fe123d0a378b2e12feb6999b9051a4dc3e4600))
+* increase RAM for fedserver ([028b28e](https://github.com/ai4os/ai4-papi/commit/028b28eaf4e9fe5f4f102832ec939146065b532c))
+* migrate to new metadata ([#63](https://github.com/ai4os/ai4-papi/issues/63)) ([14146a5](https://github.com/ai4os/ai4-papi/commit/14146a5bac0487058189945edd605291d525de43))
+* overwrite some metadata with Github info ([6964cbe](https://github.com/ai4os/ai4-papi/commit/6964cbe150b4b13acc3efaa7418a7fc4c15acb36))
+* support AI4Life project (`vo.ai4life.eu`) ([#57](https://github.com/ai4os/ai4-papi/issues/57)) ([f183423](https://github.com/ai4os/ai4-papi/commit/f18342304a7ca13db588bd7ae4a006547468c072))
+* support try-me endpoints in Nomad ([#59](https://github.com/ai4os/ai4-papi/issues/59)) ([de9b373](https://github.com/ai4os/ai4-papi/commit/de9b3736af5b6098fb7257e0378cb58567e351db))
+
+
+### Bug Fixes
+
+* add more statuses when allowing purging ([5b4c67f](https://github.com/ai4os/ai4-papi/commit/5b4c67f9a0796bf5d78d723c0a06eadd44a2ffbd))
+* allow purging stuck Nomad jobs (`status=queued`) ([21be7a2](https://github.com/ai4os/ai4-papi/commit/21be7a2acb6e01ae9f497f9c41f4dc2933d11d15))
+* avoid checking for vo membership in `get_user_info` ([9c0243f](https://github.com/ai4os/ai4-papi/commit/9c0243f37a33e137ec327ec3fb98a0bc37cefec9))
+* better catch missing tryme resources ([dda2ff3](https://github.com/ai4os/ai4-papi/commit/dda2ff362e636ac0741722bd61d89bfeb2cfbccb))
+* change found status code ([a99746e](https://github.com/ai4os/ai4-papi/commit/a99746e19ce9e2619f8a254b01ab257e235d26ae))
+* correct some references to old federated server ([61204dc](https://github.com/ai4os/ai4-papi/commit/61204dc9846ae7f6900a4d0e402ffc70a2a1831b))
+* fix CI/CD link for tools ([d6cacfb](https://github.com/ai4os/ai4-papi/commit/d6cacfb8e231fc6ffb15fee1cb08f289c7e37832))
+* fix Dockerhub link ([e950cb9](https://github.com/ai4os/ai4-papi/commit/e950cb958e06c86d31223f9b45d62cb7bac7a388))
+* fix retrieval of Github license ([d8a3161](https://github.com/ai4os/ai4-papi/commit/d8a31614d274f390f829aa9d00147aaea891a355))
+* handle case where user does not belong to VO supported by the project ([4f67727](https://github.com/ai4os/ai4-papi/commit/4f67727e435a4de7120862f72ac40bd2aabb9105))
+* improve `get_metadata()` logic ([772dbcd](https://github.com/ai4os/ai4-papi/commit/772dbcd74440a81578c46e6c1d741db3878c5716))
+* only parse ready nodes ([6e3fa32](https://github.com/ai4os/ai4-papi/commit/6e3fa3200ead028b534ede2a1ad993ad2aa6d413))
+* properly cache `cluster` stats endpoint ([b7f2fb8](https://github.com/ai4os/ai4-papi/commit/b7f2fb85e576c1339e350a55ff78ff2fee8da85d))
+* remove references to old `deep-oc-generic-dev` ([9129dbd](https://github.com/ai4os/ai4-papi/commit/9129dbdf3083f8d0d7bd8534673101f95fcbf700))
+* stats compute should run on the background ([e9ac53d](https://github.com/ai4os/ai4-papi/commit/e9ac53d3bcf31b3b6bbe303f678cdcd2621605d0))
+* **stats:** account for federated cluster migration ([ab1d208](https://github.com/ai4os/ai4-papi/commit/ab1d208aa6807ad4be7553c31e63040e9ca9bd1d))
+* **stats:** allow initializing cluster stats when PAPI is used as package ([66898f9](https://github.com/ai4os/ai4-papi/commit/66898f9277cb705bd297b40d8cb485f7ba4e03a9))
+* **stats:** return reserved disk ([7b2ed94](https://github.com/ai4os/ai4-papi/commit/7b2ed94603b1754a659d08fac806264027239557))
+
 ## [1.2.0](https://github.com/ai4os/ai4-papi/compare/v1.1.0...v1.2.0) (2024-08-05)
 
 
