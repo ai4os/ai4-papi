@@ -130,9 +130,11 @@ def run(
 
 # Compute cluster stats in background task
 @repeat_every(seconds=30)
-async def get_cluster_stats_thread():
+def get_cluster_stats_thread():
     """
     Recompute cluster stats
+    Do *not* run as async to avoid blocking the main event.
+    ref: https://stackoverflow.com/questions/67599119/fastapi-asynchronous-background-tasks-blocks-other-requests
     """
     get_cluster_stats_bg.cache_clear()
     get_cluster_stats_bg()
