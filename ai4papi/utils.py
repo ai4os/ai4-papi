@@ -9,6 +9,8 @@ from cachetools import cached, TTLCache
 from fastapi import HTTPException
 import requests
 
+import ai4papi.conf as papiconf
+
 
 # Persistent requests session for faster requests
 session = requests.Session()
@@ -191,6 +193,12 @@ def get_github_info(owner, repo):
     """
     Retrieve information from a Github repo
     """
+    # Avoid running this function if were are doing local development, because
+    # repeatedly calling the Github API will otherwise get you blocked
+    if papiconf.IS_DEV:
+        print('[info] Skipping Github API info fetching (development).')
+        return {}
+
     # Retrieve information from Github API
     url = f"https://api.github.com/repos/{owner}/{repo}"
     headers = {'Authorization': f'token {github_token}'} if github_token else {}

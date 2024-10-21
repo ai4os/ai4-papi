@@ -10,6 +10,13 @@ Nomad (ie. after launching)
 #TODO: move to proper testing package
 #TODO: rename test script: modules --> test_modules
 
+import ai4papi.conf as papiconf
+
+
+# We want to test full functionality, without disabling any parts
+papiconf.IS_DEV = False
+
+
 import catalog.modules
 import catalog.tools
 import deployments.modules
