@@ -1,20 +1,24 @@
+"""
+Make snapshots to Harbor from Nomad deployments
+"""
+from copy import deepcopy
+import datetime
 import os
-from types import SimpleNamespace
 import types
 from typing import Tuple, Union
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
-from copy import deepcopy
 from harborapi import HarborAsyncClient
 import nomad as nomadAPI
-import uuid
-import datetime
 
 from ai4papi import auth
 from ai4papi.routers.v1 import deployments
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 import ai4papi.nomad.patches as nomad_patches
+
 
 router = APIRouter(
     prefix="/snapshots",
@@ -34,7 +38,7 @@ Nomad.job.get_allocations = types.MethodType(nomad_patches.get_allocations, Noma
 security = HTTPBearer()
 
 
-@router.get("/")
+@router.get("")
 async def get_snapshots(authorization=Depends(security)):
     auth_info = auth.get_user_info(token=authorization.credentials)
 
@@ -66,7 +70,7 @@ async def get_snapshots(authorization=Depends(security)):
     )
 
     nomad_jobs = get_snapshots_jobs(
-        authorization=SimpleNamespace(credentials=authorization.credentials), vos=vos
+        authorization=types.SimpleNamespace(credentials=authorization.credentials), vos=vos
     )
 
     r = []
@@ -121,7 +125,7 @@ async def get_snapshots(authorization=Depends(security)):
     return r
 
 
-@router.post("/")
+@router.post("")
 async def create_snapshot(
     target: str = Query(..., description="The target job UUID"),
     authorization=Depends(security),
@@ -147,7 +151,7 @@ async def create_snapshot(
             vo=vo,
             deployment_uuid=target,
             full_info=True,
-            authorization=SimpleNamespace(credentials=authorization.credentials),
+            authorization=types.SimpleNamespace(credentials=authorization.credentials),
         )
 
         if job:
@@ -192,7 +196,7 @@ async def create_snapshot(
     return r
 
 
-@router.delete("/")
+@router.delete("")
 async def delete_snapshot(authorization=Depends(security), snapshot: str = Query(...)):
     auth_info = auth.get_user_info(token=authorization.credentials)
 

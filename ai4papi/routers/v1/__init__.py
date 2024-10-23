@@ -13,7 +13,6 @@ app.include_router(try_me.app)
 app.include_router(snapshots.app)
 
 
-
 @app.get(
     "/",
     summary="Get v1 version information.",
