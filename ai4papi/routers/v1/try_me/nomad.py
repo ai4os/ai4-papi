@@ -19,7 +19,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     module_name: str,
     authorization=Depends(security),

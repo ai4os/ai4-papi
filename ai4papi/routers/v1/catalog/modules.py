@@ -102,7 +102,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 router.add_api_route(
-    "/",
+    "",
     Modules.get_filtered_list,
     methods=["GET"],
     )
