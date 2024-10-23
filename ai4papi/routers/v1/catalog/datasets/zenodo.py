@@ -91,7 +91,7 @@ def _zenodo_proxy(
     return r.json()
 
 
-@router.post("/")
+@router.post("")
 def zenodo_proxy(
     api_route: str,
     params: Union[dict, None] = None,
