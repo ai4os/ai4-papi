@@ -11,10 +11,10 @@ replacing Nomad values
 
 job "snapshot-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
-  type      = "batch"       # try-me jobs should not be redeployed when exit_code=0
+  type      = "batch"         # snapshot jobs should not be redeployed when exit_code=0
   region    = "global"
   id        = "${JOB_UUID}"
-  priority  = "0"           # try-me jobs have low priority
+  priority  = "50"            # snapshot jobs have medium priority
 
   meta {
     owner       = "${OWNER}"  # user-id from OIDC
@@ -22,27 +22,10 @@ job "snapshot-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = ""
     description = ""
-    snapshot_name = "${FORMATED_OWNER}"
-    snapshot_label = "${TARGET_JOB_ID}_${TIMESTAMP}"
-    target_job_id = "${TARGET_JOB_ID}"
-    snapshot_job_id = "${JOB_UUID}"
-    snapshot_date = "${SNAPSHOT_DATE}"
+
+    snapshot_id = "${TARGET_JOB_ID}_${TIMESTAMP}"  # Harbor Docker image label
+    submit_time = "${SUBMIT_TIME}"
   }
-
-  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
-#  constraint {
-#    attribute = "${meta.status}"
-#    operator  = "regexp"
-#    value     = "ready"
-#  }
-
-  # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
-  # because Nomad does not allow a node to belong to several node pools)
-#  constraint {
-#    attribute = "${meta.namespace}"
-#    operator  = "regexp"
-#    value     = "${NAMESPACE}"
-#  }
 
   # Force snapshot job to land in the same node as target job
   constraint {
@@ -76,7 +59,7 @@ input_job_id=${TARGET_JOB_ID}
 
 container_ids=$(sudo docker ps -q)
 
-size_limit=$((15 * 1024 * 1024 * 1024))  # 15 GB en bytes
+size_limit=$((10 * 1024 * 1024 * 1024))  # 10 GB en bytes
 
 for container_id in $container_ids; do
 
@@ -86,25 +69,25 @@ for container_id in $container_ids; do
         if [ "$task_name" == "main" ]; then
 
                   job_id=$(sudo docker exec "$container_id" printenv NOMAD_JOB_ID)
-    
+
                   if [ "$job_id" == "$input_job_id" ]; then
-    
+
                           echo "$container_id"
 
                           container_size=$(sudo docker inspect --size --format='{{.SizeRootFs}}' "$container_id")
 
                           echo "$container_size"
-                                  
+
                           if [ "$container_size" -gt "$size_limit" ]; then
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is more than 15GB."
+                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is more than 10 GB."
                                   exit 1
                           else
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is less than 15GB."
+                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is less than 10 GB."
                                   exit 0
                           fi
-      
+
                   fi
-        
+
         fi
 done
 
@@ -148,12 +131,9 @@ for container_id in $container_ids; do
                         echo "Container ID: $container_id"
                         echo "Creating a snapshot of docker container"
 
-                        sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SNAPSHOT_DATE}"' $container_id ${FORMATED_OWNER}
+                        sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SNAPSHOT_DATE}" VO="${VO}"' $container_id ${FORMATTED_OWNER}
 
                         echo "Login on the registry"
-
-                        # username=$(cat login.json | jq -r .name)
-                        # password=$(cat login.json | jq -r .secret)
 
                         username='robot$user-snapshots+snapshot-api'
                         password='${HARBOR_ROBOT_PASSWORD}'
@@ -162,18 +142,18 @@ for container_id in $container_ids; do
 
                         echo "Uploading image to registry"
 
-                        sudo docker tag ${FORMATED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker tag ${FORMATTED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
 
-                        sudo docker tag ${FORMATED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker tag ${FORMATTED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
 
-                        if ! sudo docker push registry.services.ai4os.eu/user-snapshots/${FORMATED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}; then
-                            sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-                            sudo docker image rm ${FORMATED_OWNER}:latest
+                        if ! sudo docker push registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}; then
+                            sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                            sudo docker image rm ${FORMATTED_OWNER}:latest
                             exit 1
                         fi
 
-                        sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-                        sudo docker image rm ${FORMATED_OWNER}:latest
+                        sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker image rm ${FORMATTED_OWNER}:latest
 
                 fi
         fi
@@ -185,7 +165,7 @@ EOF
         ]
       }
     }
-    
+
     restart {
       attempts = 0
       mode     = "fail"
