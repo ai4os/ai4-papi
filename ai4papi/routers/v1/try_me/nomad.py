@@ -110,7 +110,7 @@ def get_deployment(
     return job
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     module_name: str,
     title: str = Query(default=""),
@@ -127,7 +127,8 @@ def create_deployment(
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
-    docker_image = meta['sources']['docker_registry_repo']
+    registry = meta['links']['docker_image']
+    docker_image = '/'.join(registry.split('/')[-2:])
 
     # Load module configuration
     nomad_conf = deepcopy(papiconf.TRY_ME['nomad'])
@@ -163,11 +164,13 @@ def create_deployment(
 
     for _, datacenter  in stats['datacenters'].items():
         for _, node in datacenter['nodes'].items():
-            if 'tryme' in node['tags']:
+            if 'tryme' in node['tags'] and node['status'] == 'ready':
                 for k in keys:
                     status[k] += node[k]
     for r in resources:
-        if status[f"{r}_used"] / status[f"{r}_total"] > 0.95:
+        if status[f"{r}_total"] == 0 or status[f"{r}_used"] / status[f"{r}_total"] > 0.85:
+            # We cut of somehow earlier than 100% because we are only accounting for
+            # cores consumed in "main" task. But UI task is also consuming resources.
             raise HTTPException(
                 status_code=503,
                 detail="Sorry, but there seem to be no resources available right " \

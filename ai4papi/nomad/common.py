@@ -217,6 +217,7 @@ def get_deployment(
         elif a['ClientStatus'] == 'unknown':
             info['status'] = 'down'
         else:
+            # This status can be for example: "complete", "failed"
             info['status'] = a['ClientStatus']
 
         # Add error messages if needed
@@ -346,10 +347,10 @@ def delete_deployment(
         full_info=False,
         )
 
-    # If job is in "queued" status, allow deleting with purge.
+    # If job is in stuck status, allow deleting with purge.
     # Most of the time, when a job is in this status, it is due to a platform error.
     # It gets stuck and cannot be deleted without purge
-    if info['status'] == 'queued':
+    if info['status'] in ['queued', 'complete', 'failed', 'error', 'down'] :
         purge = True
     else:
         purge = False

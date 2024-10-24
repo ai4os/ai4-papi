@@ -1,4 +1,6 @@
 from copy import deepcopy
+import datetime
+import os
 import re
 import types
 from typing import Tuple, Union
@@ -20,7 +22,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-@router.get("/")
+@router.get("")
 def get_deployments(
     vos: Union[Tuple, None] = Query(default=None),
     full_info: bool = Query(default=False),
@@ -40,11 +42,10 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Else only retrieve from allowed VOs
+    # Always remove VOs that do not belong to the project
     if not vos:
         vos = auth_info['vos']
-    else:
-        vos = set(vos).intersection(auth_info['vos'])
+    vos = set(vos).intersection(set(papiconf.MAIN_CONF['auth']['VO']))
     if not vos:
         raise HTTPException(
             status_code=401,
@@ -129,7 +130,7 @@ def get_deployment(
     return job
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     vo: str,
     conf: Union[dict, None] = None,
@@ -250,6 +251,9 @@ def create_deployment(
             'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
             'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
             'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+            'MAILING_TOKEN': os.getenv("MAILING_TOKEN", default=""),
+            'PROJECT_NAME': papiconf.MAIN_CONF['nomad']['namespaces'][vo].upper(),
+            'TODAY': str(datetime.date.today()),
         }
     )
 

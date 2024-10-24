@@ -1,10 +1,10 @@
 import fastapi
 
-from . import nomad
+from . import oscar
 
 
 router = fastapi.APIRouter()
 router.include_router(
-    router=nomad.router,
-    prefix='/try_me',
+    router=oscar.router,
+    prefix='/inference',
     )

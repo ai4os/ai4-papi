@@ -105,7 +105,7 @@ def recursive_path_builder(client, kv_list):
     return kv_list
 
 
-@router.get("/")
+@router.get("")
 def get_secrets(
     vo: str,
     subpath: str = '',
@@ -169,7 +169,7 @@ def get_secrets(
     return out
 
 
-@router.post("/")
+@router.post("")
 def create_secret(
     vo: str,
     secret_path: str,
@@ -209,7 +209,7 @@ def create_secret(
     return {'status': 'success'}
 
 
-@router.delete("/")
+@router.delete("")
 def delete_secret(
     vo: str,
     secret_path: str,

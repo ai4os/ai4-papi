@@ -3,16 +3,16 @@ import fastapi
 from . import modules, tools, datasets
 
 
-app = fastapi.APIRouter()
-app.include_router(
+router = fastapi.APIRouter()
+router.include_router(
     router=modules.router,
     prefix='/catalog',
     )
-app.include_router(
+router.include_router(
     router=tools.router,
     prefix='/catalog',
     )
-app.include_router(
-    router=datasets.app,
+router.include_router(
+    router=datasets.router,
     prefix='/datasets',
     )

@@ -23,7 +23,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-@router.get("/")
+@router.get("")
 def get_deployments(
     vos: Union[Tuple, None] = Query(default=None),
     full_info: bool = Query(default=False),
@@ -132,7 +132,7 @@ def get_deployment(
     return job
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     vo: str,
     conf: Union[dict, None] = None,
@@ -181,6 +181,9 @@ def create_deployment(
             submitted=conf,
             reference=user_conf,
         )
+
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
 
     # Check if the provided configuration is within the job quotas
     quotas.check_jobwise(

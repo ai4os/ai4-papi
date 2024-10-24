@@ -53,7 +53,7 @@ job "module-${JOB_UUID}" {
     attribute = "${meta.namespace}"
     operator  = "regexp"
     value     = "ai4eosc"
-    weight    = -50  # anti-affinity for ai4eosc clients
+    weight    = -100  # anti-affinity for ai4eosc clients
   }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
@@ -62,7 +62,7 @@ job "module-${JOB_UUID}" {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
-    weight    = 50
+    weight    = 100
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut
@@ -192,6 +192,37 @@ job "module-${JOB_UUID}" {
         memory = 2000
       }
 
+    }
+
+    task "email-notification" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        image = "registry.services.ai4os.eu/ai4os/docker-mail:client"
+      }
+
+      env {
+        NUM_DAYS="7"  # if the job takes more than this to deploy, then we notify the users
+        DATE="${TODAY}"  # when the job was created by the user
+        MAILING_TOKEN="${MAILING_TOKEN}"
+        DEST="${OWNER_EMAIL}"
+        SUBJECT="[AI4EOSC Support] Your job is ready! 🚀️"
+        BODY="Dear ${OWNER_NAME}, \n\nyour deployment \"${TITLE}\", created on ${TODAY}, is now ready to use. \nYou can access it at the ${PROJECT_NAME} Dashboard. \nRemember to delete the deployment in case you no longer need it! \n\nRegards, \n\n[The AI4EOSC Support Team]"
+      }
+
+      resources {
+        cores  = 1
+      }
+
+      restart {
+        attempts = 0
+        mode     = "fail"
+      }
     }
 
     task "main" {

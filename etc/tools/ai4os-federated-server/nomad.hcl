@@ -53,7 +53,7 @@ job "tool-fl-${JOB_UUID}" {
     attribute = "${meta.namespace}"
     operator  = "regexp"
     value     = "ai4eosc"
-    weight    = -50  # anti-affinity for ai4eosc clients
+    weight    = -100  # anti-affinity for ai4eosc clients
   }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
@@ -62,7 +62,7 @@ job "tool-fl-${JOB_UUID}" {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
-    weight    = 50
+    weight    = 100
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut

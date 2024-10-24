@@ -17,6 +17,7 @@ auth:
 
     - https://ai4life.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
+    - https://dashboard-ai4eosc-test.ifca-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
     - http://localhost:8080
 
   OP:  # OIDC providers
@@ -49,3 +50,19 @@ lb:  # load balancer, Traefik
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     vo.ai4life.eu: deployments.cloud.ai4eosc.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
+
+oscar:
+
+  clusters:
+
+    vo.ai4eosc.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
+
+    vo.imagine-ai.eu:
+      endpoint:  https://inference-walton.cloud.imagine-ai.eu
+      cluster_id: oscar-imagine-cluster
+
+    training.egi.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
