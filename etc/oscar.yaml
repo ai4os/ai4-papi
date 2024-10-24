@@ -22,15 +22,34 @@ script: |-
    from subprocess import run, PIPE
 
    # Read input file
-   run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
-   FILE_PATH=os.getenv("INPUT_FILE_PATH")+".json"
+   FILE_PATH=os.getenv("INPUT_FILE_PATH")
+   SAVE_OUT=True
+   if not FILE_PATH.endswith(".json"):
+      SAVE_OUT=False
+      run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
+      FILE_PATH=os.getenv("INPUT_FILE_PATH")+".json"
+
+   def get_rnd_filename(ex):
+      rnd_str = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
+      if ex == "":
+         TMP_OUTPUT_DIR=os.getenv("TMP_OUTPUT_DIR")
+         filename=''.join([TMP_OUTPUT_DIR, "/" ,"tmp-file-", rnd_str])
+         print("Output will be saved on:", filename)
+         return filename
+      else: 
+         return ''.join(["tmp-file-", rnd_str, ".", ex])
 
    DEEPAAS_CLI_VERSION=[2,3,1]
    STR_VERSION='2.3.1'
    DEEPAAS_CLI_VCOMMAND=['deepaas-cli', '--version']
 
-   DEEPAAS_CLI_COMMAND=['deepaas-cli', 'predict']
    OSCAR_FILES="oscar-files"
+
+   if SAVE_OUT:
+      DEEPAAS_CLI_COMMAND=['deepaas-cli', '--deepaas_method_output', get_rnd_filename("") ,'predict']
+   else:
+      DEEPAAS_CLI_COMMAND=['deepaas-cli', 'predict']
+
 
    def check_deepaas_version():
       v = run(DEEPAAS_CLI_VCOMMAND, stdout=PIPE)
@@ -54,8 +73,7 @@ script: |-
 
    def parse_files(files):
          for file in files:
-                  rnd_str = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
-                  filename=''.join(["tmp-file-", rnd_str, ".", file["file_format"]])
+                  filename=get_rnd_filename(file["file_format"])
                   add_arg(file["key"], filename)
                   decode_b64(filename, file["data"])
 
@@ -64,7 +82,7 @@ script: |-
 
    # Process input
    with open(FILE_PATH, "r") as f:
-   params = json.loads(f.read())
+      params = json.loads(f.read())
 
    for k, v in params.items():
       # If param is 'oscar-files' decode the array of files
@@ -74,6 +92,7 @@ script: |-
          if isinstance(v, int): 
                v = str(v)
          add_arg(k, v)
+
    run(DEEPAAS_CLI_COMMAND)
 
    EOF
