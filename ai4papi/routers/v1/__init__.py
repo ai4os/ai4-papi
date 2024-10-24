@@ -3,16 +3,16 @@ import fastapi
 from . import catalog, deployments, inference, secrets, stats, try_me
 
 
-app = fastapi.APIRouter()
-app.include_router(catalog.app)
-app.include_router(deployments.app)
-app.include_router(inference.app)
-app.include_router(secrets.router)
-app.include_router(stats.app)
-app.include_router(try_me.app)
+router = fastapi.APIRouter()
+router.include_router(catalog.router)
+router.include_router(deployments.router)
+router.include_router(inference.router)
+router.include_router(secrets.router)
+router.include_router(stats.router)
+router.include_router(try_me.router)
 
 
-@app.get(
+@router.get(
     "/",
     summary="Get v1 version information.",
     tags=["API", "version"],

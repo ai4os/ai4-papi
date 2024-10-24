@@ -30,8 +30,7 @@ assert isinstance(tools_sum[0], dict)
 
 # Get catalog tags
 tools_tags = Tools.get_tags()
-assert isinstance(tools_tags, list)
-assert 'docker' in tools_tags
+assert isinstance(tools_tags, list)  # empty list; deprecated method
 
 # Explore an individual tool
 tool_name = tools_list[0]

@@ -2,12 +2,19 @@
 Manage configurations of the API.
 """
 
+import os
 from pathlib import Path
 from string import Template
 import subprocess
 
 import yaml
 
+
+# Check if we are developing from local, to disable parts of the code that are compute
+# intensive (eg. disables calls to Github API)
+# The variables 'FORWARDED_ALLOW_IPS' serves as proxy for this, as it is only defined
+# when running from the Docker container
+IS_DEV = False if os.getenv('FORWARDED_ALLOW_IPS') else True
 
 # Paths
 main_path = Path(__file__).parent.absolute()

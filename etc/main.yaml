@@ -17,6 +17,7 @@ auth:
 
     - https://ai4life.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
+    - https://dashboard-ai4eosc-test.ifca-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
     - http://localhost:8080
 
   OP:  # OIDC providers

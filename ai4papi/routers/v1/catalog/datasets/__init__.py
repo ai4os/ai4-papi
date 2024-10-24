@@ -3,7 +3,7 @@ import fastapi
 from . import zenodo
 
 
-app = fastapi.APIRouter()
-app.include_router(
+router = fastapi.APIRouter()
+router.include_router(
     router=zenodo.router,
     )
