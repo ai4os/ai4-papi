@@ -181,8 +181,8 @@ def load_datacenters():
     return datacenters
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=30))
 @router.get("/cluster")
+@cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
     vo: str,
     ):

@@ -11,6 +11,13 @@ Nomad (ie. after launching)
 #TODO: rename test script: modules --> test_modules
 #TODO: add spinners
 
+import ai4papi.conf as papiconf
+
+
+# We want to test full functionality, without disabling any parts
+papiconf.IS_DEV = False
+
+
 import catalog.modules
 import catalog.tools
 import deployments.modules

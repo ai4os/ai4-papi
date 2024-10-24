@@ -22,11 +22,11 @@ ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hasha
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
-import configparser
-import json
 import re
 from typing import Tuple, Union
+import yaml
 
+import ai4_metadata.validate
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
 import requests
@@ -92,89 +92,16 @@ class Catalog:
         not_tags_any: Union[Tuple, None] = Query(default=None),
         ):
         """
-        Retrieve a list of all items, optionally filtering by tags.
+        Retrieve a list of all items.
 
-        The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
-        * `tags`: Items that contain all of the specified tags
-        * `tags-any`: Items that contain at least one of the specified tags
-        * `not-tags`: Items that do not contain exactly all of the specified tags
-        * `not-tags-any`: Items that do not contain any one of the specified tags
-
-        You can also use wildcards:
-        * `image*` matches all tags _starting_ with "image"
-        * `*image` matches all tags _ending_ with "image"
-        * `*image*` matches all tags _containing_ the substring "image"
-
-
+        Tag-related fields are kept to avoid breaking backward-compatibility but
+        aren't actually serving any purpose.
         """
         # Retrieve all modules
         modules = list(self.get_items().keys())
         # (!): without list(...) FastAPI throws weird error
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
-        if any([tags, tags_any, not_tags, not_tags_any]):  # apply filtering
-
-            # Move to tag dict for easier manipulation (wildcard substitution)
-            td = {
-                'tags': tags if tags else [],
-                'tags_any': tags_any if tags_any else [],
-                'not_tags': not_tags if not_tags else [],
-                'not_tags_any': not_tags_any if not_tags_any else [],
-            }
-
-            # Replace the wildcards with actual tags
-            all_tags = self.get_tags()
-            for k, v in td.items():
-
-                new_tags = []
-                for i in v:
-                    matched_tags = None
-                    if i.startswith('*') and i.endswith('*'):
-                        matched_tags = [j for j in all_tags if (i[1:-1] in j)]
-                    elif i.startswith('*'):
-                        matched_tags = [j for j in all_tags if j.endswith(i[1:])]
-                    elif i.endswith('*'):
-                        matched_tags = [j for j in all_tags if j.startswith(i[:-1])]
-
-                    if matched_tags:
-                        new_tags += matched_tags
-                    else:
-                        new_tags.append(i)
-
-                td[k] = new_tags
-
-            # Filter modules
-            fmodules = []
-            for m in modules:
-                mtags = set(
-                    self.get_metadata(m)['keywords']
-                )
-
-                conditions = []
-                if td['tags']:
-                    conditions.append(
-                        len(mtags.intersection(td['tags'])) == len(td['tags'])
-                    )
-                if td['tags_any']:
-                    conditions.append(
-                        len(mtags.intersection(td['tags_any'])) != 0
-                    )
-                if td['not_tags']:
-                    conditions.append(
-                        len(mtags.intersection(td['not_tags'])) != len(td['not_tags'])
-                    )
-                if td['not_tags_any']:
-                    conditions.append(
-                        len(mtags.intersection(td['not_tags_any'])) == 0
-                    )
-
-                if all(conditions):
-                    fmodules.append(m)
-
-            return fmodules
-
-        else:  # no filtering applied
-            return modules
-
+        return modules
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_summary(
@@ -185,28 +112,14 @@ class Catalog:
         not_tags_any: Union[Tuple, None] = Query(default=None),
         ):
         """
-        Retrieve a list of all items' basic metadata
-        (name, title, summary, keywords), optionally filtering items by tags.
+        Retrieve a list of all items' basic metadata.
 
-        The tag filtering logic is based on [Openstack](https://docs.openstack.org/api-ref/identity/v3/?expanded=list-projects-detail#filtering-and-searching-by-tags):
-        * `tags`: Items that contain all of the specified tags
-        * `tags-any`: Items that contain at least one of the specified tags
-        * `not-tags`: Items that do not contain exactly all of the specified tags
-        * `not-tags-any`: Items that do not contain any one of the specified tags
-
-        You can also use wildcards:
-        * `image*` matches all tags _starting_ with "image"
-        * `*image` matches all tags _ending_ with "image"
-        * `*image*` matches all tags _containing_ the substring "image"
+        Tag-related fields are kept to avoid breaking backward-compatibility but
+        aren't actually serving any purpose.
         """
+        modules = self.get_filtered_list()
         summary = []
-        keys = ['title', 'summary', 'keywords']
-        modules = self.get_filtered_list(
-            tags=tags,
-            tags_any=tags_any,
-            not_tags=not_tags,
-            not_tags_any=not_tags_any,
-            )
+        ignore = ['description', 'links']  # don't send this info to decrease latency
         for m in modules:
             try:
                 meta1 = self.get_metadata(m)
@@ -214,25 +127,21 @@ class Catalog:
                 # Avoid breaking the whole method if failing to retrieve a module
                 print(f'Error retrieving metadata: {m}')
                 continue
-            meta = {k: v for k, v in meta1.items() if k in keys}  # filter keys
+            meta = {k: v for k, v in meta1.items() if k not in ignore}  # filter keys
             meta['name'] = m
             summary.append(meta)
         return summary
 
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_tags(
         self,
         ):
         """
         Retrieve a list of all the existing tags.
+        Now deprecated, kept to avoid breaking backward-compatibility.
+        Returns an empty list.
         """
-        tags = []
-        for m in self.get_items().keys():
-            meta = self.get_metadata(m)
-            tags += meta['keywords']
-        tags = sorted(set(tags))
-        return tags
+        return []
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -243,6 +152,8 @@ class Catalog:
         """
         Get the item's full metadata.
         """
+        print(f"Retrieving metadata from {item_name}")
+
         # Check if item is in the items list
         items = self.get_items()
         if item_name not in items.keys():
@@ -256,44 +167,105 @@ class Catalog:
         # all the Dashboard
         branch = items[item_name].get("branch", "master")
         url = items[item_name]['url'].replace('github.com', 'raw.githubusercontent.com')
-        metadata_url = f"{url}/{branch}/metadata.json"
-        try:
-            r = requests.get(metadata_url)
-            metadata = json.loads(r.text)
-        except Exception:
-            print(f'Error parsing metadata: {item_name}')
+        metadata_url = f"{url}/{branch}/ai4-metadata.yml"
+
+        error = None
+        # Try to retrieve the metadata from Github
+        r = requests.get(metadata_url)
+        if not r.ok:
+            error = \
+                "The metadata of this module could not be retrieved because the " \
+                "module is lacking a metadata file (`ai4-metadata.yml`)."
+        else:
+            # Try to load the YML file
+            try:
+                metadata = yaml.safe_load(r.text)
+            except Exception:
+                metadata = None
+                error = \
+                    "The metadata of this module could not be retrieved because the " \
+                    "metadata file is badly formatted (`ai4-metadata.yml`)."
+
+            # Since we are loading the metadata directly from the repo main branch,
+            # we cannot know if they have successfully passed or not the Jenkins
+            # validation. So we have to validate them, just in case we have naughty users.
+            if metadata:
+                try:
+                    schema = ai4_metadata.get_schema("2.0.0")
+                    ai4_metadata.validate.validate(instance=metadata, schema=schema)
+                except Exception:
+                    error = \
+                        "The metadata of this module has failed to comply with the " \
+                        "specifications of the AI4EOSC Platform (see the " \
+                        "[metadata validator](https://github.com/ai4os/ai4-metadata))."
+
+                # Make sure the repo belongs to one of supported orgs
+                pattern = r"https?:\/\/(www\.)?github\.com\/([^\/]+)\/"
+                match = re.search(pattern, metadata['links']['source_code'])
+                github_org = match.group(2) if match else None
+                if not github_org:
+                    error = \
+                        "This module does not seem to have a valid Github source code. " \
+                        "If you are the developer of this module, please check the " \
+                        "\"source_code\" link in your metadata."
+                if github_org not in ['ai4os', 'ai4os-hub', 'deephdc']:
+                    error = \
+                        "This module belongs to a Github organization not supported by " \
+                        "the project. If you are the developer of this module, please " \
+                        "check the \"source_code\" link in your metadata."
+
+        # If any of the previous steps raised an error, load a metadata placeholder
+        if error:
+            print(f"  [Error] {error}")
             metadata = {
+                "metadata_version": "2.0.0",
                 "title": item_name,
                 "summary": "",
-                "description": [
-                    "The metadata of this module could not be retrieved probably due to a ",
-                    "JSON formatting error from the module maintainer."
-                ],
-                "keywords": [],
-                "license": "",
-                "date_creation": "",
-                "sources": {
-                    "dockerfile_repo": f"https://github.com/ai4oshub/{item_name}",
-                    "docker_registry_repo": f"ai4os-hub/{item_name}",
-                    "code": "",
-                }
+                "description": error,
+                "doi": "",
+                "dates": {
+                    "created": "",
+                    "updated": "",
+                    },
+                "links": {
+                    "documentation": "",
+                    "source_code": "",
+                    "docker_image": "",
+                    "ai4_template": "",
+                    "dataset": "",
+                    "weights": "",
+                    "citation": "",
+                    "base_model": "",
+                },
+                "tags": ["invalid metadata"],
+                "tasks": [],
+                "categories": [],
+                "libraries": [],
+                "data-type": [],
             }
 
-        # Format "description" field nicely for the Dashboards Markdown parser
-        metadata["description"] = "\n".join(metadata["description"])
-
-        # Replace some fields with the info gathered from Github
-        pattern = r'github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$'
-        match = re.search(pattern, items[item_name]['url'])
-        if match:
-            owner, repo = match.group(1), match.group(2)
-            gh_info = utils.get_github_info(owner, repo)
-
-            metadata['date_creation'] = gh_info.get('created', '')
-            # metadata['updated'] = gh_info.get('updated', '')
-            metadata['license'] = gh_info.get('license', '')
         else:
-            print(f"Failed to parse owner/repo in {items[item_name]['url']}")
+            # Replace some fields with the info gathered from Github
+            pattern = r'github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$'
+            match = re.search(pattern, items[item_name]['url'])
+            if match:
+                owner, repo = match.group(1), match.group(2)
+                gh_info = utils.get_github_info(owner, repo)
+
+                metadata.setdefault('dates', {})
+                metadata['dates']['created'] = gh_info.get('created', '')
+                metadata['dates']['updated'] = gh_info.get('updated', '')
+                metadata['license'] = gh_info.get('license', '')
+
+            # Add Jenkins CI/CD links
+            metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
+            metadata['links']['cicd_badge'] = f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+
+            # Add DockerHub
+            # TODO: when the migration is finished, we have to generate the url from the module name
+            # (ie. ignore the value coming from the metadata)
+            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
+            metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
 
         return metadata
 

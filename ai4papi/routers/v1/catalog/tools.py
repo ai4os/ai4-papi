@@ -42,8 +42,8 @@ def get_config(
     metadata = self.get_metadata(item_name)
 
     # Parse docker registry
-    registry = metadata['sources']['docker_registry_repo']
-    repo, image = registry.split('/')[:2]
+    registry = metadata['links']['docker_image']
+    repo, image = registry.split('/')[-2:]
     if repo not in ['deephdc', 'ai4oshub']:
         repo = 'ai4oshub'
 
@@ -125,7 +125,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 router.add_api_route(
-    "/",
+    "",
     Tools.get_filtered_list,
     methods=["GET"],
     )
@@ -138,6 +138,7 @@ router.add_api_route(
     "/tags",
     Tools.get_tags,
     methods=["GET"],
+    deprecated=True,
     )
 router.add_api_route(
     "/{item_name}/metadata",
