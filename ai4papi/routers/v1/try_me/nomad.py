@@ -19,7 +19,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     module_name: str,
     authorization=Depends(security),
@@ -38,7 +38,8 @@ def create_deployment(
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
-    docker_image = meta['sources']['docker_registry_repo']
+    registry = meta['links']['docker_image']
+    docker_image = '/'.join(registry.split('/')[-2:])
 
     # Load module configuration
     nomad_conf = deepcopy(papiconf.TRY_ME['nomad'])

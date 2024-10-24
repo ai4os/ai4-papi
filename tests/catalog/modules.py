@@ -30,8 +30,7 @@ assert isinstance(modules_sum[0], dict)
 
 # Get catalog tags
 modules_tags = Modules.get_tags()
-assert isinstance(modules_tags, list)
-assert 'docker' in modules_tags
+assert isinstance(modules_tags, list)  # empty list; deprecated method
 
 # Explore an individual module
 module_name = modules_list[0]

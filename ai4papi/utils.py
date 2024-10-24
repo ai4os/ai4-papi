@@ -9,6 +9,8 @@ from cachetools import cached, TTLCache
 from fastapi import HTTPException
 import requests
 
+import ai4papi.conf as papiconf
+
 
 # Persistent requests session for faster requests
 session = requests.Session()
@@ -185,11 +187,18 @@ def validate_conf(conf):
     return conf
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+#TODO: temporarily parse every 24hrs (instead of 6hrs) to reduce a bit the latency
+@cached(cache=TTLCache(maxsize=1024, ttl=24*60*60))
 def get_github_info(owner, repo):
     """
     Retrieve information from a Github repo
     """
+    # Avoid running this function if were are doing local development, because
+    # repeatedly calling the Github API will otherwise get you blocked
+    if papiconf.IS_DEV:
+        print('[info] Skipping Github API info fetching (development).')
+        return {}
+
     # Retrieve information from Github API
     url = f"https://api.github.com/repos/{owner}/{repo}"
     headers = {'Authorization': f'token {github_token}'} if github_token else {}
@@ -210,6 +219,7 @@ def get_github_info(owner, repo):
         out['license'] = (repo_data['license'] or {}).get('spdx_id', '')
         # out['stars'] = repo_data['stargazers_count']
     else:
-        print(f'Failed to parse Github repo: {owner}/{repo}')
+        msg = "API rate limit exceeded" if r.status_code == 403 else ""
+        print(f'  [Error] Failed to parse Github repo info: {msg}')
 
     return out
