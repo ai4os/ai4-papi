@@ -16,6 +16,16 @@ import yaml
 # when running from the Docker container
 IS_DEV = False if os.getenv('FORWARDED_ALLOW_IPS') else True
 
+# Harbor token is kind of mandatory in production, otherwise snapshots won't work.
+HARBOR_USER = "robot$user-snapshots+snapshot-api"
+HARBOR_PASS = os.environ.get('HARBOR_ROBOT_PASSWORD')
+if not HARBOR_PASS:
+    if IS_DEV:
+        # Not enforce this for developers
+        print("You should define the variable \"HARBOR_ROBOT_PASSWORD\" to use the \"/snapshots\" endpoint.")
+    else:
+        raise Exception("You need to define the variable \"HARBOR_ROBOT_PASSWORD\".")
+
 # Paths
 main_path = Path(__file__).parent.absolute()
 paths = {

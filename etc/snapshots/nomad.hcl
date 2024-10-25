@@ -135,7 +135,7 @@ for container_id in $container_ids; do
 
                         echo "Login on the registry"
 
-                        username='robot$user-snapshots+snapshot-api'
+                        username='${HARBOR_ROBOT_USER}'
                         password='${HARBOR_ROBOT_PASSWORD}'
 
                         echo "$password" | sudo docker login https://registry.services.ai4os.eu --username "$username" --password-stdin

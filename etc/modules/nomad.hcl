@@ -244,6 +244,13 @@ job "module-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
+
+        # # This will be added later on, if the job is meant to be deployed in Harbor
+        # auth {
+        #   username = "harbor_user"
+        #   password = "harbor_password"
+        # }
+
       }
 
       env {

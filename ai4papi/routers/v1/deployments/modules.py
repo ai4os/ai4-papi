@@ -12,6 +12,7 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
+from ai4papi.routers import v1
 
 
 router = APIRouter(
@@ -277,6 +278,35 @@ def create_deployment(
         # If gpu_type not provided, remove constraint to GPU model
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
+
+    # If the image belong to Harbor, then it's a user snapshot
+    docker_image = user_conf['general']['docker_image']
+    if docker_image.split('/')[0] == "registry.services.ai4os.eu":
+
+        # Check the user is the owner of the image
+        if docker_image.split('/')[-1] != auth_info['id'].replace('@', '_at_'):
+            raise HTTPException(
+                status_code=401,
+                detail="You are not the owner of the Harbor image.",
+                )
+
+        # Check the snapshot indeed exists
+        user_snapshots = v1.snapshots.get_harbor_snapshots(
+            owner=auth_info['id'],
+            vo=vo,
+        )
+        snapshot_ids = [s['snapshot_ID'] for s in user_snapshots]
+        if user_conf['general']['docker_tag'] not in snapshot_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="The snapshot does not exist.",
+                )
+
+        # Add Harbor authentication credentials to Nomad job
+        usertask['Config']['auth'] = [{
+            'username': papiconf.HARBOR_USER,
+            'password': papiconf.HARBOR_PASS,
+            }]
 
     # If storage credentials not provided, remove all storage-related tasks
     rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}

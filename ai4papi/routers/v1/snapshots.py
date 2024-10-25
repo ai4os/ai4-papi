@@ -8,8 +8,6 @@ The strategy for saving in Harbor is:
 """
 from copy import deepcopy
 import datetime
-import os
-import types
 from typing import Tuple, Union
 import uuid
 
@@ -18,9 +16,7 @@ from fastapi.security import HTTPBearer
 from harborapi import HarborClient
 from nomad.api import exceptions
 
-
 from ai4papi import auth
-from ai4papi.routers.v1 import deployments
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad_common
 
@@ -33,18 +29,11 @@ router = APIRouter(
 security = HTTPBearer()
 
 # Init the Harbor client
-HARBOR_TOKEN = os.environ.get('HARBOR_ROBOT_PASSWORD')
-if not HARBOR_TOKEN:
-    if papiconf.IS_DEV:  # Not enforce this for developers
-            print("You should define the variable \"HARBOR_ROBOT_PASSWORD\" to use '/snapshot' endpoints")
-    else:
-        raise Exception("You need to define the variable \"HARBOR_ROBOT_PASSWORD\"")
-else:
-    client = HarborClient(
-        url = "https://registry.services.ai4os.eu/api/v2.0/",
-        username = "robot$user-snapshots+snapshot-api",
-        secret = HARBOR_TOKEN,
-    )
+client = HarborClient(
+    url = "https://registry.services.ai4os.eu/api/v2.0/",
+    username = papiconf.HARBOR_USER,
+    secret = papiconf.HARBOR_PASS,
+)
 
 # Use the Nomad cluster inited in nomad.common
 Nomad = nomad_common.Nomad
@@ -110,6 +99,9 @@ def create_snapshot(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
 
+    # Retrieve the associated namespace to that VO
+    namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
+
     # Check the user is within our limits
     snapshots = get_harbor_snapshots(
         owner=auth_info['id'],
@@ -126,11 +118,11 @@ def create_snapshot(
     nomad_conf = deepcopy(papiconf.SNAPSHOTS['nomad'])
 
     # Get target job info
-    job_info = deployments.modules.get_deployment(
-        vo=vo,
+    job_info = nomad_common.get_deployment(
         deployment_uuid=deployment_uuid,
+        namespace=namespace,
+        owner=auth_info['id'],
         full_info=False,
-        authorization=types.SimpleNamespace(credentials=authorization.credentials),
     )
     if job_info['status'] != 'running':
         raise HTTPException(
@@ -157,7 +149,8 @@ def create_snapshot(
             'TITLE': job_info['title'],
             'DESCRIPTION': job_info['description'],
             'SUBMIT_TIME': now.strftime("%Y-%m-%d %X"),
-            'HARBOR_ROBOT_PASSWORD': os.environ.get('HARBOR_ROBOT_PASSWORD', None),
+            'HARBOR_ROBOT_USER': papiconf.HARBOR_USER,
+            'HARBOR_ROBOT_PASSWORD': papiconf.HARBOR_PASS,
             'VO': vo,
         }
     )
@@ -290,6 +283,7 @@ def get_harbor_snapshots(
                 'title': a_labels['TITLE'],
                 'description': a_labels['DESCRIPTION'],
                 'nomad_ID': None,
+                'docker_image': f"registry.services.ai4os.eu/user-snapshots/{user_str}",
             }
         )
     return snapshots
@@ -360,6 +354,7 @@ def get_nomad_snapshots(
             'title': None,
             'description': None,
             'nomad_ID': j['ID'],
+            'docker_image': None,
         }
         if size_error:
             tmp['status'] = 'failed'
