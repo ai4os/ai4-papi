@@ -20,6 +20,7 @@ that ENV variable.'
 # Create deployment
 rcreate = nomad.create_deployment(
     module_name="ai4os-demo-app",
+    title="PAPI tests",
     authorization=SimpleNamespace(
         credentials=token
     ),

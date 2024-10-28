@@ -4,7 +4,6 @@ required). We deploy jobs by default in the AI4EOSC namespace.
 """
 
 from copy import deepcopy
-from typing import Tuple, Union
 import types
 import uuid
 
@@ -29,7 +28,8 @@ security = HTTPBearer()
 VO = "vo.ai4eosc.eu"
 NAMESPACE = papiconf.MAIN_CONF['nomad']['namespaces'][VO]
 
-@router.get("/")
+
+@router.get("")
 def get_deployments(
     full_info: bool = Query(default=False),
     authorization=Depends(security),
