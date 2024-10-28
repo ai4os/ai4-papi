@@ -263,8 +263,12 @@ def create_deployment(
             'FEDERATED_MIN_AVAILABLE_CLIENTS': user_conf['configuration']['min_available_clients'],
             'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
             'MU_FEDPROX': user_conf['configuration']['mu'],
-            'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
-            'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
+            'FEDAVGM_SERVER_FL' : user_conf['configuration']['fl'],
+            'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['momentum'],
+            'DP': user_conf['configuration']['dp'],
+            'NOISE_MULT': user_conf['configuration']['noise_mult'],
+            'SAMPLED_CLIENTS': user_conf['configuration']['sampled_clients'],
+            'CLIP_NORM': user_conf['configuration']['clip_norm']
         }
     )
 

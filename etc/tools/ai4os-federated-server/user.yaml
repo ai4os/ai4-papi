@@ -118,3 +118,26 @@ configuration:
     value: 0
     range: [0, null]
     description: In the FedAvgM strategy, server-side momentum factor.
+
+  dp:
+    name: Differential privacy
+    value: False
+    options: [True, False]
+
+  noise_mult:
+    name: Noise multiplier
+    value: 1
+    range: [0.00001, null]
+    description: Noise multiplier for the Gaussian mechanism.
+
+  sampled_clients:
+    name: Number of sampled clients
+    value: 2
+    range: [2, null]
+    description: Number of clients sampled on each FL round.
+
+  clip_norm:
+    name: Clipping norm
+    value: 0.1
+    range: [0.1, null]
+    description: Threshold value for the clipping.
