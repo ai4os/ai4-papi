@@ -200,24 +200,8 @@ def create_deployment(
     else:
         priority = 50
 
-    # Remove non-compliant characters from hostname
     base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
-    hostname = utils.safe_hostname(
-        hostname=user_conf['general']['hostname'],
-        job_uuid=job_uuid,
-    )
-
-    #TODO: reenable custom hostname, when we are able to parse all node metadata
-    # (domain key) to build the true domain
-    hostname = job_uuid
-
-    # # Check the hostname is available in all data-centers
-    # # (we don't know beforehand where the job will land)
-    # #TODO: make sure this does not break if the datacenter is unavailable
-    # #TODO: disallow custom hostname, pain in the ass, slower deploys
-    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
-    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
-
+    
     # Create a default secret for the Federated Server
     _ = ai4secrets.create_secret(
         vo=vo,
@@ -247,7 +231,7 @@ def create_deployment(
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
             'BASE_DOMAIN': base_domain,
-            'HOSTNAME': hostname,
+            'HOSTNAME': job_uuid,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
             'CPU_NUM': user_conf['hardware']['cpu_num'],
