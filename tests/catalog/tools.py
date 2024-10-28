@@ -55,19 +55,10 @@ for tool_name in tools_list:
 
     print(f'  - Testing {tool_name}')
 
-    if tool_name == 'ai4os-cvat':
-        extra = {'storage_name': 'share.services.ai4os.eu'}
-    else:
-        extra = {}
-
     # Get tool config
     tool_conf = Tools.get_config(
         item_name=tool_name,
         vo='vo.ai4eosc.eu',
-        additional_info=extra,
-        authorization=SimpleNamespace(
-            credentials=token
-        ),
     )
     assert isinstance(tool_conf, dict)
     assert 'general' in tool_conf.keys()

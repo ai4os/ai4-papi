@@ -26,4 +26,5 @@ import try_me.test_nomad
 import routes
 import test_secrets
 import test_stats
+import test_storage
 import test_launch

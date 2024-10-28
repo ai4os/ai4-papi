@@ -349,7 +349,7 @@ def create_deployment(
                 'HOSTNAME': hostname,
                 'CVAT_USERNAME': user_conf['general']['cvat_username'],
                 'CVAT_PASSWORD': user_conf['general']['cvat_password'],
-                'RESTORE_FROM': user_conf['general']['cvat_backup'],
+                'RESTORE_FROM': user_conf['storage']['cvat_backup'],
                 'BACKUP_NAME': f'{current_date}_{job_title}',
                 'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
                 'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],

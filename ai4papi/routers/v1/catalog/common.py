@@ -22,6 +22,7 @@ ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hasha
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
+import configparser
 import re
 from typing import Tuple, Union
 import yaml
