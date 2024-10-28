@@ -28,7 +28,7 @@ def refresh_cache(item_name: str):
 
 router = APIRouter(
     prefix="/refresh",
-    tags=["Modules catalog"],
+    tags=["Catalog"],
     responses={404: {"description": "Not found"}},
 )
 router.add_api_route(
