@@ -23,8 +23,11 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
 import re
+import types
 from typing import Tuple, Union
 import yaml
+from cachetools.keys import hashkey
+
 
 import ai4_metadata.validate
 from cachetools import cached, TTLCache
@@ -35,15 +38,13 @@ from ai4papi import utils
 
 
 class Catalog:
-
     def __init__(self) -> None:
         pass
 
-
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_items(
         self,
-        ):
+    ):
         """
         Retrieve a dict of *all* items.
         ```
@@ -59,15 +60,14 @@ class Catalog:
         """
         return {}
 
-
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_filtered_list(
         self,
         tags: Union[Tuple, None] = Query(default=None),
         tags_any: Union[Tuple, None] = Query(default=None),
         not_tags: Union[Tuple, None] = Query(default=None),
         not_tags_any: Union[Tuple, None] = Query(default=None),
-        ):
+    ):
         """
         Retrieve a list of all items.
 
@@ -80,14 +80,14 @@ class Catalog:
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
         return modules
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_summary(
         self,
         tags: Union[Tuple, None] = Query(default=None),
         tags_any: Union[Tuple, None] = Query(default=None),
         not_tags: Union[Tuple, None] = Query(default=None),
         not_tags_any: Union[Tuple, None] = Query(default=None),
-        ):
+    ):
         """
         Retrieve a list of all items' basic metadata.
 
@@ -109,10 +109,9 @@ class Catalog:
             summary.append(meta)
         return summary
 
-
     def get_tags(
         self,
-        ):
+    ):
         """
         Retrieve a list of all the existing tags.
         Now deprecated, kept to avoid breaking backward-compatibility.
@@ -120,12 +119,15 @@ class Catalog:
         """
         return []
 
-
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    # @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
+    @cached(
+        cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60),
+        key=lambda self, item_name: item_name,
+    )
     def get_metadata(
         self,
         item_name: str,
-        ):
+    ):
         """
         Get the item's full metadata.
         """
@@ -137,7 +139,7 @@ class Catalog:
             raise HTTPException(
                 status_code=404,
                 detail=f"Item {item_name} not in catalog: {list(items.keys())}",
-                )
+            )
 
         # Retrieve metadata from default branch
         # Use try/except to avoid that a single module formatting error could take down
@@ -150,18 +152,20 @@ class Catalog:
         # Try to retrieve the metadata from Github
         r = requests.get(metadata_url)
         if not r.ok:
-            error = \
-                "The metadata of this module could not be retrieved because the " \
+            error = (
+                "The metadata of this module could not be retrieved because the "
                 "module is lacking a metadata file (`ai4-metadata.yml`)."
+            )
         else:
             # Try to load the YML file
             try:
                 metadata = yaml.safe_load(r.text)
             except Exception:
                 metadata = None
-                error = \
-                    "The metadata of this module could not be retrieved because the " \
+                error = (
+                    "The metadata of this module could not be retrieved because the "
                     "metadata file is badly formatted (`ai4-metadata.yml`)."
+                )
 
             # Since we are loading the metadata directly from the repo main branch,
             # we cannot know if they have successfully passed or not the Jenkins
@@ -171,25 +175,28 @@ class Catalog:
                     schema = ai4_metadata.get_schema("2.0.0")
                     ai4_metadata.validate.validate(instance=metadata, schema=schema)
                 except Exception:
-                    error = \
-                        "The metadata of this module has failed to comply with the " \
-                        "specifications of the AI4EOSC Platform (see the " \
+                    error = (
+                        "The metadata of this module has failed to comply with the "
+                        "specifications of the AI4EOSC Platform (see the "
                         "[metadata validator](https://github.com/ai4os/ai4-metadata))."
+                    )
 
                 # Make sure the repo belongs to one of supported orgs
                 pattern = r"https?:\/\/(www\.)?github\.com\/([^\/]+)\/"
                 match = re.search(pattern, metadata['links']['source_code'])
                 github_org = match.group(2) if match else None
                 if not github_org:
-                    error = \
-                        "This module does not seem to have a valid Github source code. " \
-                        "If you are the developer of this module, please check the " \
+                    error = (
+                        "This module does not seem to have a valid Github source code. "
+                        "If you are the developer of this module, please check the "
                         "\"source_code\" link in your metadata."
+                    )
                 if github_org not in ['ai4os', 'ai4os-hub', 'deephdc']:
-                    error = \
-                        "This module belongs to a Github organization not supported by " \
-                        "the project. If you are the developer of this module, please " \
+                    error = (
+                        "This module belongs to a Github organization not supported by "
+                        "the project. If you are the developer of this module, please "
                         "check the \"source_code\" link in your metadata."
+                    )
 
         # If any of the previous steps raised an error, load a metadata placeholder
         if error:
@@ -203,7 +210,7 @@ class Catalog:
                 "dates": {
                     "created": "",
                     "updated": "",
-                    },
+                },
                 "links": {
                     "documentation": "",
                     "source_code": "",
@@ -235,20 +242,32 @@ class Catalog:
                 metadata['license'] = gh_info.get('license', '')
 
             # Add Jenkins CI/CD links
-            metadata['links']['cicd_url'] = f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
-            metadata['links']['cicd_badge'] = f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+            metadata['links']['cicd_url'] = (
+                f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
+            )
+            metadata['links']['cicd_badge'] = (
+                f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+            )
 
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
-            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
-            metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
+            metadata['links']['docker_image'] = (
+                f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
+            )
+            metadata['links']['docker_image'] = metadata['links']['docker_image'].strip(
+                '/ '
+            )
 
         return metadata
 
+    def refresh_metadata_cache_entry(self, item_name: str):
+        self.get_metadata.cache.pop(item_name, None)
+        self.get_metadata(item_name)
+
     def get_config(
         self,
-        ):
+    ):
         """
         Returns the default configuration (dict) for creating a deployment
         for a specific item. It is prefilled with the appropriate
@@ -260,7 +279,7 @@ class Catalog:
 def retrieve_docker_tags(
     image: str,
     repo: str = 'ai4oshub',
-    ):
+):
     """
     Retrieve tags from Dockerhub image
     """
@@ -273,6 +292,6 @@ def retrieve_docker_tags(
         raise HTTPException(
             status_code=400,
             detail=f"Could not retrieve Docker tags from {repo}/{image}.",
-            )
+        )
     tags = [i["name"] for i in r["results"]]
     return tags

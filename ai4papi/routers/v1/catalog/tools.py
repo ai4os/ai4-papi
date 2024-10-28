@@ -9,12 +9,12 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def get_items(self):
     # Set default branch manually (because we are not yet reading this from submodules)
     # TODO: start reading from submodules (only accept the submodules that have been
     # integrated in papiconf.TOOLS)
-    tools_branches= {
+    tools_branches = {
         'ai4os-federated-server': 'main',
     }
 
@@ -32,7 +32,7 @@ def get_config(
     self,
     item_name: str,
     vo: str,
-    ):
+):
     # Retrieve tool configuration
     try:
         conf = deepcopy(papiconf.TOOLS[item_name]['user']['full'])
@@ -40,7 +40,7 @@ def get_config(
         raise HTTPException(
             status_code=400,
             detail=f"{item_name} is not an available tool.",
-            )
+        )
 
     # Retrieve tool metadata
     metadata = self.get_metadata(item_name)
@@ -71,6 +71,9 @@ def get_config(
 Tools = Catalog()
 Tools.get_items = types.MethodType(get_items, Tools)
 Tools.get_config = types.MethodType(get_config, Tools)
+Tools.refresh_metadata_cache_entry = types.MethodType(
+    Catalog.refresh_metadata_cache_entry, Tools
+)
 
 
 router = APIRouter(
@@ -82,25 +85,25 @@ router.add_api_route(
     "",
     Tools.get_filtered_list,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/detail",
     Tools.get_summary,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/tags",
     Tools.get_tags,
     methods=["GET"],
     deprecated=True,
-    )
+)
 router.add_api_route(
     "/{item_name}/metadata",
     Tools.get_metadata,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/{item_name}/config",
     Tools.get_config,
     methods=["GET"],
-    )
+)

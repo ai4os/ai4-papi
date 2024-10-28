@@ -12,9 +12,11 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def get_items(self):
-    gitmodules_url = "https://raw.githubusercontent.com/ai4os-hub/modules-catalog/master/.gitmodules"
+    gitmodules_url = (
+        "https://raw.githubusercontent.com/ai4os-hub/modules-catalog/master/.gitmodules"
+    )
     r = requests.get(gitmodules_url)
 
     cfg = configparser.ConfigParser()
@@ -34,14 +36,14 @@ def get_config(
     self,
     item_name: str,
     vo: str,
-    ):
+):
     # Check if module exists
     modules = self.get_items()
     if item_name not in modules.keys():
         raise HTTPException(
             status_code=400,
             detail=f"{item_name} is not an available module.",
-            )
+        )
 
     # Retrieve module configuration
     conf = deepcopy(papiconf.MODULES['user']['full'])
@@ -75,7 +77,9 @@ def get_config(
         # Use VS Code (Coder OSS) in the development container
         conf["general"]["service"]["value"] = 'vscode'
         conf["general"]["service"]["options"].insert(0, 'vscode')
-        conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
+        conf["general"]["service"]["options"].remove(
+            'deepaas'
+        )  # no models installed in dev
 
     # Modify the resources limits for a given user or VO
     conf['hardware'] = quotas.limit_resources(
@@ -92,9 +96,11 @@ def get_config(
 
 
 Modules = Catalog()
-Modules.get_items  = types.MethodType(get_items, Modules)
+Modules.get_items = types.MethodType(get_items, Modules)
 Modules.get_config = types.MethodType(get_config, Modules)
-
+Modules.refresh_metadata_cache_entry = types.MethodType(
+    Catalog.refresh_metadata_cache_entry, Modules
+)
 
 router = APIRouter(
     prefix="/modules",
@@ -105,25 +111,25 @@ router.add_api_route(
     "",
     Modules.get_filtered_list,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/detail",
     Modules.get_summary,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/tags",
     Modules.get_tags,
     methods=["GET"],
     deprecated=True,
-    )
+)
 router.add_api_route(
     "/{item_name}/metadata",
     Modules.get_metadata,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/{item_name}/config",
     Modules.get_config,
     methods=["GET"],
-    )
+)
