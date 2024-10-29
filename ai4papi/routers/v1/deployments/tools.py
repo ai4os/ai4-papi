@@ -308,7 +308,7 @@ def create_deployment(
     elif tool_name == 'ai4os-cvat':
 
         # Enforce defining CVAT username and password
-        cvat = {k: v for k, v in user_conf['general'].items() if k.startswith('cvat')}
+        cvat = {k: v for k, v in user_conf['general'].items() if k in ['cvat_username', 'cvat_password']}
         if not all(cvat.values()):
             raise HTTPException(
                 status_code=400,
@@ -324,7 +324,7 @@ def create_deployment(
                 )
 
         # Replace the Nomad job template
-        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        current_date = datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%s")
         job_title = re.sub(
             r'[<>:"/\\|?* ]',
             '_',

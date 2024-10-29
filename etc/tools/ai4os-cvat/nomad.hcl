@@ -87,7 +87,7 @@ job "tool-cvat-${JOB_UUID}" {
     RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
 
     # remote path common for CVAT instances, without trailing /
-    RCLONE_REMOTE_PATH                 = "/ai4os-storage/tools/cvat"
+    RCLONE_REMOTE_PATH                 = "/ai4os-storage/tools/cvat/backups"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -331,6 +331,7 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
         REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
         LOCAL_PATH                  = "/alloc/data"
+        RESTORE_FROM                = "${NOMAD_META_restore_from}"
       }
       config {
         force_pull = true
@@ -378,22 +379,22 @@ job "tool-cvat-${JOB_UUID}" {
               chmod -R 750 $LOCAL_PATH/data
             fi
         done
-        if [[ $(rclone lsd $REMOTE_PATH/backup; echo $?) == 0 ]]; then
-          echo "found a CVAT backup, syncing ..."
-          rm -rf $LOCAL_PATH/backup
-          mkdir -p $LOCAL_PATH/backup
-          rclone sync $REMOTE_PATH/backup $LOCAL_PATH/backup --progress
+        if [[ $(rclone lsd $REMOTE_PATH/$RESTORE_FROM; echo $?) == 0 ]]; then
+          echo "found a CVAT backup $RESTORE_FROM, syncing ..."
+          rm -rf $LOCAL_PATH/$RESTORE_FROM
+          mkdir -p $LOCAL_PATH/$RESTORE_FROM
+          rclone sync $REMOTE_PATH/$RESTORE_FROM $LOCAL_PATH/$RESTORE_FROM --progress
           for tarbal in $tarbals; do
-            if [ -f $LOCAL_PATH/backup/$tarbal.tar.gz ]; then
+            if [ -f $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz ]; then
               echo -n "extracting $tarbal.tar.gz ... "
-              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/backup/$tarbal.tar.gz --strip 1
-              if [[ $? == 0 ]]; then echo "OK"; else "ERROR"; fi
+              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz --strip 1
+              if [[ $? == 0 ]]; then echo "OK"; else echo "ERROR"; fi
             else
-              echo "file not found: $LOCAL_PATH/backup/$tarbal.tar.gz"
+              echo "file not found: $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz"
             fi
           done
         else
-          echo "CVAT backup not found"
+          echo "CVAT backup $RESTORE_FROM not found, a clean start will be performed"
         fi
         EOF
         destination = "local/sync_local.sh"
@@ -420,6 +421,7 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
         REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
         LOCAL_PATH                  = "/alloc/data"
+        BACKUP_NAME                 = "${NOMAD_META_backup_name}"
       }
       config {
         force_pull = true
@@ -458,17 +460,25 @@ job "tool-cvat-${JOB_UUID}" {
         #!/usr/bin/env bash
         tarbals='db data events redis'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        echo "creating a CVAT backup ..."
-        rm -rf $LOCAL_PATH/backup
-        mkdir -p $LOCAL_PATH/backup
+        echo "creating a CVAT backup $BACKUP_NAME ..."
+        if [[ -d $LOCAL_PATH/$BACKUP_NAME ]]; then
+        	echo "ERROR: local backup folder $LOCAL_PATH/$BACKUP_NAME already exists"
+        	exit 1
+        fi
+        rm -rf $LOCAL_PATH/$BACKUP_NAME
+        mkdir -p $LOCAL_PATH/$BACKUP_NAME
         cd $LOCAL_PATH
         for tarbal in $tarbals; do
           echo -n "creating $tarbal.tar.gz ..."
-          tar -czf $LOCAL_PATH/backup/$tarbal.tar.gz $tarbal
-          if [ -f $LOCAL_PATH/backup/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
+          tar -czf $LOCAL_PATH/$BACKUP_NAME/$tarbal.tar.gz $tarbal
+          if [ -f $LOCAL_PATH/$BACKUP_NAME/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
         done
-        rclone mkdir $REMOTE_PATH/backup
-        rclone sync $LOCAL_PATH/backup $REMOTE_PATH/backup --progress
+        if [[ $(rclone lsd $REMOTE_PATH/$BACKUP_NAME; echo $?) == 0 ]]; then
+          echo "ERROR: remote backup folder $REMOTE_PATH/$BACKUP_NAME already exists"
+          exit 1
+        fi
+        rclone mkdir $REMOTE_PATH/$BACKUP_NAME
+        rclone sync $LOCAL_PATH/$BACKUP_NAME $REMOTE_PATH/$BACKUP_NAME --progress
         EOF
         destination = "local/sync_remote.sh"
       }
