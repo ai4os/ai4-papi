@@ -168,13 +168,14 @@ def validate_conf(conf):
     if datasets:
         for d in datasets:
 
-            # Validate DOI
+            # Validate DOI and URL
             # ref: https://stackoverflow.com/a/48524047/18471590
-            pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
-            if not re.match(pattern, d['doi'], re.IGNORECASE):
+            doiPattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
+            urlPattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+            if not (re.match(doiPattern, d['doi'], re.IGNORECASE) or re.match(urlPattern, d['doi'], re.IGNORECASE)):
                 raise HTTPException(
                     status_code=400,
-                    detail="Invalid DOI."
+                    detail="Invalid DOI or URL."
                     )
 
             # Check force pull parameter
