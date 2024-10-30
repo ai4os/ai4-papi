@@ -140,7 +140,9 @@ job "module-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        # image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        image      = "ignacioheredia/docker-storage:latest-rclone"
+        #TODO: revert this when we deploy in production (rebuild Harbor image first)
         privileged = true
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
