@@ -371,13 +371,13 @@ job "tool-cvat-${JOB_UUID}" {
         tarbals='db data events redis'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
         for tarbal in $tarbals; do
-            rm -rf $LOCAL_PATH/$tarbal
-            mkdir -p $LOCAL_PATH/$tarbal
-            if [[ $tarbal == "data" ]]; then
-              chown -R 1000 $LOCAL_PATH/data
-              chgrp -R 1000 $LOCAL_PATH/data
-              chmod -R 750 $LOCAL_PATH/data
-            fi
+          rm -rf $LOCAL_PATH/$tarbal
+          mkdir -p $LOCAL_PATH/$tarbal
+          if [[ $tarbal == "data" ]]; then
+            chown -R 1000 $LOCAL_PATH/data
+            chgrp -R 1000 $LOCAL_PATH/data
+            chmod -R 750 $LOCAL_PATH/data
+          fi
         done
         if [[ $(rclone lsd $REMOTE_PATH/$RESTORE_FROM; echo $?) == 0 ]]; then
           echo "found a CVAT backup $RESTORE_FROM, syncing ..."
@@ -462,8 +462,8 @@ job "tool-cvat-${JOB_UUID}" {
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
         echo "creating a CVAT backup $BACKUP_NAME ..."
         if [[ -d $LOCAL_PATH/$BACKUP_NAME ]]; then
-        	echo "ERROR: local backup folder $LOCAL_PATH/$BACKUP_NAME already exists"
-        	exit 1
+          echo "ERROR: local backup folder $LOCAL_PATH/$BACKUP_NAME already exists"
+          exit 1
         fi
         rm -rf $LOCAL_PATH/$BACKUP_NAME
         mkdir -p $LOCAL_PATH/$BACKUP_NAME
@@ -520,23 +520,23 @@ job "tool-cvat-${JOB_UUID}" {
           echo "
           CREATE TABLE IF NOT EXISTS $$$${CLICKHOUSE_DB}.events
           (
-              \`scope\` String NOT NULL,
-              \`obj_name\` String NULL,
-              \`obj_id\` UInt64 NULL,
-              \`obj_val\` String NULL,
-              \`source\` String NOT NULL,
-              \`timestamp\` DateTime64(3, 'Etc/UTC') NOT NULL,
-              \`count\` UInt16 NULL,
-              \`duration\` UInt32 DEFAULT toUInt32(0),
-              \`project_id\` UInt64 NULL,
-              \`task_id\` UInt64 NULL,
-              \`job_id\` UInt64 NULL,
-              \`user_id\` UInt64 NULL,
-              \`user_name\` String NULL,
-              \`user_email\` String NULL,
-              \`org_id\` UInt64 NULL,
-              \`org_slug\` String NULL,
-              \`payload\` String NULL
+            \`scope\` String NOT NULL,
+            \`obj_name\` String NULL,
+            \`obj_id\` UInt64 NULL,
+            \`obj_val\` String NULL,
+            \`source\` String NOT NULL,
+            \`timestamp\` DateTime64(3, 'Etc/UTC') NOT NULL,
+            \`count\` UInt16 NULL,
+            \`duration\` UInt32 DEFAULT toUInt32(0),
+            \`project_id\` UInt64 NULL,
+            \`task_id\` UInt64 NULL,
+            \`job_id\` UInt64 NULL,
+            \`user_id\` UInt64 NULL,
+            \`user_name\` String NULL,
+            \`user_email\` String NULL,
+            \`org_id\` UInt64 NULL,
+            \`org_slug\` String NULL,
+            \`payload\` String NULL
           )
           ENGINE = MergeTree
           PARTITION BY toYYYYMM(timestamp)
