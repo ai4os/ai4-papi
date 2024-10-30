@@ -26,11 +26,11 @@ script: |-
    def get_rnd_filename(ex):
       rnd_str = ''.join(random.choice(string.ascii_lowercase) for i in range(5))
       if ex == "":
-         TMP_OUTPUT_DIR=os.getenv("TMP_OUTPUT_DIR")
-         filename=''.join([TMP_OUTPUT_DIR, "/" ,"tmp-file-", rnd_str])
+         TMP_OUTPUT_DIR = os.getenv("TMP_OUTPUT_DIR")
+         filename = ''.join([TMP_OUTPUT_DIR, "/" ,"tmp-file-", rnd_str])
          print("Output will be saved on:", filename)
          return filename
-      else: 
+      else:
          return ''.join(["tmp-file-", rnd_str, ".", ex])
 
    def decode_b64(filename, data):
@@ -73,21 +73,21 @@ script: |-
       exit(1)
 
    # Read input file
-   FILE_PATH=os.getenv("INPUT_FILE_PATH")
-   SAVE_OUT=True
+   FILE_PATH = os.getenv("INPUT_FILE_PATH")
+   SAVE_OUT = True
    if not FILE_PATH.endswith(".json"):
-      SAVE_OUT=False
+      SAVE_OUT = False
       run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
-      FILE_PATH=os.getenv("INPUT_FILE_PATH")+".json"
+      FILE_PATH = os.getenv("INPUT_FILE_PATH")+".json"
 
-   DEEPAAS_CLI_VCOMMAND=['deepaas-cli', '--version']
+   DEEPAAS_CLI_VCOMMAND = ['deepaas-cli', '--version']
 
-   OSCAR_FILES="oscar-files"
+   OSCAR_FILES = "oscar-files"
 
    if SAVE_OUT:
-      DEEPAAS_CLI_COMMAND=['deepaas-cli', '--deepaas_method_output', get_rnd_filename("") ,'predict']
+      DEEPAAS_CLI_COMMAND = ['deepaas-cli', '--deepaas_method_output', get_rnd_filename("") ,'predict']
    else:
-      DEEPAAS_CLI_COMMAND=['deepaas-cli', 'predict']
+      DEEPAAS_CLI_COMMAND = ['deepaas-cli', 'predict']
 
    # Process input
    with open(FILE_PATH, "r") as f:
@@ -117,4 +117,3 @@ script: |-
    run(DEEPAAS_CLI_COMMAND)
 
    EOF
-
