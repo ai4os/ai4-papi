@@ -106,11 +106,11 @@ script: |-
               filename = get_rnd_filename(file["file_format"])
               k, v = file["key"], filename
 
-          print("[*] Processing file: ", filename)
-          decode_b64(filename, file["data"])
+              print("[*] Processing file: ", filename)
+              decode_b64(filename, file["data"])
 
-          # Add the arg to the command
-          DEEPAAS_CLI_COMMAND += [f"--{k}", v]
+              # Add the arg to the command
+              DEEPAAS_CLI_COMMAND += [f"--{k}", v]
 
       else:
           if isinstance(v, int) or isinstance(v, float):
