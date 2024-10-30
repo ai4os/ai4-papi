@@ -293,7 +293,7 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         rm -rf $LOCAL_PATH/share
         mkdir -p $LOCAL_PATH/share
         rclone mkdir $REMOTE_PATH/share
@@ -369,7 +369,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         #!/usr/bin/env bash
         tarbals='db data events redis'
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         for tarbal in $tarbals; do
           rm -rf $LOCAL_PATH/$tarbal
           mkdir -p $LOCAL_PATH/$tarbal
@@ -379,22 +379,22 @@ job "tool-cvat-${JOB_UUID}" {
             chmod -R 750 $LOCAL_PATH/data
           fi
         done
-        if [[ $(rclone lsd $REMOTE_PATH/$RESTORE_FROM; echo $?) == 0 ]]; then
-          echo "found a CVAT backup $RESTORE_FROM, syncing ..."
-          rm -rf $LOCAL_PATH/$RESTORE_FROM
-          mkdir -p $LOCAL_PATH/$RESTORE_FROM
-          rclone sync $REMOTE_PATH/$RESTORE_FROM $LOCAL_PATH/$RESTORE_FROM --progress
+        if [[ $(rclone lsd $REMOTE_PATH/$$RESTORE_FROM; echo $?) == 0 ]]; then
+          echo "found a CVAT backup $$RESTORE_FROM, syncing ..."
+          rm -rf $LOCAL_PATH/$$RESTORE_FROM
+          mkdir -p $LOCAL_PATH/$$RESTORE_FROM
+          rclone sync $REMOTE_PATH/$$RESTORE_FROM $LOCAL_PATH/$$RESTORE_FROM --progress
           for tarbal in $tarbals; do
-            if [ -f $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz ]; then
+            if [ -f $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz ]; then
               echo -n "extracting $tarbal.tar.gz ... "
-              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz --strip 1
+              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz --strip 1
               if [[ $? == 0 ]]; then echo "OK"; else echo "ERROR"; fi
             else
-              echo "file not found: $LOCAL_PATH/$RESTORE_FROM/$tarbal.tar.gz"
+              echo "file not found: $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz"
             fi
           done
         else
-          echo "CVAT backup $RESTORE_FROM not found, a clean start will be performed"
+          echo "CVAT backup $$RESTORE_FROM not found, a clean start will be performed"
         fi
         EOF
         destination = "local/sync_local.sh"
@@ -461,7 +461,7 @@ job "tool-cvat-${JOB_UUID}" {
         TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
         BACKUP_NAME="$${BACKUP_NAME}_$${TS}"
         tarbals='db data events redis'
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         echo "creating a CVAT backup $$BACKUP_NAME ..."
         if [[ -d $LOCAL_PATH/$$BACKUP_NAME ]]; then
           echo "ERROR: local backup folder $LOCAL_PATH/$$BACKUP_NAME already exists"
