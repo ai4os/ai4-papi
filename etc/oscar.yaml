@@ -21,8 +21,8 @@ script: |-
   import json
   import os
   import random
-  from subprocess import run, PIPE
   import string
+  import subprocess
 
 
   # Aux function to get a random filename
@@ -35,11 +35,6 @@ script: |-
           return filename
       else:
           return ''.join(["tmp-file-", rnd_str, ".", ex])
-
-
-  def decode_b64(filename, data):
-      with open(filename, "wb") as f:
-          f.write(base64.b64decode(data))
 
 
   # Check the DEEPaaS version
@@ -69,8 +64,9 @@ script: |-
       else:
           return 0
 
+
   required = "2.5.0"  # minimum required DEEPaaS version
-  out = run(["deepaas-cli", "--version"], stdout=PIPE)
+  out = subprocess.run(["deepaas-cli", "--version"], stdout=subprocess.PIPE)
   current = out.stdout.decode("utf-8").split(" ")[0].split("-")[0]
 
   if compare_versions(required, current) == 1:
@@ -82,21 +78,22 @@ script: |-
   SAVE_OUT = True
   if not FILE_PATH.endswith(".json"):
       SAVE_OUT = False
-      run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
-      FILE_PATH = os.getenv("INPUT_FILE_PATH")+".json"
+      subprocess.run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
+      FILE_PATH = os.getenv("INPUT_FILE_PATH") + ".json"
 
   DEEPAAS_CLI_VCOMMAND = ['deepaas-cli', '--version']
 
   OSCAR_FILES = "oscar-files"
 
-  if SAVE_OUT:
-      DEEPAAS_CLI_COMMAND = ['deepaas-cli', '--deepaas_method_output', get_rnd_filename("") ,'predict']
-  else:
-      DEEPAAS_CLI_COMMAND = ['deepaas-cli', 'predict']
-
   # Process input
   with open(FILE_PATH, "r") as f:
       params = json.loads(f.read())
+
+  # Create the DEEPaaS predict command
+  if SAVE_OUT:
+      DEEPAAS_CLI_COMMAND = ["deepaas-cli", "--deepaas_method_output", get_rnd_filename(""), "predict"]
+  else:
+      DEEPAAS_CLI_COMMAND = ["deepaas-cli", "predict"]
 
   for k, v in params.items():
 
@@ -107,7 +104,8 @@ script: |-
               k, v = file["key"], filename
 
               print("[*] Processing file: ", filename)
-              decode_b64(filename, file["data"])
+              with open(filename, "wb") as f:
+                  f.write(base64.b64decode(file["data"]))
 
               # Add the arg to the command
               DEEPAAS_CLI_COMMAND += [f"--{k}", v]
@@ -119,6 +117,7 @@ script: |-
           # Add the arg to the command
           DEEPAAS_CLI_COMMAND += [f"--{k}", v]
 
-  run(DEEPAAS_CLI_COMMAND)
+  print(f"[*] Final command: {' '.join(DEEPAAS_CLI_COMMAND)}")
+  subprocess.run(DEEPAAS_CLI_COMMAND)
 
   EOF
