@@ -459,28 +459,28 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         #!/usr/bin/env bash
         TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
-        BACKUP_NAME="${BACKUP_NAME}_${TS}"
+        BACKUP_NAME="$${BACKUP_NAME}_$${TS}"
         tarbals='db data events redis'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        echo "creating a CVAT backup $BACKUP_NAME ..."
-        if [[ -d $LOCAL_PATH/$BACKUP_NAME ]]; then
-          echo "ERROR: local backup folder $LOCAL_PATH/$BACKUP_NAME already exists"
+        echo "creating a CVAT backup $$BACKUP_NAME ..."
+        if [[ -d $LOCAL_PATH/$$BACKUP_NAME ]]; then
+          echo "ERROR: local backup folder $LOCAL_PATH/$$BACKUP_NAME already exists"
           exit 1
         fi
-        rm -rf $LOCAL_PATH/$BACKUP_NAME
-        mkdir -p $LOCAL_PATH/$BACKUP_NAME
+        rm -rf $LOCAL_PATH/$$BACKUP_NAME
+        mkdir -p $LOCAL_PATH/$$BACKUP_NAME
         cd $LOCAL_PATH
         for tarbal in $tarbals; do
           echo -n "creating $tarbal.tar.gz ..."
-          tar -czf $LOCAL_PATH/$BACKUP_NAME/$tarbal.tar.gz $tarbal
-          if [ -f $LOCAL_PATH/$BACKUP_NAME/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
+          tar -czf $LOCAL_PATH/$$BACKUP_NAME/$tarbal.tar.gz $tarbal
+          if [ -f $LOCAL_PATH/$$BACKUP_NAME/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
         done
-        if [[ $(rclone lsd $REMOTE_PATH/$BACKUP_NAME; echo $?) == 0 ]]; then
-          echo "ERROR: remote backup folder $REMOTE_PATH/$BACKUP_NAME already exists"
+        if [[ $(rclone lsd $REMOTE_PATH/$$BACKUP_NAME; echo $?) == 0 ]]; then
+          echo "ERROR: remote backup folder $REMOTE_PATH/$$BACKUP_NAME already exists"
           exit 1
         fi
-        rclone mkdir $REMOTE_PATH/$BACKUP_NAME
-        rclone sync $LOCAL_PATH/$BACKUP_NAME $REMOTE_PATH/$BACKUP_NAME --progress
+        rclone mkdir $REMOTE_PATH/$$BACKUP_NAME
+        rclone sync $LOCAL_PATH/$$BACKUP_NAME $REMOTE_PATH/$$BACKUP_NAME --progress
         EOF
         destination = "local/sync_remote.sh"
       }
