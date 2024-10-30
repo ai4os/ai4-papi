@@ -299,7 +299,7 @@ job "tool-cvat-${JOB_UUID}" {
         rclone mkdir $REMOTE_PATH/share
         chown 1000:1000 $LOCAL_PATH/share
         chmod 750 $LOCAL_PATH/share
-        rclone --log-level DEBUG mount $REMOTE_PATH/share $LOCAL_PATH/share \
+        rclone --log-level INFO mount $REMOTE_PATH/share $LOCAL_PATH/share \
           --uid 1000 \
           --gid 1000 \
           --dir-perms 0750 \
@@ -379,8 +379,10 @@ job "tool-cvat-${JOB_UUID}" {
             chmod -R 750 $LOCAL_PATH/data
           fi
         done
-        if [[ $(rclone lsd $REMOTE_PATH/$$RESTORE_FROM; echo $?) == 0 ]]; then
-          echo "found a CVAT backup $$RESTORE_FROM, syncing ..."
+        if [ -z "$${RESTORE_FROM}" ]; then
+          echo "CVAT backup not specified, a clean start will be performed"
+        elif [[ $(rclone lsd $REMOTE_PATH/$$RESTORE_FROM; echo $?) == 0 ]]; then
+          echo "found a CVAT backup '$$RESTORE_FROM', syncing ..."
           rm -rf $LOCAL_PATH/$$RESTORE_FROM
           mkdir -p $LOCAL_PATH/$$RESTORE_FROM
           rclone sync $REMOTE_PATH/$$RESTORE_FROM $LOCAL_PATH/$$RESTORE_FROM --progress
@@ -394,7 +396,7 @@ job "tool-cvat-${JOB_UUID}" {
             fi
           done
         else
-          echo "CVAT backup $$RESTORE_FROM not found, a clean start will be performed"
+          echo "CVAT backup '$$RESTORE_FROM' not found, a clean start will be performed"
         fi
         EOF
         destination = "local/sync_local.sh"
@@ -1024,7 +1026,7 @@ job "tool-cvat-${JOB_UUID}" {
         command = "run"
         args = [
           "--server",
-          "--log-level=debug",
+          "--log-level=info",
           "--set=services.cvat.url=http://${NOMAD_HOST_ADDR_server}",
           "--set=bundles.cvat.service=cvat",
           "--set=bundles.cvat.resource=/api/auth/rules",
