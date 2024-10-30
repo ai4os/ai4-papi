@@ -64,7 +64,7 @@ script: |-
       else:
          return 0
 
-   required = "2.3.2"  # minimum required DEEPaaS version
+   required = "2.5.0"  # minimum required DEEPaaS version
    out = run(["deepaas-cli", "--version"], stdout=PIPE)
    current = out.stdout.decode("utf-8").split(" ")[0].split("-")[0]
 
