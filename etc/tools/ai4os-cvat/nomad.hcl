@@ -87,7 +87,7 @@ job "tool-cvat-${JOB_UUID}" {
     RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
 
     # remote path common for CVAT instances, without trailing /
-    RCLONE_REMOTE_PATH                 = "/ai4os-storage/tools/cvat/backups"
+    RCLONE_REMOTE_PATH                 = "/ai4os-storage/tools/cvat"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -329,7 +329,7 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
+        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}/backups"
         LOCAL_PATH                  = "/alloc/data"
         RESTORE_FROM                = "${NOMAD_META_restore_from}"
       }
@@ -419,7 +419,7 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
+        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}/backups"
         LOCAL_PATH                  = "/alloc/data"
         BACKUP_NAME                 = "${NOMAD_META_backup_name}"
       }
@@ -458,6 +458,8 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
+        TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
+        BACKUP_NAME="${BACKUP_NAME}_${TS}"
         tarbals='db data events redis'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
         echo "creating a CVAT backup $BACKUP_NAME ..."
