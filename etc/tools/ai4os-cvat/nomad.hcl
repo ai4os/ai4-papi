@@ -140,6 +140,13 @@ job "tool-cvat-${JOB_UUID}" {
 
   group "usergroup" {
 
+    # Recover the job in the **original** node when the network comes back
+    # (after a network cut).
+    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
+    # Do not increase too much this limit because we want to still be able to notice
+    # when nodes are truly removed from the cluster (not just temporarily lost).
+    max_client_disconnect = "240h"
+
     ephemeral_disk {
       size = 4096
     }
