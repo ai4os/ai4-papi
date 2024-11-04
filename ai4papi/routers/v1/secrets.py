@@ -138,7 +138,7 @@ def get_secrets(
         subpath += '/'
 
     # Retrieve initial level-0 secrets
-    user_path = f"users/{auth_info['id']}"
+    user_path = f"users/{auth_info['id']}/{vo}"
     try:
         r = client.secrets.kv.v1.list_secrets(
             path = user_path + subpath,
@@ -201,7 +201,7 @@ def create_secret(
 
     # Create secret
     client.secrets.kv.v1.create_or_update_secret(
-        path=f"users/{auth_info['id']}/{secret_path}",
+        path=f"users/{auth_info['id']}/{vo}/{secret_path}",
         mount_point='/secrets/',
         secret=secret_data,
     )
@@ -237,7 +237,7 @@ def delete_secret(
 
     # Delete secret
     client.secrets.kv.v1.delete_secret(
-        path=f"users/{auth_info['id']}/{secret_path}",
+        path=f"users/{auth_info['id']}/{vo}/{secret_path}",
         mount_point=VAULT_MOUNT_POINT,
     )
 
