@@ -61,7 +61,7 @@ def storage_ls(
         # Use rclone to parse the existing CVAT backups to restore from
         result = subprocess.run([
             f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
-            f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/webdav/ && "
+            f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
             "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
             f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
             f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
