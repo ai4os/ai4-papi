@@ -127,3 +127,9 @@ router.add_api_route(
     Modules.get_config,
     methods=["GET"],
     )
+
+router.add_api_route(
+    "/refresh",
+    Modules.refresh_metadata_cache_entry,
+    methods=["GET"],
+)

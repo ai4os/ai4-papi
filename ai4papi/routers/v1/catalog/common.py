@@ -121,7 +121,7 @@ class Catalog:
         return []
 
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60), key=lambda self, item_name: item_name,)
     def get_metadata(
         self,
         item_name: str,
@@ -246,6 +246,22 @@ class Catalog:
 
         return metadata
 
+    def refresh_metadata_cache_entry(self, item_name: str):
+        if item_name in self.get_items().keys():
+            try:
+                self.get_metadata.cache.pop(item_name, None)
+                self.get_metadata(item_name)
+
+                return {"message": "Cache refreshed successfully"}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{item_name} is not an available tool or metadata.",
+            )
+            
     def get_config(
         self,
         ):
@@ -276,3 +292,5 @@ def retrieve_docker_tags(
             )
     tags = [i["name"] for i in r["results"]]
     return tags
+
+
