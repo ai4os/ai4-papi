@@ -8,24 +8,28 @@ services:
         environment:
             - NOMAD_ADDR=https://193.146.75.205:4646
             - ACCOUNTING_PTH=/home/ai4-accounting
-            - ZENODO_TOKEN=*************************
+            - ZENODO_TOKEN=*****************************
+            - PAPI_GITHUB_TOKEN=************************
+            - MAILING_TOKEN=****************************
+            - HARBOR_ROBOT_PASSWORD=********************
         volumes:
-            - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
-            - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting
+            - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
+            - /home/ubuntu/ai4-accounting:/home/ai4-accounting
         ports:
             - 8080:80
 
     ai4-papi-dev:
-    # Right now dev is pointing to same services as prod.
-    # Will change in the future.
-        image: "registry.services.ai4os.eu/ai4os/ai4-papi:prod"
+        image: "registry.services.ai4os.eu/ai4os/ai4-papi:dev"
         restart: always
         environment:
             - NOMAD_ADDR=https://193.146.75.205:4646
             - ACCOUNTING_PTH=/home/ai4-accounting
-            - ZENODO_TOKEN=*************************
+            - ZENODO_TOKEN=*****************************
+            - PAPI_GITHUB_TOKEN=************************
+            - MAILING_TOKEN=****************************
+            - HARBOR_ROBOT_PASSWORD=********************
         volumes:
-            - /home/ubuntu/nomad-certs/nomad-prod:/home/nomad-certs
-            - /mnt/ai4os-logs/ai4-accounting:/home/ai4-accounting
+            - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
+            - /home/ubuntu/ai4-accounting:/home/ai4-accounting
         ports:
             - 8081:80

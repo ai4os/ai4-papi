@@ -20,11 +20,6 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
-  hostname:
-    name: Hostname
-    value: ''
-    description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
-
   docker_image:
     name: Docker image
     value: 'ai4oshub/ai4os-federated-server'

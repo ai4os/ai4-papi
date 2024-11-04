@@ -20,7 +20,6 @@
 #     - 127 GB RAM --> ~57 GB / gpu (reserving 10% for the node)
 
 general:
-
   title:
     name: Deployment title
     value: ''
@@ -30,11 +29,6 @@ general:
     name: Deployment description
     value: ''
     description: Provide some additional extended information about this deployment.
-
-  hostname:
-    name: Custom domain
-    value: ''
-    description: Host domain where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
   docker_image:
     name: Docker image
@@ -59,7 +53,6 @@ general:
     description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
 
 hardware:
-
   cpu_num:
     name: Number of CPUs
     value: 4
@@ -87,7 +80,6 @@ hardware:
     range: [1000, 50000]
 
 storage:
-
   rclone_conf:
     name: RCLONE configuration
     value: '/srv/.rclone/rclone.conf'
@@ -95,8 +87,8 @@ storage:
 
   rclone_url:
     name: Storage URL
-    value: 'https://share.services.ai4os.eu/remote.php/webdav/'
-    description: Remote storage link to be accessed via rclone (webdav)
+    value: ''
+    description: Remote storage link to be accessed via rclone (webdav). For example, in Nextcloud `https://share.services.ai4os.eu/remote.php/dav/files/<USER-ID>`
 
   rclone_vendor:
     name: RCLONE vendor
