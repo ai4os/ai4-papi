@@ -131,7 +131,7 @@ for container_id in $container_ids; do
                         echo "Container ID: $container_id"
                         echo "Creating a snapshot of docker container"
 
-                        sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SNAPSHOT_DATE}" VO="${VO}"' $container_id ${FORMATTED_OWNER}
+                        sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SUBMIT_TIME}" VO="${VO}"' $container_id ${FORMATTED_OWNER}
 
                         echo "Login on the registry"
 
