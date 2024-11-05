@@ -91,7 +91,7 @@ def get_config(
     return conf
 
 
-Modules = Catalog()
+Modules = Catalog(item_type='module')
 Modules.get_items  = types.MethodType(get_items, Modules)
 Modules.get_config = types.MethodType(get_config, Modules)
 
@@ -129,7 +129,7 @@ router.add_api_route(
     )
 
 router.add_api_route(
-    "/refresh",
+    "/{item_name}/refresh",
     Modules.refresh_metadata_cache_entry,
-    methods=["GET"],
+    methods=["PUT"],
 )

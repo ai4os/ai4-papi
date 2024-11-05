@@ -68,7 +68,7 @@ def get_config(
     return conf
 
 
-Tools = Catalog()
+Tools = Catalog(item_type='tool')
 Tools.get_items = types.MethodType(get_items, Tools)
 Tools.get_config = types.MethodType(get_config, Tools)
 
@@ -105,7 +105,7 @@ router.add_api_route(
     methods=["GET"],
     )
 router.add_api_route(
-    "/refresh",
+    "/{item_name}/refresh",
     Tools.refresh_metadata_cache_entry,
-    methods=["GET"],
+    methods=["PUT"],
 )
