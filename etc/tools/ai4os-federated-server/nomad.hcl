@@ -155,6 +155,10 @@ job "tool-fl-${JOB_UUID}" {
         MU_FEDPROX                      = "${MU_FEDPROX}"
         FEDAVGM_SERVER_FL               = "${FEDAVGM_SERVER_FL}"
         FEDAVGM_SERVER_MOMENTUM         = "${FEDAVGM_SERVER_MOMENTUM}"
+        DP                              = "${DP}"
+        NOISE_MULT                      = "${NOISE_MULT}"
+        SAMPLED_CLIENTS                 = "${SAMPLED_CLIENTS}"
+        CLIP_NORM                       = "${CLIP_NORM}"
       }
 
       resources {
