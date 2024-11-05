@@ -265,7 +265,7 @@ def create_deployment(
     # If storage credentials not provided, remove all storage-related tasks
     rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
     if not all(rclone.values()):
-        exclude_tasks = ['storagetask', 'storagecleanup', 'dataset_download']
+        exclude_tasks = ['storage_mount', 'storage_cleanup', 'dataset_download']
     else:
         # If datasets provided, replicate 'dataset_download' task as many times as needed
         if user_conf['storage']['datasets']:
