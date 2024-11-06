@@ -318,11 +318,25 @@ def get_nomad_snapshots(
     # user_jobs = []
     snapshots = []
     for j in jobs:
+
         # Get job to retrieve the metadata
         job_info = Nomad.job.get_job(
             id_=j["ID"],
             namespace=namespace,
         )
+
+        # Generate snapshot info template
+        tmp = {
+            "snapshot_ID": job_info["Meta"].get("snapshot_id"),
+            "status": None,
+            "error_msg": None,
+            "submit_time": job_info["Meta"].get("submit_time"),
+            "size": None,
+            "title": None,
+            "description": None,
+            "nomad_ID": j["ID"],
+            "docker_image": None,
+        }
 
         # Get allocation to retrieve the task status
         allocs = Nomad.job.get_allocations(
@@ -340,32 +354,14 @@ def get_nomad_snapshots(
             )
         ][::-1]  # more recent first
 
-        # Check status of both tasks
-        tasks = allocs[0]["TaskStates"]
-        
-        # size_status = tasks["check-container-size"]["State"]
-        # size_error = tasks["check-container-size"]["Failed"]
-        # upload_status = tasks["upload-image-registry"]["State"]
-        # upload_error = tasks["upload-image-registry"]["Failed"]
+        # Check status of both tasks and generate appropriate snapshot status/error
+        tasks = allocs[0]["TaskStates"] if allocs else {}
 
-        size_status = tasks.get("check-container-size", {}).get("State", "starting")
+        size_status = tasks.get("check-container-size", {}).get("State", None)
         size_error = tasks.get("check-container-size", {}).get("Failed", False)
-        upload_status = tasks.get("upload-image-registry", {}).get("State", "starting")
+        upload_status = tasks.get("upload-image-registry", {}).get("State", None)
         upload_error = tasks.get("upload-image-registry", {}).get("Failed", False)
 
-
-        # Generate snapshot
-        tmp = {
-            "snapshot_ID": job_info["Meta"].get("snapshot_id"),
-            "status": None,
-            "error_msg": None,
-            "submit_time": job_info["Meta"].get("submit_time"),
-            "size": None,
-            "title": None,
-            "description": None,
-            "nomad_ID": j["ID"],
-            "docker_image": None,
-        }
         if size_error:
             tmp["status"] = "failed"
             tmp["error_msg"] = (
@@ -379,7 +375,7 @@ def get_nomad_snapshots(
         elif size_status == "running" or upload_status == "running":
             tmp["status"] = "in progress"
 
-        elif allocs[0]["ClientStatus"] == "pending" or size_status == "starting" or upload_status == "starting":
+        elif allocs[0]["ClientStatus"] == "pending" or (not size_status) or (not upload_status):
             tmp["status"] = "starting"
 
         else:
