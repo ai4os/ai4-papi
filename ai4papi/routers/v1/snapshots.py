@@ -342,10 +342,17 @@ def get_nomad_snapshots(
 
         # Check status of both tasks
         tasks = allocs[0]["TaskStates"]
-        size_status = tasks["check-container-size"]["State"]
-        size_error = tasks["check-container-size"]["Failed"]
-        upload_status = tasks["upload-image-registry"]["State"]
-        upload_error = tasks["upload-image-registry"]["Failed"]
+        
+        # size_status = tasks["check-container-size"]["State"]
+        # size_error = tasks["check-container-size"]["Failed"]
+        # upload_status = tasks["upload-image-registry"]["State"]
+        # upload_error = tasks["upload-image-registry"]["Failed"]
+
+        size_status = tasks.get("check-container-size", {}).get("State", "starting")
+        size_error = tasks.get("check-container-size", {}).get("Failed", False)
+        upload_status = tasks.get("upload-image-registry", {}).get("State", "starting")
+        upload_error = tasks.get("upload-image-registry", {}).get("Failed", False)
+
 
         # Generate snapshot
         tmp = {
@@ -372,7 +379,7 @@ def get_nomad_snapshots(
         elif size_status == "running" or upload_status == "running":
             tmp["status"] = "in progress"
 
-        elif allocs[0]["ClientStatus"] == "pending":
+        elif allocs[0]["ClientStatus"] == "pending" or size_status == "starting" or upload_status == "starting":
             tmp["status"] = "starting"
 
         else:
