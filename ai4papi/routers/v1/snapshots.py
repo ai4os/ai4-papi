@@ -276,7 +276,7 @@ def get_harbor_snapshots(
         snapshots.append(
             {
                 "snapshot_ID": a.tags[0].name,
-                "status": "completed",
+                "status": "complete",
                 "error_msg": None,
                 "submit_time": a_labels["DATE"],
                 "size": a.size,  # bytes
