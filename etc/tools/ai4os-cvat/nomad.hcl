@@ -56,8 +56,8 @@ job "tool-cvat-${JOB_UUID}" {
     description = "${DESCRIPTION}"
 
     # CVAT-specific metadata
-    force_pull_img_cvat_server         = false
-    force_pull_img_cvat_ui             = false
+    force_pull_img_cvat_server         = true
+    force_pull_img_cvat_ui             = true
     cvat_version                       = "v2.7.3"
     cvat_version_custom                = "-AI4OS"
     cvat_hostname                      = "${meta.domain}-${BASE_DOMAIN}"
@@ -75,13 +75,12 @@ job "tool-cvat-${JOB_UUID}" {
     opa_image                          = "openpolicyagent/opa:0.45.0-rootless"
     vector_image                       = "timberio/vector:0.26.0-alpine"
     server_image                       = "registry.services.ai4os.eu/ai4os/ai4-cvat-server"
-    su_username                        = "admin"
+    su_username                        = "${CVAT_USERNAME}"
     su_password                        = "${CVAT_PASSWORD}"
-    su_email                           = "${CVAT_USERNAME}"
 
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
     RCLONE_CONFIG_RSHARE_TYPE          = "webdav"
-    RCLONE_CONFIG_RSHARE_URL           = "${RCLONE_CONFIG_RSHARE_URL}"
+    RCLONE_CONFIG_RSHARE_URL           = "${RCLONE_CONFIG_RSHARE_URL}/${RCLONE_CONFIG_RSHARE_USER}"
     RCLONE_CONFIG_RSHARE_VENDOR        = "${RCLONE_CONFIG_RSHARE_VENDOR}"
     RCLONE_CONFIG_RSHARE_USER          = "${RCLONE_CONFIG_RSHARE_USER}"
     RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
@@ -730,6 +729,7 @@ job "tool-cvat-${JOB_UUID}" {
         memory = 4096
       }
       env {
+        DJANGO_LOG_LEVEL = "INFO"
         DJANGO_MODWSGI_EXTRA_ARGS = ""
         ALLOWED_HOSTS = "*"
         CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
@@ -747,7 +747,6 @@ job "tool-cvat-${JOB_UUID}" {
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         DJANGO_SUPERUSER_USERNAME = "${NOMAD_META_su_username}"
         DJANGO_SUPERUSER_PASSWORD = "${NOMAD_META_su_password}"
-        DJANGO_SUPERUSER_EMAIL = "${NOMAD_META_su_email}"
         CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
         CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
         CVAT_ANALYTICS = "1"

@@ -28,14 +28,14 @@ general:
     description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
   cvat_username:
-    name: CVAT username
+    name: CVAT superuser name
     value: ''
-    description: Select a username (or email) for your CVAT instance.
+    description: Select a username (or email) for your CVAT instance superuser.
 
   cvat_password:
-    name: CVAT password
+    name: CVAT superuser password
     value: ''
-    description: Select a password for your CVAT instance.
+    description: Select a password for your CVAT instance superuser.
 
 storage:
 
@@ -46,7 +46,7 @@ storage:
 
   rclone_url:
     name: Storage URL
-    value: 'https://share.services.ai4os.eu/remote.php/webdav/'
+    value: 'https://share.services.ai4os.eu/remote.php/dav/files'
     description: Remote storage link to be accessed via rclone (webdav)
 
   rclone_vendor:

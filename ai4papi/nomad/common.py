@@ -133,7 +133,7 @@ def get_deployment(
         # Iterate through tags to find `Host` tag
         for t in s['Tags']:
             try:
-                url = re.search('Host\(`(.+?)`', t).group(1)
+                url = re.search(r'Host\(`(.+?)`', t).group(1)
                 break
             except Exception:
                 url = "missing-endpoint"
