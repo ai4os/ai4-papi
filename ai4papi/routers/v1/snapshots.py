@@ -354,9 +354,11 @@ def get_nomad_snapshots(
             )
         ][::-1]  # more recent first
 
-        # Check status of both tasks and generate appropriate snapshot status/error
-        tasks = allocs[0]["TaskStates"] if allocs else {}
+        # Retrieve tasks
+        tasks = allocs[0]["TaskStates"] if allocs else {}  # if no allocations, use empty dict
+        tasks = tasks or {}  # if None, use empty dict
 
+        # Check status of both tasks and generate appropriate snapshot status/error
         size_status = tasks.get("check-container-size", {}).get("State", None)
         size_error = tasks.get("check-container-size", {}).get("Failed", False)
         upload_status = tasks.get("upload-image-registry", {}).get("State", None)
