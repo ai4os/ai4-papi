@@ -45,11 +45,10 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Else only retrieve from allowed VOs
+    # Always remove VOs that do not belong to the project
     if not vos:
         vos = auth_info['vos']
-    else:
-        vos = set(vos).intersection(auth_info['vos'])
+    vos = set(vos).intersection(set(papiconf.MAIN_CONF['auth']['VO']))
     if not vos:
         raise HTTPException(
             status_code=401,
