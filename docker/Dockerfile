@@ -4,9 +4,12 @@ FROM ubuntu:22.04
 
 # Install Nomad
 # Updated commands: https://developer.hashicorp.com/nomad/tutorials/get-started/gs-install
+# curl, unzip: install for the rclone command
 RUN apt-get update && \
     apt-get install -y \
     wget \
+    curl \
+    unzip \
     gpg \
     coreutils \
     lsb-release \
