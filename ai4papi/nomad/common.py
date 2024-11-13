@@ -133,7 +133,7 @@ def get_deployment(
         # Iterate through tags to find `Host` tag
         for t in s['Tags']:
             try:
-                url = re.search('Host\(`(.+?)`', t).group(1)
+                url = re.search(r'Host\(`(.+?)`', t).group(1)
                 break
             except Exception:
                 url = "missing-endpoint"
@@ -166,7 +166,7 @@ def get_deployment(
         info['main_endpoint'] = service2endpoint[service]
 
     except Exception:  # return first endpoint
-        info['main_endpoint'] = list(info['endpoints'].values())[0]
+        info['main_endpoint'] = list(info['endpoints'].keys())[0]
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
@@ -274,7 +274,7 @@ def get_deployment(
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
         info['status'] = 'error'
-        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
+        info['error_msg'] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
         # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."

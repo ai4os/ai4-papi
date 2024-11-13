@@ -43,4 +43,6 @@ assert ('/v1/try_me/nomad', {'GET'}) in routes
 assert ('/v1/try_me/nomad/{deployment_uuid}', {'GET'}) in routes
 assert ('/v1/try_me/nomad/{deployment_uuid}', {'DELETE'}) in routes
 
+assert ('/v1/storage/{storage_name}/ls', {'GET'}) in routes
+
 print('Checks for API routes passed!')
