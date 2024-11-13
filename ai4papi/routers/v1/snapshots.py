@@ -357,6 +357,7 @@ def get_nomad_snapshots(
         # Retrieve tasks
         tasks = allocs[0]["TaskStates"] if allocs else {}  # if no allocations, use empty dict
         tasks = tasks or {}  # if None, use empty dict
+        client_status = allocs[0]["ClientStatus"] if allocs else None
 
         # Check status of both tasks and generate appropriate snapshot status/error
         size_status = tasks.get("check-container-size", {}).get("State", None)
@@ -377,11 +378,11 @@ def get_nomad_snapshots(
         elif size_status == "running" or upload_status == "running":
             tmp["status"] = "in progress"
 
-        elif allocs[0]["ClientStatus"] == "pending" or (not size_status) or (not upload_status):
+        elif client_status == "pending" or (not size_status) or (not upload_status):
             tmp["status"] = "starting"
 
         else:
-            # Avoid showing dead/completed jobs to users
+            # Avoid showing dead user jobs that completed correctly
             continue
 
         snapshots.append(tmp)
