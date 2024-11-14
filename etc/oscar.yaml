@@ -81,10 +81,6 @@ script: |-
       subprocess.run(["mv", "$INPUT_FILE_PATH", "$INPUT_FILE_PATH.json"])
       FILE_PATH = os.getenv("INPUT_FILE_PATH") + ".json"
 
-  DEEPAAS_CLI_VCOMMAND = ['deepaas-cli', '--version']
-
-  OSCAR_FILES = "oscar-files"
-
   # Process input
   with open(FILE_PATH, "r") as f:
       params = json.loads(f.read())
