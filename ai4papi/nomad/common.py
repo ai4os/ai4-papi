@@ -260,8 +260,13 @@ def get_deployment(
             info['active_endpoints'] = []
             for k, v in info['endpoints'].items():
                 try:
+                    # We use GET and not HEAD, because HEAD is not returning the correct status_codes (even with "allow_redirects=True")
+                    # Anyway, both latencies are almost the same when using "allow_redirects=True"
+                    # * IDE deployed: GET (200), HEAD (405) | latency: ~90 ms
+                    # * API not deployed: GET (502), HEAD (502) | latency: ~40 ms
+                    # * Non existing domain: GET (404), HEAD (404) | latency: ~40 ms
                     r = session.get(v, timeout=2)
-                    if r.status_code == 200:
+                    if r.ok:
                         info['active_endpoints'].append(k)
                 except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
                     continue
