@@ -279,7 +279,19 @@ def create_deployment(
         # Always exclude initial 'dataset_download' task, as it is used as template
         exclude_tasks = ['dataset_download']
 
+    # If DEEPaaS was not launched, do not launch UI because it will fail
+    if user_conf['general']['service'] != 'deepaas':
+        exclude_tasks.append('ui')
+
     tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
+
+    # Remove appropriate ports in each case
+    services = nomad_conf['TaskGroups'][0]['Services']
+    if user_conf['general']['service'] == 'deepaas':
+        exclude_services = ['ide']
+    else:
+        exclude_services = ['ui']
+    services[:] = [s for s in services if s['PortLabel'] not in exclude_services]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
