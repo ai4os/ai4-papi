@@ -2,10 +2,12 @@
 Miscellaneous utils
 """
 from datetime import datetime
+import json
+from pathlib import Path
 import os
 import re
 
-from cachetools import cached, TTLCache
+from cachetools import cached, TTLCache, LRUCache
 from fastapi import HTTPException
 import requests
 
@@ -125,3 +127,47 @@ def get_github_info(owner, repo):
         print(f'  [Error] Failed to parse Github repo info: {msg}')
 
     return out
+
+
+@cached(cache=LRUCache(maxsize=20))
+def retrieve_from_snapshots(
+    deployment_uuid: str,
+    ):
+    """
+    Retrieve the deployment info from Nomad periodic snapshots.
+
+    This implementation is ugly as hell (iterate through all JSONs). Hopefully
+    after refactoring the "ai4-accounting" repo we will implement something cleaner
+    (eg. database).
+
+    Anyway, not a big concern because this function is not meant to be called very
+    frequently and latency from reading JSONs is very small.
+    """
+    main_dir = os.environ.get('ACCOUNTING_PTH', None)
+    if not main_dir:
+        raise HTTPException(
+            status_code=500,
+            detail="Accounting repo with snapshots not available.",
+            )
+    snapshot_dir = Path(main_dir) / 'snapshots'
+
+    # Iterate over snapshots, from recent to old
+    for snapshot_pth in sorted(snapshot_dir.glob('**/*.json'))[::-1]:
+
+        # Load the snapshot
+        with open(snapshot_pth, 'r') as f:
+            snapshot = json.load(f)
+
+        # Iterate over deployments until we find the correct one
+        for namespace, jobs in snapshot.items():
+            for job in jobs:
+                if (job['job_ID'] == deployment_uuid) and (job['status'] == 'running'):
+                    job['namespace'] = namespace
+                    job['alloc_end'] = f'{snapshot_pth.stem}0000Z'  # the end date is approximate (true value lies between this snapshot date and next one)
+                    return job
+
+    # If no deployment found, show error
+    raise HTTPException(
+        status_code=404,
+        detail="Could not find the deployment in the database."
+        )

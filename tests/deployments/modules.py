@@ -97,4 +97,13 @@ rdeps3 = modules.get_deployments(
 )
 assert not any([d['job_ID']==rcreate['job_ID'] for d in rdeps3])
 
+# Check that we are able to retrieve info from Nomad snapshots (provenance)
+r_prov = modules.get_deployment(
+    vo='',
+    deployment_uuid='de0599d6-a1b9-11ef-b98d-0242ac120005',
+    authorization=SimpleNamespace(
+        credentials='1234'
+    ),
+)
+
 print('Deployments (modules) tests passed!')
