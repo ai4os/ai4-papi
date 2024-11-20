@@ -95,6 +95,9 @@ job "module-${JOB_UUID}" {
       port "ui" {
         to = 80
       }
+      port "custom" {
+        to = 80
+      }
     }
 
     service {
@@ -134,6 +137,16 @@ job "module-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ui.tls=true",
         "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+      ]
+    }
+
+    service {
+      name = "${JOB_UUID}-custom"
+      port = "custom"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-custom.tls=true",
+        "traefik.http.routers.${JOB_UUID}-custom.rule=Host(`custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -249,7 +262,7 @@ job "module-${JOB_UUID}" {
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         command    = "deep-start"
         args       = ["--${SERVICE}"]
-        ports      = ["api", "monitor", "ide"]
+        ports      = ["api", "monitor", "ide", "custom"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         volumes    = [

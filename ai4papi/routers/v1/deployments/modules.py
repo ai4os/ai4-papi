@@ -285,7 +285,7 @@ def create_deployment(
 
     tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
 
-    # Remove appropriate ports in each case
+    # Remove appropriate Traefik domains in each case (no need to remove the ports)
     services = nomad_conf['TaskGroups'][0]['Services']
     if user_conf['general']['service'] == 'deepaas':
         exclude_services = ['ide']
