@@ -11,6 +11,12 @@ memory: ${MEMORY}Mi
 vo: ${VO}
 allowed_users: ${ALLOWED_USERS}
 environment: ${ENV_VARS}
+input:
+  - storage_provider: minio.default
+    path: ${NAME}/inputs
+output:
+  - storage_provider: minio.default
+    path: ${NAME}/outputs
 script: |-
   echo "[*] Using DEEPaaS version $(deepaas-run --version)"
   echo "[*] Using Python version $(python3 --version)"
