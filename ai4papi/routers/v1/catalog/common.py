@@ -265,7 +265,6 @@ class Catalog:
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
-            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
             metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
 
         return metadata
