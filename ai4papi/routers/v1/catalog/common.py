@@ -72,7 +72,7 @@ class Catalog:
         modules = {}
         for section in cfg.sections():
             items = dict(cfg.items(section))
-            key = items.pop('path').lower()
+            key = items.pop('path')
             items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
             modules[key] = items
 
