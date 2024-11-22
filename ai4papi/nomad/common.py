@@ -212,13 +212,13 @@ def get_deployment(
         info['datacenter'] = Nomad.node.get_node(a['NodeID'])['Datacenter']
 
         # Replace Nomad status with a more user-friendly status
-        if a['ClientStatus'] == 'pending':
-            info['status'] = 'starting'
-        elif a['ClientStatus'] == 'unknown':
-            info['status'] = 'down'
-        else:
-            # This status can be for example: "complete", "failed"
-            info['status'] = a['ClientStatus']
+        # Final list includes: starting, down, running, complete, failed, ...
+        status = a['TaskStates']['main']['State'] # more relevant than a['ClientStatus']
+        status_map = {  # nomad: papi
+            'pending': 'starting',
+            'unknown': 'down',
+        }
+        info['status'] = status_map.get(status, status)  # if not mapped, then return original status
 
         # Add error messages if needed
         if info['status'] == 'failed':
