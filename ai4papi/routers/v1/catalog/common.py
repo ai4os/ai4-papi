@@ -72,7 +72,7 @@ class Catalog:
         modules = {}
         for section in cfg.sections():
             items = dict(cfg.items(section))
-            key = items.pop('path').lower()
+            key = items.pop('path')
             items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
             modules[key] = items
 
@@ -265,7 +265,6 @@ class Catalog:
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
-            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
             metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
 
         return metadata
