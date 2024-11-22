@@ -213,7 +213,9 @@ def get_deployment(
 
         # Replace Nomad status with a more user-friendly status
         # Final list includes: starting, down, running, complete, failed, ...
-        status = a['TaskStates']['main']['State'] # more relevant than a['ClientStatus']
+        # We use the status of the "main" task because it isn more relevant the the
+        # status of the overall job (a['ClientStatus'])
+        status = a['TaskStates']['main']['State'] if a.get('TaskStates') else 'queued'
         status_map = {  # nomad: papi
             'pending': 'starting',
             'unknown': 'down',
