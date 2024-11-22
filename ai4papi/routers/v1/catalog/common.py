@@ -22,6 +22,7 @@ ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hasha
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
+import configparser
 import os
 import re
 from typing import Tuple, Union
@@ -34,6 +35,7 @@ from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import utils
+import ai4papi.conf as papiconf
 
 
 security = HTTPBearer()
@@ -43,8 +45,13 @@ JENKINS_TOKEN = os.getenv('PAPI_JENKINS_TOKEN')
 
 class Catalog:
 
-
-    def __init__(self, item_type='item') -> None:
+    def __init__(self, repo:str, item_type:str='item') -> None:
+        """
+        Parameters:
+        * repo: Github repo where the catalog is hosted (via git submodules)
+        * item_type: Name to display in messages (eg. "module", "tool")
+        """
+        self.repo = repo
         self.item_type = item_type
 
 
@@ -65,8 +72,26 @@ class Catalog:
         This is implemented in a separate function as many functions from this router
         are using this function, so we need to avoid infinite recursions.
         """
-        return {}
+        gitmodules_url = f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
+        r = requests.get(gitmodules_url)
 
+        cfg = configparser.ConfigParser()
+        cfg.read_string(r.text)
+
+        modules = {}
+        for section in cfg.sections():
+            items = dict(cfg.items(section))
+            key = items.pop('path')
+            items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
+            modules[key] = items
+
+        # In the case of the tools repo, make sure to remove any tool that is not yet
+        # supported by PAPI (use the ^ operator to only keep common items)
+        if 'tool' in self.repo:
+            for tool_name in papiconf.TOOLS.keys() ^ modules.keys():
+                _ = modules.pop(tool_name)
+
+        return modules
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_filtered_list(
@@ -250,7 +275,6 @@ class Catalog:
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
-            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
             metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
 
         return metadata

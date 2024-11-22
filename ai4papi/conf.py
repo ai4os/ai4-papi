@@ -88,6 +88,15 @@ for tool_path in tool_list:
         }
     }
 
+# For tools, map the Nomad job name prefixes to tool IDs
+tools_nomad2id = {
+    'fl': 'ai4os-federated-server',
+    'cvat': 'ai4os-cvat',
+}
+for tool in TOOLS.keys():
+    if tool not in tools_nomad2id.values():
+        raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
+
 # OSCAR template
 with open(paths['conf'] / 'oscar.yaml', 'r') as f:
     OSCAR_TMPL = Template(f.read())

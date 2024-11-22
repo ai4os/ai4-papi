@@ -9,6 +9,7 @@ Nomad (ie. after launching)
 
 #TODO: move to proper testing package
 #TODO: rename test script: modules --> test_modules
+#TODO: add spinners
 
 import ai4papi.conf as papiconf
 
@@ -25,4 +26,5 @@ import try_me.test_nomad
 import routes
 import test_secrets
 import test_stats
+import test_storage
 import test_launch

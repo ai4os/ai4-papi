@@ -4,9 +4,12 @@ FROM ubuntu:22.04
 
 # Install Nomad
 # Updated commands: https://developer.hashicorp.com/nomad/tutorials/get-started/gs-install
+# curl, unzip: install for the rclone command
 RUN apt-get update && \
     apt-get install -y \
     wget \
+    curl \
+    unzip \
     gpg \
     coreutils \
     lsb-release \
@@ -29,6 +32,9 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # Trying to restrict to internal network (172.16.0.0/16 or 172.*) didn't work
 # ENV FORWARDED_ALLOW_IPS="*"
 ENV FORWARDED_ALLOW_IPS=172.16.44.228
+
+# Install latest rclone (for checking backups in CVAT; "/storage" route)
+RUN curl https://rclone.org/install.sh | bash
 
 # Install API
 WORKDIR /home/ai4-papi
