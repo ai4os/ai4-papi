@@ -203,6 +203,7 @@ job "module-${JOB_UUID}" {
       driver = "docker"
 
       config {
+        force_pull = true
         image = "registry.services.ai4os.eu/ai4os/docker-mail:client"
       }
 
