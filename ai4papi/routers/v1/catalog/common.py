@@ -295,6 +295,10 @@ class Catalog:
                 detail="Invalid authorization token.",
             )
 
+        # First refresh the items in the catalog, because this item might be a
+        # new addition to the catalog (ie. not present since last parsing the catalog)
+        self.get_items.cache_clear()
+
         # Check if the item is indeed valid
         if item_name not in self.get_items().keys():
             raise HTTPException(
