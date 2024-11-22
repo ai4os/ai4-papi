@@ -219,6 +219,7 @@ class Catalog:
         if error:
             print(f"  [Error] {error}")
             metadata = {
+                "id": item_name,
                 "metadata_version": "2.0.0",
                 "title": item_name,
                 "summary": "",
@@ -266,6 +267,9 @@ class Catalog:
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
             metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
+
+            # Add the item name
+            metadata['id'] = item_name
 
         return metadata
 
