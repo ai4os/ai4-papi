@@ -28,7 +28,7 @@ To avoid too much disruption, I'm only changing this inside the service field
 - ${NOMAD_META_cvat_hostname} --> ${meta.domain}-${BASE_DOMAIN}
 
 To avoid too much disruption, I'm only changing this in the "main" task (parameter `image`)
-- ${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom} --> registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS
+- ${NOMAD_META_server_image} --> registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS
 
 [1]: https://github.com/ai4os/ai4os-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
 [2]: https://stackoverflow.com/a/56957750/18471590
@@ -58,8 +58,7 @@ job "tool-cvat-${JOB_UUID}" {
     # CVAT-specific metadata
     force_pull_img_cvat_server         = true
     force_pull_img_cvat_ui             = true
-    cvat_version                       = "v2.7.3"
-    cvat_version_custom                = "-AI4OS"
+    cvat_branch                        = "v2.7.3-AI4OS"
     cvat_hostname                      = "${meta.domain}-${BASE_DOMAIN}"
     job_uuid                           = "${JOB_UUID}"
     restore_from                       = "${RESTORE_FROM}"
@@ -71,10 +70,12 @@ job "tool-cvat-${JOB_UUID}" {
     db_image                           = "postgres:16.4-alpine"
     grafana_image                      = "grafana/grafana-oss:9.3.6"
     redis_image                        = "eqalpha/keydb:x86_64_v6.3.2"
-    ui_image                           = "registry.services.ai4os.eu/ai4os/ai4-cvat-ui"
+    # ui_image                           = "registry.services.ai4os.eu/ai4os/ai4-cvat-ui:v2.7.3-AI4OS"
+    # server_image                       = "registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS"
+    ui_image                           = "ai4oshub/ai4os-cvat:v2.7.3-ai4os-ui"
+    server_image                       = "ai4oshub/ai4os-cvat:v2.7.3-ai4os-server"
     opa_image                          = "openpolicyagent/opa:0.45.0-rootless"
     vector_image                       = "timberio/vector:0.26.0-alpine"
-    server_image                       = "registry.services.ai4os.eu/ai4os/ai4-cvat-server"
     su_username                        = "${CVAT_USERNAME}"
     su_password                        = "${CVAT_PASSWORD}"
 
@@ -611,15 +612,15 @@ job "tool-cvat-${JOB_UUID}" {
         ]
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/all_events.json"
+        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/all_events.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/management.json"
+        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/management.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/monitoring.json"
+        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/monitoring.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       template {
@@ -723,7 +724,7 @@ job "tool-cvat-${JOB_UUID}" {
         }
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/vector/vector.toml"
+        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/vector/vector.toml"
         destination = "local/etc/vector/"
       }
     }
@@ -762,7 +763,9 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS"
+        # Do not use: image = "${NOMAD_META_server_image}"
+        # because otherwise the Dashboard will show that (unreplaced) variable in the Docker image field
+        image = "ai4oshub/ai4os-cvat:v2.7.3-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["server"]
         volumes = [
@@ -802,7 +805,7 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "1"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["utils"]
         volumes = [
@@ -839,7 +842,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-import"]
         volumes = [
@@ -875,7 +878,7 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "2"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-export"]
         volumes = [
@@ -911,7 +914,7 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "1"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-annotation"]
         volumes = [
@@ -944,7 +947,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-webhooks"]
         volumes = [
@@ -975,7 +978,7 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "1"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-quality-reports"]
         volumes = [
@@ -1010,7 +1013,7 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "2"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_server_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker-analytics-reports"]
         volumes = [
@@ -1050,7 +1053,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       config {
-        image = "${NOMAD_META_ui_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "${NOMAD_META_ui_image}"
         force_pull = "${NOMAD_META_force_pull_img_cvat_ui}"
         ports = ["ui"]
       }
