@@ -13,3 +13,4 @@ hvac >= 2.1.0, < 3.0
 pydantic >= 2.5.2  # >= 2.5.2 needed for OSCAR's pydantic model ("_name" private arg)
 natsort >= 8.1.0, < 9.0
 ai4_metadata >= 2.0.2, < 3.0
+harborapi == 0.25.3
