@@ -22,6 +22,12 @@ router = APIRouter(
 security = HTTPBearer()
 
 
+# When deploying in production, force the definition of a provenance token
+provenance_token = os.environ.get('PAPI_PROVENANCE_TOKEN', None)
+if not papiconf.IS_DEV and not provenance_token:
+    raise Exception("You need to define the variable \"PAPI_PROVENANCE_TOKEN\".")
+
+
 @router.get("")
 def get_deployments(
     vos: Union[Tuple, None] = Query(default=None),
@@ -106,6 +112,10 @@ def get_deployment(
 
     Returns a dict with info
     """
+    # Check if the query comes from the provenance-workflow, if so search in snapshots
+    if authorization.credentials == provenance_token:
+        return utils.retrieve_from_snapshots(deployment_uuid)
+
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
