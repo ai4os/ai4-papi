@@ -23,27 +23,36 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
 import configparser
+import os
 import re
 from typing import Tuple, Union
 import yaml
 
 import ai4_metadata.validate
 from cachetools import cached, TTLCache
-from fastapi import HTTPException, Query
+from fastapi import Depends, HTTPException, Query
+from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import utils
 import ai4papi.conf as papiconf
 
 
+security = HTTPBearer()
+
+JENKINS_TOKEN = os.getenv('PAPI_JENKINS_TOKEN')
+
+
 class Catalog:
 
-    def __init__(self, repo: str) -> None:
+    def __init__(self, repo:str, item_type:str='item') -> None:
         """
         Parameters:
         * repo: Github repo where the catalog is hosted (via git submodules)
+        * item_type: Name to display in messages (eg. "module", "tool")
         """
         self.repo = repo
+        self.item_type = item_type
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -104,6 +113,7 @@ class Catalog:
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
         return modules
 
+
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_summary(
         self,
@@ -145,7 +155,7 @@ class Catalog:
         return []
 
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60), key=lambda self, item_name: item_name,)
     def get_metadata(
         self,
         item_name: str,
@@ -272,6 +282,42 @@ class Catalog:
             metadata['id'] = item_name
 
         return metadata
+
+
+    def refresh_metadata_cache_entry(
+        self,
+        item_name: str,
+        authorization=Depends(security),
+    ):
+        """
+        Expire the metadata cache of a given item and recompute new cache value.
+        """
+        # Check if token is valid
+        if authorization.credentials != JENKINS_TOKEN:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authorization token.",
+            )
+
+        # First refresh the items in the catalog, because this item might be a
+        # new addition to the catalog (ie. not present since last parsing the catalog)
+        self.get_items.cache_clear()
+
+        # Check if the item is indeed valid
+        if item_name not in self.get_items().keys():
+            raise HTTPException(
+                status_code=400,
+                detail=f"{item_name} is not an available {self.item_type}.",
+            )
+
+        # Refresh cache
+        try:
+            self.get_metadata.cache.pop(item_name, None)
+            self.get_metadata(item_name)
+            return {"message": "Cache refreshed successfully"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
 
     def get_config(
         self,

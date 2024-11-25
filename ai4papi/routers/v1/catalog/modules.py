@@ -72,6 +72,7 @@ def get_config(
 
 Modules = Catalog(
     repo='ai4os-hub/modules-catalog',
+    item_type='module',
 )
 Modules.get_config = types.MethodType(get_config, Modules)
 
@@ -107,3 +108,9 @@ router.add_api_route(
     Modules.get_config,
     methods=["GET"],
     )
+
+router.add_api_route(
+    "/{item_name}/refresh",
+    Modules.refresh_metadata_cache_entry,
+    methods=["PUT"],
+)
