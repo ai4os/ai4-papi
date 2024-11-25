@@ -83,3 +83,66 @@ def storage_ls(
                 status_code=500,
                 detail=f"Error retrieving information from storage. \n \n {result.stderr}",
             )
+
+
+@router.delete("/{storage_name}/rm")
+def storage_rm(
+    vo: str,
+    storage_name: str,
+    subpath: str = '',
+    authorization=Depends(security),
+    ):
+    """
+    Deletes the files/folders inside a given subpath of the specified storage.
+    It is using RCLONE under-the-hood.
+
+    Parameters:
+    * **vo**: Virtual Organization where you want to create your deployment
+    * **storage_name**: storage to parse.
+    * **subpath**: subpath of the file/folder to delete
+    """
+    # Retrieve authenticated user info
+    auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_vo_membership(vo, auth_info['vos'])
+
+    # Retrieve storage credentials
+    if storage_name:
+        # Retrieve the rclone credentials
+        secrets = ai4secrets.get_secrets(
+            vo=vo,
+            subpath='/services/storage/',
+            authorization=types.SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
+        storage = secrets[f'/services/storage/{storage_name}']
+        if not storage:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid storage name.",
+            )
+
+        # Use rclone to delete the corresponding CVAT backup
+        result = subprocess.run([
+            f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
+            f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
+            "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
+            f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
+            f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
+            "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
+            f"rclone purge rshare:/{subpath} ;"
+            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done"
+            ],
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+
+        # Check stderr
+        if result.stderr != '':
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error deleting the selected directory/folder from storage. \n \n {result.stderr}",
+            )
+        
+        return {'status': 'success'}
