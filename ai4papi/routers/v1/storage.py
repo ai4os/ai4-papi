@@ -89,7 +89,7 @@ def storage_ls(
 def storage_rm(
     vo: str,
     storage_name: str,
-    subpath: str = '',
+    subpath: str,
     authorization=Depends(security),
     ):
     """
@@ -104,6 +104,13 @@ def storage_rm(
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
+
+    # Do not allow to delete root folder to prevent accidents
+    if not subpath.strip('/'):
+        raise HTTPException(
+            status_code=400,
+            detail="You cannot delete the root folder for security reasons.",
+            )
 
     # Retrieve storage credentials
     if storage_name:
@@ -131,18 +138,20 @@ def storage_rm(
             f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
             "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
             f"rclone purge rshare:/{subpath} ;"
-            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done"
+            "status=$? ;"  # we want to return the status code of the rclone purge command
+            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
+            "exit $status"
             ],
             shell=True,
             capture_output=True,
             text=True
         )
 
-        # Check stderr
-        if result.stderr != '':
+        # Check for possible errors
+        if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
                 detail=f"Error deleting the selected directory/folder from storage. \n \n {result.stderr}",
             )
-        
+
         return {'status': 'success'}
