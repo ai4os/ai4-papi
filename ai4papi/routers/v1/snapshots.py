@@ -160,7 +160,7 @@ def create_snapshot(
     nomad_conf = nomad_common.load_job_conf(nomad_conf)
 
     # Submit job
-    r = nomad_common.create_deployment(nomad_conf)
+    _ = nomad_common.create_deployment(nomad_conf)
 
     return {
         "status": "success",

@@ -263,7 +263,7 @@ def create_service(
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
-    r = client.create_service(service_definition)
+    _ = client.create_service(service_definition)
 
     return svc_conf._name
 
@@ -290,7 +290,7 @@ def update_service(
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
-    r = client.update_service(svc_conf._name, service_definition)
+    _ = client.update_service(svc_conf._name, service_definition)
 
     return service_name
 
@@ -311,6 +311,6 @@ def delete_service(
 
     # Delete service
     client = get_client_from_auth(authorization.credentials, vo)
-    r = client.remove_service(service_name)
+    _ = client.remove_service(service_name)
 
     return service_name
