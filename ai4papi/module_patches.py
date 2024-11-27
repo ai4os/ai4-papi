@@ -3,10 +3,11 @@ Temporarily patch deployment creation of old modules until we have time to prope
 fix/rebuild them.
 """
 
+
 def patch_nextcloud_mount(
     docker_image: str,
     task: dict,
-    ):
+):
     """
     Some module are blocked when running deepaas.
 
@@ -37,10 +38,10 @@ def patch_nextcloud_mount(
         "DEEP-OC-image-classification-tf-dicom",
         "DEEP-OC-speech-to-text-tf",
     ]
-    modules = [f'deephdc/{m.lower()}' for m in modules]
+    modules = [f"deephdc/{m.lower()}" for m in modules]
     # TODO: this will need to be updated to ai4os-hub
 
     if docker_image in modules:
-        task['Env']['RCLONE_CONTIMEOUT'] = '1s'
+        task["Env"]["RCLONE_CONTIMEOUT"] = "1s"
 
     return task
