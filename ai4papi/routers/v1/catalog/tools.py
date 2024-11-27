@@ -16,7 +16,7 @@ def get_config(
     self,
     item_name: str,
     vo: str,
-    ):
+):
     """
     Returns the default configuration (dict) for creating a deployment
     for a specific item. It is prefilled with the appropriate
@@ -25,24 +25,24 @@ def get_config(
 
     # Retrieve tool configuration
     try:
-        conf = deepcopy(papiconf.TOOLS[item_name]['user']['full'])
+        conf = deepcopy(papiconf.TOOLS[item_name]["user"]["full"])
     except Exception:
         raise HTTPException(
             status_code=400,
             detail=f"{item_name} is not an available tool.",
-            )
+        )
 
     # Retrieve tool metadata
     metadata = self.get_metadata(item_name)
 
     # Parse docker registry
-    registry = metadata['links']['docker_image']
-    repo, image = registry.split('/')[-2:]
-    if repo not in ['deephdc', 'ai4oshub']:
-        repo = 'ai4oshub'
+    registry = metadata["links"]["docker_image"]
+    repo, image = registry.split("/")[-2:]
+    if repo not in ["deephdc", "ai4oshub"]:
+        repo = "ai4oshub"
 
     # Fill with correct Docker image and tags (not needed for CVAT because hardcoded)
-    if item_name != 'ai4os-cvat':
+    if item_name != "ai4os-cvat":
         conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
         tags = retrieve_docker_tags(image=image, repo=repo)
@@ -60,8 +60,8 @@ def get_config(
 
 
 Tools = Catalog(
-    repo='ai4os/tools-catalog',
-    item_type='tool',
+    repo="ai4os/tools-catalog",
+    item_type="tool",
 )
 Tools.get_config = types.MethodType(get_config, Tools)
 
@@ -75,28 +75,28 @@ router.add_api_route(
     "",
     Tools.get_filtered_list,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/detail",
     Tools.get_summary,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/tags",
     Tools.get_tags,
     methods=["GET"],
     deprecated=True,
-    )
+)
 router.add_api_route(
     "/{item_name}/metadata",
     Tools.get_metadata,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/{item_name}/config",
     Tools.get_config,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/{item_name}/refresh",
     Tools.refresh_metadata_cache_entry,

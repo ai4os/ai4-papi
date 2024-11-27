@@ -35,27 +35,26 @@ flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
 
 
 def get_user_info(token):
-
     try:
         user_infos = flaat.get_user_infos_from_access_token(token)
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail=str(e),
-            )
+        )
 
     # Check output
     if user_infos is None:
         raise HTTPException(
             status_code=401,
             detail="Invalid token",
-            )
+        )
 
     # Retrieve VOs the user belongs to
     # VOs can be empty if the user does not belong to any VO, or the
     # 'eduperson_entitlement wasn't correctly retrieved from the token
     vos = []
-    for i in user_infos.get('eduperson_entitlement', []):
+    for i in user_infos.get("eduperson_entitlement", []):
         # Parse Virtual Organizations manually from URNs
         # If more complexity is need in the future, check https://github.com/oarepo/urnparse
         ent_i = re.search(r"group:(.+?):", i)
@@ -63,18 +62,18 @@ def get_user_info(token):
             vos.append(ent_i.group(1))
 
     # Generate user info dict
-    for k in ['sub', 'iss', 'name', 'email']:
+    for k in ["sub", "iss", "name", "email"]:
         if user_infos.get(k) is None:
             raise HTTPException(
                 status_code=401,
                 detail=f"You token should have scopes for {k}.",
-                )
+            )
     out = {
-        'id': user_infos.get('sub'),  # subject, user-ID
-        'issuer': user_infos.get('iss'),  # URL of the access token issuer
-        'name': user_infos.get('name'),
-        'email': user_infos.get('email'),
-        'vos': vos,
+        "id": user_infos.get("sub"),  # subject, user-ID
+        "issuer": user_infos.get("iss"),  # URL of the access token issuer
+        "name": user_infos.get("name"),
+        "email": user_infos.get("email"),
+        "vos": vos,
     }
 
     return out
@@ -90,5 +89,5 @@ def check_vo_membership(
     if requested_vo not in user_vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}."
-            )
+            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}.",
+        )

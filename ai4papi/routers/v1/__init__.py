@@ -1,6 +1,15 @@
 import fastapi
 
-from . import catalog, deployments, inference, secrets, stats, storage, try_me, snapshots
+from . import (
+    catalog,
+    deployments,
+    inference,
+    secrets,
+    stats,
+    storage,
+    try_me,
+    snapshots,
+)
 
 
 router = fastapi.APIRouter()
