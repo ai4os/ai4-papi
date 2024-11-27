@@ -32,6 +32,8 @@ def storage_ls(
     Returns a list of files/folders inside a given subpath of the specified storage.
     It is using RCLONE under-the-hood.
 
+    It is used for example to allow listing CVAT snapshots from storage.
+
     Parameters:
     * **vo**: Virtual Organization where you want to create your deployment
     * **storage_name**: storage to parse.
@@ -58,7 +60,7 @@ def storage_ls(
                 detail="Invalid storage name.",
             )
 
-        # Use rclone to parse the existing CVAT backups to restore from
+        # Use rclone to list content of subpath
         result = subprocess.run([
             f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
             f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
@@ -67,12 +69,21 @@ def storage_ls(
             f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
             "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
             f"rclone lsjson rshare:/{subpath} ;"
-            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done"
+            "status=$? ;"  # we want to return the status code of the rclone purge command
+            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
+            "exit $status"
             ],
             shell=True,
             capture_output=True,
             text=True
         )
+
+        # Check for possible errors
+        if result.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error listing the selected folder from storage. \n\n {result.stderr}",
+            )
 
         # Parse the JSON output
         try:
@@ -81,7 +92,7 @@ def storage_ls(
         except Exception:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error retrieving information from storage. \n \n {result.stderr}",
+                detail=f"Error retrieving information from storage. \n\n {result.stderr}",
             )
 
 
@@ -95,6 +106,8 @@ def storage_rm(
     """
     Deletes the files/folders inside a given subpath of the specified storage.
     It is using RCLONE under-the-hood.
+
+    It is used for example to allow deleting CVAT snapshots from storage.
 
     Parameters:
     * **vo**: Virtual Organization where you want to create your deployment
@@ -129,7 +142,7 @@ def storage_rm(
                 detail="Invalid storage name.",
             )
 
-        # Use rclone to delete the corresponding CVAT backup
+        # Use rclone to delete the subpath
         result = subprocess.run([
             f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
             f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
@@ -151,7 +164,7 @@ def storage_rm(
         if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error deleting the selected directory/folder from storage. \n \n {result.stderr}",
+                detail=f"Error deleting the selected subpath from storage. \n\n {result.stderr}",
             )
 
         return {'status': 'success'}
