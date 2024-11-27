@@ -7,6 +7,7 @@
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Build Docker](https://github.com/ai4os/ai4-papi/actions/workflows/build-docker-prod.yml/badge.svg)](https://github.com/ai4os/ai4-papi/actions/workflows/build-docker-prod.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ai4os/ai4-papi/master.svg)](https://results.pre-commit.ci/latest/github/ai4os/ai4-papi/master)
 
 [//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
 [//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/releases&#41;)
@@ -278,3 +279,5 @@ The pattern for the subfolders follows:
 
 This repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
 We use [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) and [FormatOnSave](https://marketplace.visualstudio.com/items?itemName=BdSoftware.format-on-auto-save) ([issue](https://github.com/microsoft/vscode/issues/45997#issuecomment-950405496)) VScode extensions to make the development workflow smoother.
+
+We use [Precommit](https://pre-commit.com/) locally to enforce format in commits. Then use [Precommit.CI](https://pre-commit.ci/) to enforce it at the Github level.
