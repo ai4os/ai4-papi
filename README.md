@@ -273,3 +273,8 @@ The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.
     Also contains the generic quotas for hardware (see `range` parameter).
   - `nomad.hcl`: additional non-customizable values (eg. ports)
+
+### Implementation notes
+
+This repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
+We use [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) and [FormatOnSave](https://marketplace.visualstudio.com/items?itemName=BdSoftware.format-on-auto-save) ([issue](https://github.com/microsoft/vscode/issues/45997#issuecomment-950405496)) VScode extensions to make the development workflow smoother.
