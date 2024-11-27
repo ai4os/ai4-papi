@@ -1,33 +1,12 @@
-import configparser
 from copy import deepcopy
 import types
 
-from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
 from natsort import natsorted
-import requests
 
 from ai4papi import quotas, nomad
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
-
-
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_items(self):
-    gitmodules_url = "https://raw.githubusercontent.com/ai4os-hub/modules-catalog/master/.gitmodules"
-    r = requests.get(gitmodules_url)
-
-    cfg = configparser.ConfigParser()
-    cfg.read_string(r.text)
-
-    modules = {}
-    for section in cfg.sections():
-        items = dict(cfg.items(section))
-        key = items.pop('path').lower()
-        items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
-        modules[key] = items
-
-    return modules
 
 
 def get_config(
@@ -91,8 +70,10 @@ def get_config(
     return conf
 
 
-Modules = Catalog()
-Modules.get_items  = types.MethodType(get_items, Modules)
+Modules = Catalog(
+    repo='ai4os-hub/modules-catalog',
+    item_type='module',
+)
 Modules.get_config = types.MethodType(get_config, Modules)
 
 
@@ -127,3 +108,9 @@ router.add_api_route(
     Modules.get_config,
     methods=["GET"],
     )
+
+router.add_api_route(
+    "/{item_name}/refresh",
+    Modules.refresh_metadata_cache_entry,
+    methods=["PUT"],
+)

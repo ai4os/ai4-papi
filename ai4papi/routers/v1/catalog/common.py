@@ -22,22 +22,37 @@ ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hasha
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
+import configparser
+import os
 import re
 from typing import Tuple, Union
 import yaml
 
 import ai4_metadata.validate
 from cachetools import cached, TTLCache
-from fastapi import HTTPException, Query
+from fastapi import Depends, HTTPException, Query
+from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import utils
+import ai4papi.conf as papiconf
+
+
+security = HTTPBearer()
+
+JENKINS_TOKEN = os.getenv('PAPI_JENKINS_TOKEN')
 
 
 class Catalog:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, repo:str, item_type:str='item') -> None:
+        """
+        Parameters:
+        * repo: Github repo where the catalog is hosted (via git submodules)
+        * item_type: Name to display in messages (eg. "module", "tool")
+        """
+        self.repo = repo
+        self.item_type = item_type
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -57,8 +72,26 @@ class Catalog:
         This is implemented in a separate function as many functions from this router
         are using this function, so we need to avoid infinite recursions.
         """
-        return {}
+        gitmodules_url = f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
+        r = requests.get(gitmodules_url)
 
+        cfg = configparser.ConfigParser()
+        cfg.read_string(r.text)
+
+        modules = {}
+        for section in cfg.sections():
+            items = dict(cfg.items(section))
+            key = items.pop('path')
+            items['url'] = items['url'].replace('.git', '')  # remove `.git`, if present
+            modules[key] = items
+
+        # In the case of the tools repo, make sure to remove any tool that is not yet
+        # supported by PAPI (use the ^ operator to only keep common items)
+        if 'tool' in self.repo:
+            for tool_name in papiconf.TOOLS.keys() ^ modules.keys():
+                _ = modules.pop(tool_name)
+
+        return modules
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_filtered_list(
@@ -79,6 +112,7 @@ class Catalog:
         # (!): without list(...) FastAPI throws weird error
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
         return modules
+
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
     def get_summary(
@@ -121,7 +155,7 @@ class Catalog:
         return []
 
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60), key=lambda self, item_name: item_name,)
     def get_metadata(
         self,
         item_name: str,
@@ -195,6 +229,7 @@ class Catalog:
         if error:
             print(f"  [Error] {error}")
             metadata = {
+                "id": item_name,
                 "metadata_version": "2.0.0",
                 "title": item_name,
                 "summary": "",
@@ -241,10 +276,48 @@ class Catalog:
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
-            metadata['links']['docker_image'] = f"https://hub.docker.com/r/{metadata['links']['docker_image']}"
             metadata['links']['docker_image'] = metadata['links']['docker_image'].strip('/ ')
 
+            # Add the item name
+            metadata['id'] = item_name
+
         return metadata
+
+
+    def refresh_metadata_cache_entry(
+        self,
+        item_name: str,
+        authorization=Depends(security),
+    ):
+        """
+        Expire the metadata cache of a given item and recompute new cache value.
+        """
+        # Check if token is valid
+        if authorization.credentials != JENKINS_TOKEN:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authorization token.",
+            )
+
+        # First refresh the items in the catalog, because this item might be a
+        # new addition to the catalog (ie. not present since last parsing the catalog)
+        self.get_items.cache_clear()
+
+        # Check if the item is indeed valid
+        if item_name not in self.get_items().keys():
+            raise HTTPException(
+                status_code=400,
+                detail=f"{item_name} is not an available {self.item_type}.",
+            )
+
+        # Refresh cache
+        try:
+            self.get_metadata.cache.pop(item_name, None)
+            self.get_metadata(item_name)
+            return {"message": "Cache refreshed successfully"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
 
     def get_config(
         self,

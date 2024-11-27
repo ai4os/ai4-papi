@@ -62,7 +62,7 @@ job "try-${JOB_UUID}" {
         to = 80  # -1 will assign random port
       }
       port "api" {
-        to = 5000  # -1 will assign random port
+        to = 5000
       }
     }
 

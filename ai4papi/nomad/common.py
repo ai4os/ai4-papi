@@ -133,7 +133,7 @@ def get_deployment(
         # Iterate through tags to find `Host` tag
         for t in s['Tags']:
             try:
-                url = re.search('Host\(`(.+?)`', t).group(1)
+                url = re.search(r'Host\(`(.+?)`', t).group(1)
                 break
             except Exception:
                 url = "missing-endpoint"
@@ -166,7 +166,7 @@ def get_deployment(
         info['main_endpoint'] = service2endpoint[service]
 
     except Exception:  # return first endpoint
-        info['main_endpoint'] = list(info['endpoints'].values())[0]
+        info['main_endpoint'] = list(info['endpoints'].keys())[0]
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
@@ -212,13 +212,15 @@ def get_deployment(
         info['datacenter'] = Nomad.node.get_node(a['NodeID'])['Datacenter']
 
         # Replace Nomad status with a more user-friendly status
-        if a['ClientStatus'] == 'pending':
-            info['status'] = 'starting'
-        elif a['ClientStatus'] == 'unknown':
-            info['status'] = 'down'
-        else:
-            # This status can be for example: "complete", "failed"
-            info['status'] = a['ClientStatus']
+        # Final list includes: starting, down, running, complete, failed, ...
+        # We use the status of the "main" task because it isn more relevant the the
+        # status of the overall job (a['ClientStatus'])
+        status = a['TaskStates']['main']['State'] if a.get('TaskStates') else 'queued'
+        status_map = {  # nomad: papi
+            'pending': 'starting',
+            'unknown': 'down',
+        }
+        info['status'] = status_map.get(status, status)  # if not mapped, then return original status
 
         # Add error messages if needed
         if info['status'] == 'failed':
@@ -260,8 +262,13 @@ def get_deployment(
             info['active_endpoints'] = []
             for k, v in info['endpoints'].items():
                 try:
+                    # We use GET and not HEAD, because HEAD is not returning the correct status_codes (even with "allow_redirects=True")
+                    # Anyway, both latencies are almost the same when using "allow_redirects=True"
+                    # * IDE deployed: GET (200), HEAD (405) | latency: ~90 ms
+                    # * API not deployed: GET (502), HEAD (502) | latency: ~40 ms
+                    # * Non existing domain: GET (404), HEAD (404) | latency: ~40 ms
                     r = session.get(v, timeout=2)
-                    if r.status_code == 200:
+                    if r.ok:
                         info['active_endpoints'].append(k)
                 except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
                     continue
@@ -274,7 +281,7 @@ def get_deployment(
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
         info['status'] = 'error'
-        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
+        info['error_msg'] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
         # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."

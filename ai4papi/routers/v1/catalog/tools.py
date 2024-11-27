@@ -1,31 +1,15 @@
 from copy import deepcopy
 import types
 
-from cachetools import cached, TTLCache
 from fastapi import APIRouter, HTTPException
+from fastapi.security import HTTPBearer
 
 from ai4papi import quotas
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
-def get_items(self):
-    # Set default branch manually (because we are not yet reading this from submodules)
-    # TODO: start reading from submodules (only accept the submodules that have been
-    # integrated in papiconf.TOOLS)
-    tools_branches= {
-        'ai4os-federated-server': 'main',
-    }
-
-    tools = {}
-    for k in papiconf.TOOLS.keys():
-        tools[k] = {
-            'url': f'https://github.com/ai4os/{k}',
-            'branch': tools_branches[k],
-        }
-
-    return tools
+security = HTTPBearer()
 
 
 def get_config(
@@ -33,6 +17,12 @@ def get_config(
     item_name: str,
     vo: str,
     ):
+    """
+    Returns the default configuration (dict) for creating a deployment
+    for a specific item. It is prefilled with the appropriate
+    docker image and the available docker tags.
+    """
+
     # Retrieve tool configuration
     try:
         conf = deepcopy(papiconf.TOOLS[item_name]['user']['full'])
@@ -51,25 +41,28 @@ def get_config(
     if repo not in ['deephdc', 'ai4oshub']:
         repo = 'ai4oshub'
 
-    # Fill with correct Docker image
-    conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+    # Fill with correct Docker image and tags (not needed for CVAT because hardcoded)
+    if item_name != 'ai4os-cvat':
+        conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
-    # Add available Docker tags
-    tags = retrieve_docker_tags(image=image, repo=repo)
-    conf["general"]["docker_tag"]["options"] = tags
-    conf["general"]["docker_tag"]["value"] = tags[0]
+        tags = retrieve_docker_tags(image=image, repo=repo)
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Modify the resources limits for a given user or VO
-    conf["hardware"] = quotas.limit_resources(
-        item_name=item_name,
-        vo=vo,
-    )
+    if conf.get("hardware", None):
+        conf["hardware"] = quotas.limit_resources(
+            item_name=item_name,
+            vo=vo,
+        )
 
     return conf
 
 
-Tools = Catalog()
-Tools.get_items = types.MethodType(get_items, Tools)
+Tools = Catalog(
+    repo='ai4os/tools-catalog',
+    item_type='tool',
+)
 Tools.get_config = types.MethodType(get_config, Tools)
 
 
@@ -104,3 +97,8 @@ router.add_api_route(
     Tools.get_config,
     methods=["GET"],
     )
+router.add_api_route(
+    "/{item_name}/refresh",
+    Tools.refresh_metadata_cache_entry,
+    methods=["PUT"],
+)

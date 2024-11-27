@@ -12,6 +12,7 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
+from ai4papi.routers import v1
 
 
 router = APIRouter(
@@ -20,6 +21,12 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
+
+
+# When deploying in production, force the definition of a provenance token
+provenance_token = os.environ.get('PAPI_PROVENANCE_TOKEN', None)
+if not papiconf.IS_DEV and not provenance_token:
+    raise Exception("You need to define the variable \"PAPI_PROVENANCE_TOKEN\".")
 
 
 @router.get("")
@@ -106,6 +113,10 @@ def get_deployment(
 
     Returns a dict with info
     """
+    # Check if the query comes from the provenance-workflow, if so search in snapshots
+    if authorization.credentials == provenance_token:
+        return utils.retrieve_from_snapshots(deployment_uuid)
+
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info['vos'])
@@ -204,23 +215,7 @@ def create_deployment(
     else:
         priority = 50
 
-    # Remove non-compliant characters from hostname
     base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
-    hostname = utils.safe_hostname(
-        hostname=user_conf['general']['hostname'],
-        job_uuid=job_uuid,
-    )
-
-    #TODO: reenable custom hostname, when we are able to parse all node metadata
-    # (domain key) to build the true domain
-    hostname = job_uuid
-
-    # # Check the hostname is available in all data-centers
-    # # (we don't know beforehand where the job will land)
-    # #TODO: make sure this does not break if the datacenter is unavailable
-    # #TODO: disallow custom hostname, pain in the ass, slower deploys
-    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
-    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
@@ -234,7 +229,7 @@ def create_deployment(
             'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
             'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
             'BASE_DOMAIN': base_domain,
-            'HOSTNAME': hostname,
+            'HOSTNAME': job_uuid,
             'DOCKER_IMAGE': user_conf['general']['docker_image'],
             'DOCKER_TAG': user_conf['general']['docker_tag'],
             'SERVICE': user_conf['general']['service'],
@@ -278,10 +273,39 @@ def create_deployment(
         if not user_conf['hardware']['gpu_type']:
             usertask['Resources']['Devices'][0]['Constraints'] = None
 
+    # If the image belong to Harbor, then it's a user snapshot
+    docker_image = user_conf['general']['docker_image']
+    if docker_image.split('/')[0] == "registry.services.ai4os.eu":
+
+        # Check the user is the owner of the image
+        if docker_image.split('/')[-1] != auth_info['id'].replace('@', '_at_'):
+            raise HTTPException(
+                status_code=401,
+                detail="You are not the owner of the Harbor image.",
+                )
+
+        # Check the snapshot indeed exists
+        user_snapshots = v1.snapshots.get_harbor_snapshots(
+            owner=auth_info['id'],
+            vo=vo,
+        )
+        snapshot_ids = [s['snapshot_ID'] for s in user_snapshots]
+        if user_conf['general']['docker_tag'] not in snapshot_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="The snapshot does not exist.",
+                )
+
+        # Add Harbor authentication credentials to Nomad job
+        usertask['Config']['auth'] = [{
+            'username': papiconf.HARBOR_USER,
+            'password': papiconf.HARBOR_PASS,
+            }]
+
     # If storage credentials not provided, remove all storage-related tasks
     rclone = {k: v for k, v in user_conf['storage'].items() if k.startswith('rclone')}
     if not all(rclone.values()):
-        exclude_tasks = ['storagetask', 'storagecleanup', 'dataset_download']
+        exclude_tasks = ['storage_mount', 'storage_cleanup', 'dataset_download']
     else:
         # If datasets provided, replicate 'dataset_download' task as many times as needed
         if user_conf['storage']['datasets']:
@@ -295,7 +319,19 @@ def create_deployment(
         # Always exclude initial 'dataset_download' task, as it is used as template
         exclude_tasks = ['dataset_download']
 
+    # If DEEPaaS was not launched, do not launch UI because it will fail
+    if user_conf['general']['service'] != 'deepaas':
+        exclude_tasks.append('ui')
+
     tasks[:] = [t for t in tasks if t['Name'] not in exclude_tasks]
+
+    # Remove appropriate Traefik domains in each case (no need to remove the ports)
+    services = nomad_conf['TaskGroups'][0]['Services']
+    if user_conf['general']['service'] == 'deepaas':
+        exclude_services = ['ide']
+    else:
+        exclude_services = ['ui']
+    services[:] = [s for s in services if s['PortLabel'] not in exclude_services]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

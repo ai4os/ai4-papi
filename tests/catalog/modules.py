@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from ai4papi.routers.v1.catalog import common
 from ai4papi.routers.v1.catalog.modules import Modules
 
 
@@ -49,6 +52,16 @@ module_meta = Modules.get_metadata(
 )
 assert isinstance(module_meta, dict)
 assert 'title' in module_meta.keys()
+
+# Refresh metadata cache
+common.JENKINS_TOKEN = '1234'
+module_meta = Modules.refresh_metadata_cache_entry(
+    item_name=module_name,
+    authorization=SimpleNamespace(
+        credentials='1234',
+    ),
+)
+assert isinstance(module_meta, dict)
 
 #TODO: we should not be able to get config or metadata for a tool_name
 
