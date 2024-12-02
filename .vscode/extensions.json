@@ -2,6 +2,5 @@
     "recommendations": [
         "ms-python.python",
         "charliermarsh.ruff",
-        "bdsoftware.format-on-auto-save"
     ]
 }

@@ -278,6 +278,6 @@ The pattern for the subfolders follows:
 ### Implementation notes
 
 This repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
-We use [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) and [FormatOnSave](https://marketplace.visualstudio.com/items?itemName=BdSoftware.format-on-auto-save) ([issue](https://github.com/microsoft/vscode/issues/45997#issuecomment-950405496)) VScode extensions to make the development workflow smoother.
+We provide some [default VScode configuration](.vscode) to make the development workflow smoother.
 
 We use [Precommit](https://pre-commit.com/) locally to enforce format in commits. Then use [Precommit.CI](https://pre-commit.ci/) to enforce it at the Github level.
