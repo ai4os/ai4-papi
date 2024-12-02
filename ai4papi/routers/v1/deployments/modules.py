@@ -266,6 +266,9 @@ def create_deployment(
         user_conf["general"]["docker_image"], usertask
     )
 
+    a = 'jde'
+    print(a)
+
     # Modify the GPU section
     if user_conf["hardware"]["gpu_num"] <= 0:
         # Delete GPU section in CPU deployments
