@@ -152,16 +152,33 @@ class Catalog:
         """
         return []
 
-    @cached(
-        cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60),
-        key=lambda self, item_name: item_name,
-    )
     def get_metadata(
         self,
         item_name: str,
     ):
         """
         Get the item's full metadata.
+        """
+        return self._get_metadata(item_name=item_name, force=False)
+
+    @cached(
+        cache=TTLCache(maxsize=1024, ttl=7 * 24 * 60 * 60),
+        key=lambda self, item_name, **kw: item_name,
+    )
+    def _get_metadata(
+        self,
+        item_name: str,
+        force=False,
+    ):
+        """
+        Get the item's full metadata.
+
+        The function is *internal* because we don't want to expose the "force" parameter
+        to users.
+
+        We cache for 1 week because the cache is manually expired by Jenkins and refreshed
+        each time a module is updated (catalog refresh method).
+        This 1 week expiration is just a backup in case Jenkins does not work.
         """
         print(f"Retrieving metadata from {item_name}")
 
@@ -267,12 +284,15 @@ class Catalog:
             match = re.search(pattern, items[item_name]["url"])
             if match:
                 owner, repo = match.group(1), match.group(2)
+                if force:
+                    utils.get_github_info.cache.pop((owner, repo), None)
                 gh_info = utils.get_github_info(owner, repo)
 
                 metadata.setdefault("dates", {})
                 metadata["dates"]["created"] = gh_info.get("created", "")
                 metadata["dates"]["updated"] = gh_info.get("updated", "")
                 metadata["license"] = gh_info.get("license", "")
+                metadata["links"]["source_code"] = f"https://github.com/{owner}/{repo}"
 
             # Add Jenkins CI/CD links
             metadata["links"]["cicd_url"] = (
@@ -320,10 +340,11 @@ class Catalog:
                 detail=f"{item_name} is not an available {self.item_type}.",
             )
 
-        # Refresh cache
+        # Refresh metadata
+        # We use "force=True" to also refresh Github info
         try:
-            self.get_metadata.cache.pop(item_name, None)
-            self.get_metadata(item_name)
+            self._get_metadata.cache.pop(item_name, None)
+            self._get_metadata(item_name, force=True)
             return {"message": "Cache refreshed successfully"}
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

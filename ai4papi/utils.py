@@ -91,11 +91,13 @@ def validate_conf(conf):
     return conf
 
 
-# TODO: temporarily parse every 24hrs (instead of 6hrs) to reduce a bit the latency
-@cached(cache=TTLCache(maxsize=1024, ttl=24 * 60 * 60))
+@cached(cache=TTLCache(maxsize=1024, ttl=30 * 7 * 24 * 60 * 60))
 def get_github_info(owner, repo):
     """
     Retrieve information from a Github repo
+
+    We cache for a long period (1 month) because this cache will be manually expired by
+    _get_metadata() each time the metadata needs to be recomputed.
     """
     # Avoid running this function if were are doing local development, because
     # repeatedly calling the Github API will otherwise get you blocked
