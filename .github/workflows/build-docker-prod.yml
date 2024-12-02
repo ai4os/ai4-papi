@@ -32,11 +32,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Get short commit SHA
+        id: vars
+        run: echo "GIT_COMMIT_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod, ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
+          tags: |
+            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod
+            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod-${{ env.GIT_COMMIT_SHORT }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
           file: docker/Dockerfile
 
