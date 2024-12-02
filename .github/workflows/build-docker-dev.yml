@@ -33,5 +33,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev, ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:dev
+          tags: |
+            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev
+            ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:dev
           file: docker/Dockerfile
