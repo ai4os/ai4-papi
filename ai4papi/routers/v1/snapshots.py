@@ -30,11 +30,14 @@ router = APIRouter(
 security = HTTPBearer()
 
 # Init the Harbor client
-client = HarborClient(
-    url="https://registry.services.ai4os.eu/api/v2.0/",
-    username=papiconf.HARBOR_USER,
-    secret=papiconf.HARBOR_PASS,
-)
+if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
+    client = HarborClient(
+        url="https://registry.services.ai4os.eu/api/v2.0/",
+        username=papiconf.HARBOR_USER,
+        secret=papiconf.HARBOR_PASS,
+    )
+else:
+    client = None
 
 # Use the Nomad cluster inited in nomad.common
 Nomad = nomad_common.Nomad
