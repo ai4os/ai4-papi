@@ -266,7 +266,7 @@ def create_deployment(
         user_conf["general"]["docker_image"], usertask
     )
 
-    a = 'jde'
+    a = "jde"
     print(a)
 
     # Modify the GPU section
