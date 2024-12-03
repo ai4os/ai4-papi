@@ -3,6 +3,7 @@ Misc utilities regarding AI4OS compatible storages.
 """
 
 import json
+import os
 import subprocess
 import types
 
@@ -19,6 +20,55 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
+
+
+def run_clone(command, storage_name, vo, token):
+    """
+    Run an RCLONE command, setting the appropriate configuration based on the user
+    secrets stored in Vault.
+    """
+    # Retrieve the rclone credentials
+    secrets = ai4secrets.get_secrets(
+        vo=vo,
+        subpath="/services/storage/",
+        authorization=types.SimpleNamespace(
+            credentials=token,
+        ),
+    )
+    storage = secrets[f"/services/storage/{storage_name}"]
+    if not storage:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid storage name.",
+        )
+
+    # Use rclone to delete the subpath
+    result = subprocess.run(
+        [
+            f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
+            f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
+            "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
+            f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
+            f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
+            "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
+            f"{command} ;"
+            "status=$? ;"  # we want to return the status code of the RCLONE command
+            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
+            "exit $status"
+        ],
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+
+    # Check for possible errors
+    if result.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error running the RCLONE command. \n\n {result.stderr}",
+        )
+
+    return result
 
 
 @router.get("/{storage_name}/ls")
@@ -43,48 +93,18 @@ def storage_ls(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info["vos"])
 
-    # Retrieve storage credentials
     if storage_name:
-        # Retrieve the rclone credentials
-        secrets = ai4secrets.get_secrets(
+        # Sanitize user path (avoid security risk)
+        subpath = subpath.strip().split(" ")[0]
+        subpath = os.path.normpath(subpath).strip()
+
+        # Run RCLONE command
+        result = run_clone(
+            command=f"rclone lsjson rshare:/{subpath}",
+            storage_name=storage_name,
             vo=vo,
-            subpath="/services/storage/",
-            authorization=types.SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
+            token=authorization.credentials,
         )
-        storage = secrets[f"/services/storage/{storage_name}"]
-        if not storage:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid storage name.",
-            )
-
-        # Use rclone to list content of subpath
-        result = subprocess.run(
-            [
-                f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
-                f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
-                "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
-                f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
-                f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
-                "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
-                f"rclone lsjson rshare:/{subpath} ;"
-                "status=$? ;"  # we want to return the status code of the rclone purge command
-                "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
-                "exit $status"
-            ],
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-
-        # Check for possible errors
-        if result.returncode != 0:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error listing the selected folder from storage. \n\n {result.stderr}",
-            )
 
         # Parse the JSON output
         try:
@@ -126,47 +146,17 @@ def storage_rm(
             detail="You cannot delete the root folder for security reasons.",
         )
 
-    # Retrieve storage credentials
     if storage_name:
-        # Retrieve the rclone credentials
-        secrets = ai4secrets.get_secrets(
+        # Sanitize user path (avoid security risk)
+        subpath = subpath.strip().split(" ")[0]
+        subpath = os.path.normpath(subpath).strip()
+
+        # Run RCLONE command
+        _ = run_clone(
+            command=f"rclone purge rshare:/{subpath}",
+            storage_name=storage_name,
             vo=vo,
-            subpath="/services/storage/",
-            authorization=types.SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
+            token=authorization.credentials,
         )
-        storage = secrets[f"/services/storage/{storage_name}"]
-        if not storage:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid storage name.",
-            )
-
-        # Use rclone to delete the subpath
-        result = subprocess.run(
-            [
-                f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
-                f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
-                "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
-                f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
-                f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
-                "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
-                f"rclone purge rshare:/{subpath} ;"
-                "status=$? ;"  # we want to return the status code of the rclone purge command
-                "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
-                "exit $status"
-            ],
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-
-        # Check for possible errors
-        if result.returncode != 0:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error deleting the selected subpath from storage. \n\n {result.stderr}",
-            )
 
         return {"status": "success"}
