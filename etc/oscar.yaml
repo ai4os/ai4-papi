@@ -20,8 +20,9 @@ output:
 script: |-
   echo "[*] Using DEEPaaS version $(deepaas-run --version)"
   echo "[*] Using Python version $(python3 --version)"
-
-  python -u << EOF
+  FILE_NAME=`basename "$INPUT_FILE_PATH" | cut -f 1 -d '.' `
+  OUTPUT_FILE="$TMP_OUTPUT_DIR/$FILE_NAME"
+  python >service.log 2>&1 << EOF
 
   import base64
   import json
@@ -120,6 +121,17 @@ script: |-
           DEEPAAS_CLI_COMMAND += [f"--{k}", v]
 
   print(f"[*] Final command: {' '.join(DEEPAAS_CLI_COMMAND)}")
-  subprocess.run(DEEPAAS_CLI_COMMAND)
-
+  try:
+    subprocess.run(DEEPAAS_CLI_COMMAND)
+  except:
+    print("something go wrong in the execution")
+    exit(1)
   EOF
+  
+  if [ $? -eq 0 ]; then
+    mv service.log  $OUTPUT_FILE.log
+    echo `cat $OUTPUT_FILE.log | grep 'New output is' `
+    FILE_NAME_2=`cat $OUTPUT_FILE.log | grep 'New output is' | cut -f 5 -d ' '`
+    mv $FILE_NAME_2 $OUTPUT_FILE.json
+    echo OK
+  fi
