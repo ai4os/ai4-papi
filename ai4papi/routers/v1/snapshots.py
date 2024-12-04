@@ -272,7 +272,7 @@ def get_harbor_snapshots(
     snapshots = []
     for a in artifacts:
         # Ignore snapshot if it doesn't belong to the VO
-        a_labels = a.extra_attrs.config["Labels"]
+        a_labels = a.extra_attrs.root["config"]["Labels"]
         if a_labels.get("VO") != vo:
             continue
 
