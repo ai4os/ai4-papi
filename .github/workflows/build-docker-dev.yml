@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Login to Harbor
         uses: docker/login-action@v3
@@ -29,6 +33,7 @@ jobs:
       - name: Build and export to Docker
         uses: docker/build-push-action@v6
         with:
+          context: .
           load: true
           tags: test-image
           file: docker/Dockerfile
@@ -40,6 +45,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: .
           push: true
           tags: |
             ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev
