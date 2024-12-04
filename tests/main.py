@@ -7,9 +7,9 @@ when template variables have typo (eg. ${PCU_NUM}) because those only raise erro
 Nomad (ie. after launching)
 """
 
-#TODO: move to proper testing package
-#TODO: rename test script: modules --> test_modules
-#TODO: add spinners
+# TODO: move to proper testing package
+# TODO: rename test script: modules --> test_modules
+# TODO: add spinners
 
 import ai4papi.conf as papiconf
 

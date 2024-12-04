@@ -30,11 +30,14 @@ router = APIRouter(
 security = HTTPBearer()
 
 # Init the Harbor client
-client = HarborClient(
-    url="https://registry.services.ai4os.eu/api/v2.0/",
-    username=papiconf.HARBOR_USER,
-    secret=papiconf.HARBOR_PASS,
-)
+if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
+    client = HarborClient(
+        url="https://registry.services.ai4os.eu/api/v2.0/",
+        username=papiconf.HARBOR_USER,
+        secret=papiconf.HARBOR_PASS,
+    )
+else:
+    client = None
 
 # Use the Nomad cluster inited in nomad.common
 Nomad = nomad_common.Nomad
@@ -160,7 +163,7 @@ def create_snapshot(
     nomad_conf = nomad_common.load_job_conf(nomad_conf)
 
     # Submit job
-    r = nomad_common.create_deployment(nomad_conf)
+    _ = nomad_common.create_deployment(nomad_conf)
 
     return {
         "status": "success",
@@ -318,7 +321,6 @@ def get_nomad_snapshots(
     # user_jobs = []
     snapshots = []
     for j in jobs:
-
         # Get job to retrieve the metadata
         job_info = Nomad.job.get_job(
             id_=j["ID"],
@@ -355,7 +357,9 @@ def get_nomad_snapshots(
         ][::-1]  # more recent first
 
         # Retrieve tasks
-        tasks = allocs[0]["TaskStates"] if allocs else {}  # if no allocations, use empty dict
+        tasks = (
+            allocs[0]["TaskStates"] if allocs else {}
+        )  # if no allocations, use empty dict
         tasks = tasks or {}  # if None, use empty dict
         client_status = allocs[0]["ClientStatus"] if allocs else None
 

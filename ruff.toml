@@ -1,0 +1,8 @@
+line-length = 88
+
+[format]
+quote-style = "double"
+
+[lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"tests/main.py" = ["E402", "F401"]
