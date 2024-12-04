@@ -1,4 +1,4 @@
-# We first build the image without pushing, then pass some basic init tests, then push
+# Based on: https://docs.docker.com/build/ci/github-actions/test-before-push/
 
 name: Build ai4-papi:dev docker image
 
@@ -9,42 +9,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Login to Harbor
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ secrets.HARBOR_URL  }}
           username: ${{ secrets.HARBOR_USERNAME  }}
           password: ${{ secrets.HARBOR_TOKEN }}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build
-        uses: docker/build-push-action@v3
+      - name: Build and export to Docker
+        uses: docker/build-push-action@v6
         with:
-          context: .
-          push: false
+          load: true
+          tags: test-image
+          file: docker/Dockerfile
+
+      - name: Test - Basic init (dev mode)
+        run: |
+          docker run --rm test-image /bin/bash -c "unset FORWARDED_ALLOW_IPS && python3 -c 'import ai4papi'"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
           tags: |
             ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:dev
           file: docker/Dockerfile
-
-      - name: Tests - Init ai4papi package (dev mode)
-        run: docker run --rm ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev python3 -c "unset FORWARDED_ALLOW_IPS; import ai4papi"
-
-      - name: Push to Harbor
-        run: docker push ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:dev
-
-      - name: Push to Docker Hub
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:dev
