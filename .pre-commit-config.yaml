@@ -14,3 +14,6 @@ repos:
       # Run the formatter.
       - id: ruff-format
         types_or: [ python, pyi ]
+ci:
+    autofix_commit_msg: "ci: auto-format from pre-commit.com hooks"
+    autoupdate_commit_msg: "ci: pre-commit auto-update"
