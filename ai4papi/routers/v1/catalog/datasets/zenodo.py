@@ -29,20 +29,20 @@ security = HTTPBearer()
 
 # If available, authenticate the call to Zenodo to increase rate limit.
 # https://developers.zenodo.org/#rate-limiting
-API_URL = 'https://zenodo.org'
+API_URL = "https://zenodo.org"
 session = requests.Session()
-zenodo_token = os.environ.get('ZENODO_TOKEN', None)
+zenodo_token = os.environ.get("ZENODO_TOKEN", None)
 if zenodo_token:
     session.headers = {
-        'Authorization': f'Bearer {zenodo_token}',
+        "Authorization": f"Bearer {zenodo_token}",
     }
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
+@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def _zenodo_proxy(
     api_route: str,
     params: Union[frozenset, None] = None,
-    ):
+):
     """
     We use this hidden function to allow for caching responses.
     Otherwise error will be raised, because "authorization" param cannot be cached
@@ -59,11 +59,11 @@ def _zenodo_proxy(
     # To avoid security issues, only allow a subset of Zenodo API (to avoid users
     # using *our* Zenodo token to update any record)
     allowed_routes = [
-        '^communities',
-        '^communities/[a-zA-Z0-9-]+/records*$',
-        '^records/[0-9]+',
-        '^records/[0-9]+/versions*$',
-        ]
+        "^communities",
+        "^communities/[a-zA-Z0-9-]+/records*$",
+        "^records/[0-9]+",
+        "^records/[0-9]+/versions*$",
+    ]
     allowed = False
     for i in allowed_routes:
         if re.match(i, api_route):
@@ -72,21 +72,20 @@ def _zenodo_proxy(
     if not allowed:
         raise HTTPException(
             status_code=400,
-            detail="Zenodo API route not allowed."  \
-                   f"Allowed routes: {allowed_routes}",
-            )
+            detail="Zenodo API route not allowed." f"Allowed routes: {allowed_routes}",
+        )
 
     # Make the call
     r = session.get(
         f"{API_URL}/api/{api_route}",
         params=params,
-        )
+    )
 
     if not r.ok:
         raise HTTPException(
             status_code=500,
             detail="Failed to query Zenodo.",
-            )
+        )
 
     return r.json()
 
@@ -96,7 +95,7 @@ def zenodo_proxy(
     api_route: str,
     params: Union[dict, None] = None,
     authorization=Depends(security),
-    ):
+):
     """
     Zenodo proxy
 

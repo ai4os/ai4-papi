@@ -5,6 +5,9 @@
 # AI4EOSC - Platform API
 
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Build Docker](https://github.com/ai4os/ai4-papi/actions/workflows/build-docker-prod.yml/badge.svg)](https://github.com/ai4os/ai4-papi/actions/workflows/build-docker-prod.yml)
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/ai4os/ai4-papi/master.svg)](https://results.pre-commit.ci/latest/github/ai4os/ai4-papi/master)
 
 [//]: # ([![GitHub license]&#40;https://img.shields.io/github/license/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/blob/master/LICENSE&#41;)
 [//]: # ([![GitHub release]&#40;https://img.shields.io/github/release/ai4papi/ai4papi.svg&#41;]&#40;https://github.com/ai4papi/ai4papi/releases&#41;)
@@ -271,3 +274,10 @@ The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.
     Also contains the generic quotas for hardware (see `range` parameter).
   - `nomad.hcl`: additional non-customizable values (eg. ports)
+
+### Implementation notes
+
+This repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
+We provide some [default VScode configuration](.vscode) to make the development workflow smoother.
+
+We use [Precommit](https://pre-commit.com/) locally to enforce format in commits. Then use [Precommit.CI](https://pre-commit.ci/) to enforce it at the Github level.

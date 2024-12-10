@@ -124,7 +124,7 @@ script: |-
   try:
     subprocess.run(DEEPAAS_CLI_COMMAND)
   except:
-    print("something go wrong in the execution")
+    print("Something went wrong during the execution.")
     exit(1)
   EOF
   
