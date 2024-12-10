@@ -128,10 +128,14 @@ script: |-
     exit(1)
   EOF
   
-  if [ $? -eq 0 ]; then
-    mv service.log  $OUTPUT_FILE.log
-    echo `cat $OUTPUT_FILE.log | grep 'New output is' `
-    FILE_NAME_2=`cat $OUTPUT_FILE.log | grep 'New output is' | cut -f 5 -d ' '`
+  if grep -q 'New output is' "service.log"
+  then
+    FILE_NAME_2=`cat service.log | grep 'New output is' | cut -f 5 -d ' '`
     mv $FILE_NAME_2 $OUTPUT_FILE.json
-    echo OK
+    mv service.log  $OUTPUT_FILE.log
+  elif echo "$FILE_NAME" | grep event-file
+  then
+    cat service.log
+  else
+    mv service.log  $OUTPUT_FILE.log
   fi
