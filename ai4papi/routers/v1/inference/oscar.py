@@ -30,7 +30,7 @@ router = APIRouter(
 class Service(BaseModel):
     image: str
     cpu: NonNegativeInt = 2
-    memory: NonNegativeInt = 3000
+    memory: NonNegativeInt = 30000
     allowed_users: List[str] = []  # no additional users by default
     title: str = ""
 
@@ -185,6 +185,9 @@ def get_services_list(
     client = get_client_from_auth(authorization.credentials, vo)
     r = client.list_services()
 
+    # Retrieve cluster config for MinIO info
+    client_conf = client.get_cluster_config().json()
+
     # Filter services
     services = []
     for s in json.loads(r.text):
@@ -200,9 +203,13 @@ def get_services_list(
         if vo not in s.get("vo", []):
             continue
 
-        # Add service endpoint
+        # Add service endpoint for sync calls
         cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
         s["endpoint"] = f"{cluster_endpoint}/run/{s['name']}"
+
+        # Info for async calls
+        # Replace MinIO info with the one retrieved from client (which is the correct one)
+        s["storage_providers"]["minio"]["default"] = client_conf["minio_provider"]
 
         services.append(s)
 
