@@ -30,7 +30,7 @@ router = APIRouter(
 class Service(BaseModel):
     image: str
     cpu: NonNegativeInt = 2
-    memory: NonNegativeInt = 30000
+    memory: NonNegativeInt = 3000
     allowed_users: List[str] = []  # no additional users by default
     title: str = ""
 
