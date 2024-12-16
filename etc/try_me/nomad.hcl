@@ -20,7 +20,7 @@ job "try-${JOB_UUID}" {
     owner       = "${OWNER}"  # user-id from OIDC
     owner_name  = "${OWNER_NAME}"
     owner_email = "${OWNER_EMAIL}"
-    title       = ""
+    title       = "${TITLE}"
     description = ""
   }
 
@@ -62,7 +62,7 @@ job "try-${JOB_UUID}" {
         to = 80  # -1 will assign random port
       }
       port "api" {
-        to = 5000  # -1 will assign random port
+        to = 5000
       }
     }
 

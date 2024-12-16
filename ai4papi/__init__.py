@@ -16,7 +16,7 @@
 
 import urllib3
 
-from . import version
+from . import routers, version
 
 __version__ = version.release_string
 

@@ -12,6 +12,7 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
+from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
 
 
@@ -23,12 +24,12 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-@router.get("/")
+@router.get("")
 def get_deployments(
     vos: Union[Tuple, None] = Query(default=None),
     full_info: bool = Query(default=False),
     authorization=Depends(security),
-    ):
+):
     """
     Returns a list of all deployments belonging to a user.
 
@@ -43,24 +44,23 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Else only retrieve from allowed VOs
+    # Always remove VOs that do not belong to the project
     if not vos:
-        vos = auth_info['vos']
-    else:
-        vos = set(vos).intersection(auth_info['vos'])
+        vos = auth_info["vos"]
+    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
     if not vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}."
-            )
+            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}.",
+        )
 
     user_jobs = []
     for vo in vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
-            namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-            owner=auth_info['id'],
-            prefix='tool',
+            namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+            owner=auth_info["id"],
+            prefix="tool",
         )
 
         # Retrieve info for jobs in namespace
@@ -68,7 +68,7 @@ def get_deployments(
             try:
                 job_info = get_deployment(
                     vo=vo,
-                    deployment_uuid=j['ID'],
+                    deployment_uuid=j["ID"],
                     full_info=full_info,
                     authorization=types.SimpleNamespace(
                         credentials=authorization.credentials  # token
@@ -77,12 +77,12 @@ def get_deployments(
             except HTTPException:  # not a tool
                 continue
             except Exception as e:  # unexpected error
-                raise(e)
+                raise (e)
 
             user_jobs.append(job_info)
 
     # Sort deployments by creation date
-    seq = [j['submit_time'] for j in user_jobs]
+    seq = [j["submit_time"] for j in user_jobs]
     args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
     sorted_jobs = [user_jobs[i] for i in args]
 
@@ -95,7 +95,7 @@ def get_deployment(
     deployment_uuid: str,
     full_info: bool = Query(default=True),
     authorization=Depends(security),
-    ):
+):
     """
     Retrieve the info of a specific deployment.
     Format outputs to a Nomad-independent format to be used by the Dashboard
@@ -110,34 +110,54 @@ def get_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Retrieve the associated namespace to that VO
-    namespace = papiconf.MAIN_CONF['nomad']['namespaces'][vo]
+    namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
-        owner=auth_info['id'],
+        owner=auth_info["id"],
         full_info=full_info,
     )
 
     # Check the deployment is indeed a tool
-    if not job['name'].startswith('tool'):
+    if not job["name"].startswith("tool"):
         raise HTTPException(
             status_code=400,
             detail="This deployment is not a tool.",
-            )
+        )
+
+    # Add an additional field with the tool type
+    # We map name from Nomad job to tool ID
+    match = re.search(r"tool-(.*?)-[a-f0-9-]{36}", job["name"])
+    nomad_name = match.group(1) if match else ""
+    tool_id = papiconf.tools_nomad2id.get(nomad_name, "")
+    job["tool_name"] = tool_id
+
+    # Additional checks
+    if tool_id == "ai4os-cvat":
+        # Remove useless endpoints (they all point to same url)
+        ignore = ["server", "grafana"]
+        job["endpoints"] = {
+            k: v for k, v in job["endpoints"].items() if k not in ignore
+        }
+        if job["active_endpoints"]:
+            job["active_endpoints"] = [
+                k for k in job["active_endpoints"] if k not in ignore
+            ]
 
     return job
 
 
-@router.post("/")
+@router.post("")
 def create_deployment(
     vo: str,
+    tool_name: str,
     conf: Union[dict, None] = None,
     authorization=Depends(security),
-    ):
+):
     """
     Submit a deployment to Nomad.
 
@@ -163,17 +183,18 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
-    # Retrieve toolname from configuration, else deploy first tool in the list
-    try:
-        tool_name = conf["general"]["docker_image"].split('/')[1]  # deephdc/*
-    except Exception:
-        tool_name = list(papiconf.TOOLS.keys())[0]
+    # Check tool_ID
+    if tool_name not in Tools_catalog.get_items().keys():
+        raise HTTPException(
+            status_code=400,
+            detail="This ID does not correspond to an available tool.",
+        )
 
     # Load tool configuration
-    nomad_conf = deepcopy(papiconf.TOOLS[tool_name]['nomad'])
-    user_conf = deepcopy(papiconf.TOOLS[tool_name]['user']['values'])
+    nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
+    user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
 
     # Update values conf in case we received a submitted conf
     if conf is not None:
@@ -186,99 +207,161 @@ def create_deployment(
     user_conf = utils.validate_conf(user_conf)
 
     # Check if the provided configuration is within the job quotas
-    quotas.check_jobwise(
-        conf=user_conf,
-        vo=vo,
-    )
+    # Skip this check with CVAT because it does not have a "hardware" section in the conf
+    if tool_name not in ["ai4os-cvat"]:
+        quotas.check_jobwise(
+            conf=user_conf,
+            vo=vo,
+        )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    if vo == 'training.egi.eu':
+    if vo == "training.egi.eu":
         priority = 25
     else:
         priority = 50
 
-    # Remove non-compliant characters from hostname
-    base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
-    hostname = utils.safe_hostname(
-        hostname=user_conf['general']['hostname'],
-        job_uuid=job_uuid,
-    )
+    base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
-    #TODO: reenable custom hostname, when we are able to parse all node metadata
-    # (domain key) to build the true domain
-    hostname = job_uuid
+    # Deploy a Federated server
+    if tool_name == "ai4os-federated-server":
+        # Create a default secret for the Federated Server
+        _ = ai4secrets.create_secret(
+            vo=vo,
+            secret_path=f"deployments/{job_uuid}/federated/default",
+            secret_data={"token": secrets.token_hex()},
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
 
-    # # Check the hostname is available in all data-centers
-    # # (we don't know beforehand where the job will land)
-    # #TODO: make sure this does not break if the datacenter is unavailable
-    # #TODO: disallow custom hostname, pain in the ass, slower deploys
-    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
-    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
+        # Create a Vault token so that the deployment can access the Federated secret
+        vault_token = ai4secrets.create_vault_token(
+            jwt=authorization.credentials,
+            issuer=auth_info["issuer"],
+            ttl="365d",  # 1 year expiration date
+        )
 
-    # Create a default secret for the Federated Server
-    _ = ai4secrets.create_secret(
-        vo=vo,
-        secret_path=f"deployments/{job_uuid}/federated/default",
-        secret_data={'token': secrets.token_hex()},
-        authorization=SimpleNamespace(
-            credentials=authorization.credentials,
-        ),
-    )
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][
+                    :45
+                ],  # keep only 45 first characters
+                "DESCRIPTION": user_conf["general"]["desc"][
+                    :1000
+                ],  # limit to 1K characters
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "DOCKER_TAG": user_conf["general"]["docker_tag"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
+                "VAULT_TOKEN": vault_token,
+                "FEDERATED_ROUNDS": user_conf["configuration"]["rounds"],
+                "FEDERATED_METRIC": user_conf["configuration"]["metric"],
+                "FEDERATED_MIN_FIT_CLIENTS": user_conf["configuration"][
+                    "min_fit_clients"
+                ],
+                "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["configuration"][
+                    "min_available_clients"
+                ],
+                "FEDERATED_STRATEGY": user_conf["configuration"]["strategy"],
+                "MU_FEDPROX": user_conf["configuration"]["mu"],
+                "FEDAVGM_SERVER_FL": user_conf["configuration"]["fl"],
+                "FEDAVGM_SERVER_MOMENTUM": user_conf["configuration"]["momentum"],
+                "DP": user_conf["configuration"]["dp"],
+                "NOISE_MULT": user_conf["configuration"]["noise_mult"],
+                "SAMPLED_CLIENTS": user_conf["configuration"]["sampled_clients"],
+                "CLIP_NORM": user_conf["configuration"]["clip_norm"],
+            }
+        )
 
-    # Create a Vault token so that the deployment can access the Federated secret
-    vault_token = ai4secrets.create_vault_token(
-        jwt=authorization.credentials,
-        issuer=auth_info['issuer'],
-        ttl='365d',  # 1 year expiration date
-    )
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
-        {
-            'JOB_UUID': job_uuid,
-            'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-            'PRIORITY': priority,
-            'OWNER': auth_info['id'],
-            'OWNER_NAME': auth_info['name'],
-            'OWNER_EMAIL': auth_info['email'],
-            'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
-            'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
-            'BASE_DOMAIN': base_domain,
-            'HOSTNAME': hostname,
-            'DOCKER_IMAGE': user_conf['general']['docker_image'],
-            'DOCKER_TAG': user_conf['general']['docker_tag'],
-            'CPU_NUM': user_conf['hardware']['cpu_num'],
-            'RAM': user_conf['hardware']['ram'],
-            'DISK': user_conf['hardware']['disk'],
-            'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
-            # Limit at 50% of RAM memory, in bytes
-            'JUPYTER_PASSWORD': user_conf['general']['jupyter_password'],
-            'VAULT_TOKEN': vault_token,
-            'FEDERATED_ROUNDS': user_conf['configuration']['rounds'],
-            'FEDERATED_METRIC': user_conf['configuration']['metric'],
-            'FEDERATED_MIN_FIT_CLIENTS': user_conf['configuration']['min_fit_clients'],
-            'FEDERATED_MIN_AVAILABLE_CLIENTS': user_conf['configuration']['min_available_clients'],
-            'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
-            'MU_FEDPROX': user_conf['configuration']['mu'],
-            'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
-            'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        usertask = [t for t in tasks if t["Name"] == "main"][0]
+
+        # Launch `deep-start` compatible service if needed
+        service = user_conf["general"]["service"]
+        if service in ["deepaas", "jupyter", "vscode"]:
+            usertask["Config"]["command"] = "deep-start"
+            usertask["Config"]["args"] = [f"--{service}"]
+
+    # Deploy a CVAT tool
+    elif tool_name == "ai4os-cvat":
+        # Enforce defining CVAT username and password
+        cvat = {
+            k: v
+            for k, v in user_conf["general"].items()
+            if k in ["cvat_username", "cvat_password"]
         }
-    )
+        if not all(cvat.values()):
+            raise HTTPException(
+                status_code=400,
+                detail="You must fill all CVAT-related variables.",
+            )
 
-    # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+        # Enforce all rclone vars are defined
+        rclone = {
+            k: v for k, v in user_conf["storage"].items() if k.startswith("rclone")
+        }
+        if not all(rclone.values()):
+            raise HTTPException(
+                status_code=400,
+                detail="You must fill all RCLONE-related variables.",
+            )
 
-    tasks = nomad_conf['TaskGroups'][0]['Tasks']
-    usertask = [t for t in tasks if t['Name']=='main'][0]
+        # Replace the Nomad job template
+        job_title = re.sub(
+            r'[<>:"/\\|?* ]',
+            "_",
+            user_conf["general"]["title"][:45],
+        )  # make title foldername-friendly
 
-    # Launch `deep-start` compatible service if needed
-    service = user_conf['general']['service']
-    if service in ['deepaas', 'jupyter', 'vscode']:
-        usertask['Config']['command'] = 'deep-start'
-        usertask['Config']['args'] = [f'--{service}']
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][
+                    :45
+                ],  # keep only 45 first characters
+                "DESCRIPTION": user_conf["general"]["desc"][
+                    :1000
+                ],  # limit to 1K characters
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "CVAT_USERNAME": user_conf["general"]["cvat_username"],
+                "CVAT_PASSWORD": user_conf["general"]["cvat_password"],
+                "RESTORE_FROM": user_conf["storage"]["cvat_backup"],
+                "BACKUP_NAME": f"{job_title}",
+                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
+                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
+                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
+                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
+                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
@@ -291,7 +374,7 @@ def delete_deployment(
     vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
-    ):
+):
     """
     Delete a deployment. Users can only delete their own deployments.
 
@@ -303,25 +386,25 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Delete deployment
     r = nomad.delete_deployment(
         deployment_uuid=deployment_uuid,
-        namespace=papiconf.MAIN_CONF['nomad']['namespaces'][vo],
-        owner=auth_info['id'],
+        namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+        owner=auth_info["id"],
     )
 
     # Remove Vault secrets belonging to that deployment
-    r = ai4secrets.get_secrets(
+    secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath=f"/deployments/{deployment_uuid}",
         authorization=SimpleNamespace(
             credentials=authorization.credentials,
         ),
     )
-    for path in r.keys():
-        r = ai4secrets.delete_secret(
+    for path in secrets.keys():
+        _ = ai4secrets.delete_secret(
             vo=vo,
             secret_path=path,
             authorization=SimpleNamespace(

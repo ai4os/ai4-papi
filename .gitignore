@@ -67,7 +67,7 @@ target/
 .idea
 
 # VS Code
-.vscode/
+# .vscode/
 
 # Spyder
 .spyproject/

@@ -1,7 +1,7 @@
 import os
 from types import SimpleNamespace
 
-from ai4papi.routers.v1 import stats
+from ai4papi.routers.v1 import storage
 
 
 # Retrieve EGI token (not generated on the fly in case the are rate limiting issues
@@ -16,21 +16,11 @@ If running from VScode make sure to launch `code` from that terminal so it can a
 that ENV variable.'
     )
 
-SECRET_PATH = "/demo-papi-tests/demo-secret"
-SECRET_DATA = {"pwd": 12345}
-
-# Retrieve user stats
-r = stats.deployments.get_user_stats(
+r = storage.storage_ls(
     vo="vo.ai4eosc.eu",
+    storage_name="share.services.ai4os.eu",
+    subpath="ai4os-storage",
     authorization=SimpleNamespace(credentials=token),
 )
-assert r, "User stats dict is empty"
 
-# Retrieve cluster stats
-_ = stats.deployments.get_cluster_stats_bg()
-r = stats.deployments.get_cluster_stats(
-    vo="vo.ai4eosc.eu",
-)
-assert r, "Cluster stats dict is empty"
-
-print("Stats tests passed!")
+print("Storage tests passed!")
