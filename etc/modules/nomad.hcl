@@ -328,7 +328,7 @@ job "module-${JOB_UUID}" {
       }
 
       env {
-        DURATION = "10m"  # kill job after 10 mins
+        DURATION = "10000d"  # do not kill UI (duration = 10K days)
         UI_PORT  = 80
       }
 
