@@ -131,21 +131,13 @@ job "tool-cvat-${JOB_UUID}" {
     weight    = 50
   }
 
-  # Avoid rescheduling the job on **other** nodes during a network cut
-  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
-  reschedule {
-    attempts  = 0
-    unlimited = false
-  }
-
   group "usergroup" {
 
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
+    # Avoid rescheduling the job on another node:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
 
     ephemeral_disk {
       size = 4096
