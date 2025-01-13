@@ -44,7 +44,7 @@ RUN pip3 install -e .
 
 # Run the API
 EXPOSE 80
-CMD envsubst < etc/main_tmp.yaml > etc/main.yaml; \
+CMD unset NOMAD_NAMESPACE; envsubst < etc/main_tmp.yaml > etc/main.yaml; \
     ai4papi-run \
     --host 0.0.0.0 \
     --port 80
