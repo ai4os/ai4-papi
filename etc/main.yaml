@@ -19,6 +19,7 @@ auth:
     - https://tutorials.cloud.ai4eosc.eu
     - https://dashboard-ai4eosc-test.ifca-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
     - http://localhost:8080
+    - http://193.146.75.247:8081
 
   OP:  # OIDC providers
 
