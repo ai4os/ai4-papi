@@ -131,9 +131,16 @@ job "tool-cvat-${JOB_UUID}" {
     weight    = 50
   }
 
+  # Avoid rescheduling the job if the job fails the first time
+  # This is done to avoid confusing users with cyclic job statuses
+  reschedule {
+    attempts  = 0
+    unlimited = false
+  }
+
   group "usergroup" {
 
-    # Avoid rescheduling the job on another node:
+    # Avoid rescheduling the job when the node fails:
     # * if the node is lost for good, you would need to manually redeploy,
     # * if the node is unavailable due to a network cut, you will recover the job (and
     #   your saved data) once the network comes back.
