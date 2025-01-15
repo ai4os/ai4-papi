@@ -4,7 +4,7 @@ import types
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import quotas, utils
+from ai4papi import quotas, utils, nomad
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
@@ -35,6 +35,13 @@ def get_config(
     # Retrieve tool metadata
     metadata = self.get_metadata(item_name)
 
+    # Modify the resources limits for a given user or VO
+    if conf.get("hardware", None):
+        conf["hardware"] = quotas.limit_resources(
+            item_name=item_name,
+            vo=vo,
+        )
+
     # Parse docker registry
     registry = metadata["links"]["docker_image"]
     repo, image = registry.split("/")[-2:]
@@ -55,12 +62,10 @@ def get_config(
         conf["general"]["model_id"]["options"] = models
         conf["general"]["model_id"]["value"] = models[0]
 
-    # Modify the resources limits for a given user or VO
-    if conf.get("hardware", None):
-        conf["hardware"] = quotas.limit_resources(
-            item_name=item_name,
-            vo=vo,
-        )
+        # Fill with available GPU models in the cluster
+        models = nomad.common.get_gpu_models(vo)
+        if models:
+            conf["hardware"]["gpu_type"]["options"] += models
 
     return conf
 
