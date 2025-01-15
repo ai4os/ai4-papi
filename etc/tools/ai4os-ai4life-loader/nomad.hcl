@@ -107,8 +107,7 @@ job "tool-ai4life-${JOB_UUID}" {
       size = ${DISK}
     }
 
-    task "main" {
-      // Task configured by the user (deepaas, jupyter, vscode)
+    task "main" { # Task configured by the user (deepaas, jupyter, vscode)
 
       driver = "docker"
 
@@ -123,12 +122,6 @@ job "tool-ai4life-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
-
-        # # This will be added later on, if the job is meant to be deployed in Harbor
-        # auth {
-        #   username = "harbor_user"
-        #   password = "harbor_password"
-        # }
 
       }
 
@@ -176,6 +169,7 @@ job "tool-ai4life-${JOB_UUID}" {
       env {
         DURATION = "10000d"  # do not kill UI (duration = 10K days)
         UI_PORT  = 80
+        MAX_RETRIES = 1000  # some models take a lot to download --> UI will wait at least (5*1000) seconds before failing for not finding DEEPaaS
       }
 
       resources {
