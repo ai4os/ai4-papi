@@ -262,6 +262,7 @@ def create_deployment(
             "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
             "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
             "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
+            "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
             "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
             "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
             "TODAY": str(datetime.date.today()),
