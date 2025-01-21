@@ -22,45 +22,30 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
-  cvat_username:
-    name: CVAT superuser name
-    value: ''
-    description: Select a username (or email) for your CVAT instance superuser.
+  type:
+    name: Deployment type
+    value: 'both'
+    description: Type of the deployment. For example `llm`.
+    options: [
+      'vllm',
+      'open webui',
+      'both'
+    ]
 
-  cvat_password:
-    name: CVAT superuser password
-    value: ''
-    description: Select a password for your CVAT instance superuser.
+vllm:
+  
+  gpu_memory_utilization:
+    name: GPU memory utilization 
+    value: 1
+    range: [0, 1]
+    description: Fraction of GPU memory to be used. 
 
-storage:
-
-  rclone_conf:
-    name: RCLONE configuration
-    value: '/srv/.rclone/rclone.conf'
-    description: rclone.conf location
-
-  rclone_url:
-    name: Storage URL
-    value: ''
-    description: Remote storage link to be accessed via rclone (webdav). For example, in Nextcloud `https://share.services.ai4os.eu/remote.php/dav/files/<USER-ID>`
-
-  rclone_vendor:
-    name: RCLONE vendor
-    value: 'nextcloud'
-    options: ['nextcloud']
-    description: RCLONE vendor (webdav)
-
-  rclone_user:
-    name: RCLONE user
-    value: ''
-    description: rclone user to access a webdav remote storage
-
-  rclone_password:
-    name: RCLONE user password
-    value: ''
-
-  cvat_backup:
-    name: CVAT backups
-    value: ''
-    options: ['']
-    description: CVAT backup where to restore from
+  max_model_len:
+    name: Maximum model length
+    value: 
+    description: Maximum length of the model.
+    
+  tensor_parrallel_size:
+    name: Tensor parrallel size
+    value: 1
+    description: Number of tensor parrallel size.
