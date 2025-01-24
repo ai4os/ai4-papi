@@ -38,16 +38,16 @@ def get_config(
     # Parse docker registry
     registry = metadata["links"]["docker_image"]
     repo, image = registry.split("/")[-2:]
-    if repo not in ["deephdc", "ai4oshub"]:
-        repo = "ai4oshub"
+    # if repo not in ["deephdc", "ai4oshub"]:
+    #     repo = "ai4oshub"
 
     # Fill with correct Docker image and tags (not needed for CVAT because hardcoded)
-    if item_name != "ai4os-cvat":
-        conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+    # if item_name != "ai4os-cvat":
+    #     conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
-        tags = retrieve_docker_tags(image=image, repo=repo)
-        conf["general"]["docker_tag"]["options"] = tags
-        conf["general"]["docker_tag"]["value"] = tags[0]
+    #     tags = retrieve_docker_tags(image=image, repo=repo)
+    #     conf["general"]["docker_tag"]["options"] = tags
+    #     conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Modify the resources limits for a given user or VO
     if conf.get("hardware", None):

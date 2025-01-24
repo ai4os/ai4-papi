@@ -360,8 +360,85 @@ def create_deployment(
             }
         )
 
+    # Deploy a Open Webui with vllm tool
+    elif tool_name == "ai4-llm":
+        # Check if user wants to deploy a vllm tool
+
+        if user_conf["general"]["type"] != "open-webui":
+            # Configuration for vllm and open webui - vllm deployment
+
+            if user_conf["general"]["type"] == "vllm":
+                exclude_tasks = ["open-webui"]
+
+            # Enforce all vllm vars are defined
+            vllm = {k: v for k, v in user_conf["vllm"].items()}
+            if not all(vllm.values()):
+                raise HTTPException(
+                    status_code=400,
+                    detail="You must fill all vllm-related variables.",
+                )
+
+            # Replace the Nomad job template
+            job_title = re.sub(
+                r'[<>:"/\\|?* ]',
+                "_",
+                user_conf["general"]["title"][:45],
+            )  # make title foldername-friendly
+
+            nomad_conf = nomad_conf.safe_substitute(
+                {
+                    "JOB_UUID": job_uuid,
+                    "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                    "PRIORITY": priority,
+                    "OWNER": auth_info["id"],
+                    "OWNER_NAME": auth_info["name"],
+                    "OWNER_EMAIL": auth_info["email"],
+                    "TITLE": user_conf["general"]["title"][
+                        :45
+                    ],  # keep only 45 first characters
+                    "DESCRIPTION": user_conf["general"]["desc"][
+                        :1000
+                    ],  # limit to 1K characters
+                    "BASE_DOMAIN": base_domain,
+                    "HOSTNAME": job_uuid,
+                }
+            )
+
+        else:
+            # Configuration for open-webui deployment
+
+            exclude_tasks = ["vllm"]
+
+            nomad_conf = nomad_conf.safe_substitute(
+                {
+                    "JOB_UUID": job_uuid,
+                    "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                    "PRIORITY": priority,
+                    "OWNER": auth_info["id"],
+                    "OWNER_NAME": auth_info["name"],
+                    "OWNER_EMAIL": auth_info["email"],
+                    "TITLE": user_conf["general"]["title"][
+                        :45
+                    ],  # keep only 45 first characters
+                    "DESCRIPTION": user_conf["general"]["desc"][
+                        :1000
+                    ],  # limit to 1K characters
+                    "BASE_DOMAIN": base_domain,
+                    "HOSTNAME": job_uuid,
+                }
+            )
+
+        # Replace the Nomad job template
+        job_title = re.sub(
+            r'[<>:"/\\|?* ]',
+            "_",
+            user_conf["general"]["title"][:45],
+        )  # make title foldername-friendly
+
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
