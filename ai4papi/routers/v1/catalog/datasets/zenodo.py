@@ -72,7 +72,7 @@ def _zenodo_proxy(
     if not allowed:
         raise HTTPException(
             status_code=400,
-            detail="Zenodo API route not allowed." f"Allowed routes: {allowed_routes}",
+            detail=f"Zenodo API route not allowed.Allowed routes: {allowed_routes}",
         )
 
     # Make the call
