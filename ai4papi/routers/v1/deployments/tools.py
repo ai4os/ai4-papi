@@ -369,7 +369,6 @@ def create_deployment(
 
     # Deploy a CVAT tool
     elif tool_name == "ai4os-ai4life-loader":
-
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
             {
