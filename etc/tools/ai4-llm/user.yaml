@@ -48,16 +48,16 @@ vllm:
   
   gpu_memory_utilization:
     name: GPU memory utilization 
-    value: 1
+    value: 
     range: [0, 1]
     description: Fraction of GPU memory to be used. 
 
-  max_model_len:
+  max_model_length:
     name: Maximum model length
     value: 
     description: Maximum length of the model.
     
-  tensor_parrallel_size:
+  tensor_parallel_size:
     name: Tensor parrallel size
-    value: 1
+    value: 
     description: Number of tensor parrallel size.

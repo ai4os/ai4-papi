@@ -5,6 +5,7 @@ import types
 from types import SimpleNamespace
 from typing import Tuple, Union
 import uuid
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -225,6 +226,9 @@ def create_deployment(
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
+    exclude_tasks = []
+    exclude_services = []
+
     # Deploy a Federated server
     if tool_name == "ai4os-federated-server":
         # Create a default secret for the Federated Server
@@ -369,14 +373,15 @@ def create_deployment(
 
             if user_conf["general"]["type"] == "vllm":
                 exclude_tasks = ["open-webui"]
+                exclude_services = ["ui"]
 
             # Enforce all vllm vars are defined
-            vllm = {k: v for k, v in user_conf["vllm"].items()}
-            if not all(vllm.values()):
-                raise HTTPException(
-                    status_code=400,
-                    detail="You must fill all vllm-related variables.",
-                )
+            # vllm = {k: v for k, v in user_conf["vllm"].items()}
+            # if not all(vllm.values()):
+            #     raise HTTPException(
+            #         status_code=400,
+            #         detail="You must fill all vllm-related variables.",
+            #     )
 
             # Replace the Nomad job template
             job_title = re.sub(
@@ -384,6 +389,41 @@ def create_deployment(
                 "_",
                 user_conf["general"]["title"][:45],
             )  # make title foldername-friendly
+
+            # Configure VLLM args
+
+            vllm_args = []
+
+            vllm_args.extend(["--dtype=half"])
+
+            if user_conf["vllm"]["gpu_memory_utilization"] is not None:
+                vllm_args.extend(
+                    [
+                        "--gpu_memory_utilization",
+                        user_conf["vllm"]["gpu_memory_utilization"],
+                    ]
+                )
+
+            if user_conf["vllm"]["max_model_length"] is not None:
+                vllm_args.extend(
+                    [
+                        "--max_model_length",
+                        user_conf["vllm"]["max_model_length"],
+                    ]
+                )
+
+            if user_conf["vllm"]["tensor_parallel_size"] is not None:
+                vllm_args.extend(
+                    [
+                        "--tensor_parallel_size",
+                        user_conf["vllm"]["tensor_parallel_size"],
+                    ]
+                )
+
+            vllm_args.extend(["--model", "Qwen/Qwen2.5-1.5B-Instruct"])
+
+            vllm_args_str = json.dumps(vllm_args)
+            vllm_args_str = vllm_args_str[2:-2]
 
             nomad_conf = nomad_conf.safe_substitute(
                 {
@@ -401,13 +441,19 @@ def create_deployment(
                     ],  # limit to 1K characters
                     "BASE_DOMAIN": base_domain,
                     "HOSTNAME": job_uuid,
+                    "VLLM_ARGS": vllm_args_str,
                 }
             )
+
+            # print(vllm_args)
+            # print(vllm_args_str)
+            # print(nomad_conf)
 
         else:
             # Configuration for open-webui deployment
 
             exclude_tasks = ["vllm"]
+            exclude_services = ["vllm"]
 
             nomad_conf = nomad_conf.safe_substitute(
                 {
@@ -438,7 +484,11 @@ def create_deployment(
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
-        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
+    tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+    services = nomad_conf["TaskGroups"][0]["Services"]
+
+    tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
+    services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

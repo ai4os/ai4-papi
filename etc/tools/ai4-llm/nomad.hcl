@@ -148,6 +148,30 @@ job "vllm-${JOB_UUID}" {
             "traefik.http.routers.${JOB_UUID}-vllm.rule=Host(`vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
           ]
     }
+    
+    task "open-webui" {
+
+      driver = "docker"
+
+      config {
+        image   = "ghcr.io/open-webui/open-webui:main"
+        ports   = ["ui"]
+  			# args    = ["--restart", "always"] 
+        volumes    = ["open-webui:/app/backend/data"]
+      }
+
+      env {
+        OPENAI_API_KEY  = "EMPTY"
+        OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
+        WEBUI_AUTH  = false
+      } 
+
+      resources {
+
+        memory = 8000
+
+     }
+   }
 
     task "vllm" {
 
@@ -155,8 +179,8 @@ job "vllm-${JOB_UUID}" {
 
       config {
         image   = "vllm/vllm-openai:latest"
-        ports   = ["endpoint-api"]
-        args    = ["--dtype=half","--model", "Qwen/Qwen2.5-1.5B-Instruct"] # For V100 GPUs
+        ports   = ["vllm"]
+        args    = ["${VLLM_ARGS}"] # For V100 GPUs
         volumes    = ["~/.cache/huggingface:/root/.cache/huggingface"]
       }
 
