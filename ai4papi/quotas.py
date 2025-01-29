@@ -12,12 +12,18 @@ import ai4papi.conf as papiconf
 def check_jobwise(
     conf: dict,
     vo: str,
+    item_name: str = "",
 ):
     """
     Check the job configuration does not overflow the generic hardware limits.
+
+    Params:
+    ------
+    * conf: user configuration
+    * vo: user VO
+    * item_name: provide in case we look for a specific tool
     """
     # Retrieve generic quotas (vo-dependent)
-    item_name = conf["general"]["docker_image"].split("/")[-1]
     ref = limit_resources(
         item_name=item_name,
         vo=vo,
