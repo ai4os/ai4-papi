@@ -61,3 +61,14 @@ vllm:
     name: Tensor parrallel size
     value: 
     description: Number of tensor parrallel size.
+
+  huggingface_token:
+    name: Huggingface token
+    value: ''
+    description: Huggingface token to use.
+
+  vllm_model:
+    name: VLLM model
+    value: 'Qwen/Qwen2.5-1.5B-Instruct'
+    description: VLLM model to use.
+  

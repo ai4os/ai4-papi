@@ -185,7 +185,7 @@ job "vllm-${JOB_UUID}" {
       }
 
       env {
-        HUGGING_FACE_HUB_TOKEN  = ""
+        HUGGING_FACE_HUB_TOKEN  = "${HUGGINGFACE_TOKEN}"
       } 
 
       resources {
