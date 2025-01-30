@@ -9,39 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-/*
-Main changes with respect to the reference job located in [1].
-
-- added preliminary constraints and affinites
-- adapted meta field
-- group renamed to 'user_group'
-- $$ replaced with $$$$ to avoid escaping in Python Template [2]
-- replace ${BASE} with ${JOB_UUID}
-- renamed task "server" to "main" (to share same info retrieving pattern)
-
-I also had to replace the following meta fields, otherwise when retrieving the
-job info the ${env_var} where not being replaced. I'm having to do something similar
-with ${meta.domain} but I don't want to extend it to env_vars just to support CVAT.
-
-To avoid too much disruption, I'm only changing this inside the service field
-- ${NOMAD_META_job_uuid} --> ${JOB_UUID}
-- ${NOMAD_META_cvat_hostname} --> ${meta.domain}-${BASE_DOMAIN}
-
-To avoid too much disruption, I'm only changing this in the "main" task (parameter `image`)
-- ${NOMAD_META_server_image} --> registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS
-
-[1]: https://github.com/ai4os/ai4os-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
-[2]: https://stackoverflow.com/a/56957750/18471590
-
-Note:
-In several part of the job we use the old name of the repo (ai4os/ai4-cvat) which
-should redirect fine to the new repo name (ai4os/ai4os-cvat)
-But it is important nevertheless to keep it in mind, just in case.
-
-*/
-
-
-job "tool-vllm-${JOB_UUID}" {
+job "tool-llm-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -56,7 +24,7 @@ job "tool-vllm-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
-  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  # Only use nodes that have successfully passed the ai4-nomad_tests (ie. meta.status=ready)
   constraint {
     attribute = "${meta.status}"
     operator  = "regexp"
@@ -85,7 +53,7 @@ job "tool-vllm-${JOB_UUID}" {
     attribute = "${meta.namespace}"
     operator  = "regexp"
     value     = "ai4eosc"
-    weight    = -50  # anti-affinity for ai4eosc clients
+    weight    = -100  # anti-affinity for ai4eosc clients
   }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
@@ -94,7 +62,7 @@ job "tool-vllm-${JOB_UUID}" {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
-    weight    = 50
+    weight    = 100
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut
@@ -106,27 +74,20 @@ job "tool-vllm-${JOB_UUID}" {
 
   group "usergroup" {
 
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
-
-    ephemeral_disk {
-      size = 4096
-    }
+    # Avoid rescheduling the job when the node fails:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
 
     network {
 
         port "ui" {
-            to = 8080
+          to = 8080
         }
-
         port "vllm" {
-            to = 8000
+          to = 8000
         }
-
     }
 
     service {
@@ -135,7 +96,7 @@ job "tool-vllm-${JOB_UUID}" {
       	tags = [
             "traefik.enable=true",
             "traefik.http.routers.${JOB_UUID}-ui.tls=true",
-            "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`openwebui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.openwebui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+            "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
           ]
     }
 
@@ -148,7 +109,11 @@ job "tool-vllm-${JOB_UUID}" {
             "traefik.http.routers.${JOB_UUID}-vllm.rule=Host(`vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
           ]
     }
-    
+
+    ephemeral_disk {
+      size = 4096
+    }
+
     task "open-webui" {
 
       driver = "docker"
@@ -156,20 +121,18 @@ job "tool-vllm-${JOB_UUID}" {
       config {
         image   = "ghcr.io/open-webui/open-webui:main"
         ports   = ["ui"]
-  			# args    = ["--restart", "always"] 
-        volumes    = ["open-webui:/app/backend/data"]
+  			# args    = ["--restart", "always"]
+        volumes = ["open-webui:/app/backend/data"]
       }
 
       env {
-        OPENAI_API_KEY  = "EMPTY"
+        OPENAI_API_KEY      = "EMPTY"
         OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
-        WEBUI_AUTH  = false
-      } 
+        WEBUI_AUTH          = false
+      }
 
-      resources {
-
+      resources {  # UI needs a fair amount of resources because it's also doing RAG
         memory = 8000
-
      }
    }
 
@@ -181,17 +144,15 @@ job "tool-vllm-${JOB_UUID}" {
         image   = "vllm/vllm-openai:latest"
         ports   = ["vllm"]
         args    = ["${VLLM_ARGS}"] # For V100 GPUs
-        volumes    = ["~/.cache/huggingface:/root/.cache/huggingface"]
+        volumes = ["~/.cache/huggingface:/root/.cache/huggingface"]
       }
 
       env {
-        HUGGING_FACE_HUB_TOKEN  = "${HUGGINGFACE_TOKEN}"
-      } 
+        HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
+      }
 
       resources {
-
         memory = 16000
-
 
         device "gpu" {
           count = 1
@@ -204,8 +165,8 @@ job "tool-vllm-${JOB_UUID}" {
           }
 
         }
-     }
+      }
 
-   }
+    }
   }
 }
