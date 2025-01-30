@@ -41,7 +41,7 @@ But it is important nevertheless to keep it in mind, just in case.
 */
 
 
-job "vllm-${JOB_UUID}" {
+job "tool-vllm-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"

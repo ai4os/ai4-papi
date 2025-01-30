@@ -486,10 +486,23 @@ def create_deployment(
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+
     services = nomad_conf["TaskGroups"][0]["Services"]
 
     tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
+
+    if user_conf["general"]["type"] == "vllm":
+        for t in tasks:
+            if t["Name"] == "vllm":
+                t["Name"] = "main"
+    else:
+        for t in tasks:
+            if t["Name"] == "open-webui":
+                t["Name"] = "main"
+
     services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+
+    print(nomad_conf)
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
