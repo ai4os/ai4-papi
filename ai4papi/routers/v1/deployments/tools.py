@@ -149,6 +149,9 @@ def get_deployment(
                 k for k in job["active_endpoints"] if k not in ignore
             ]
 
+    if tool_id == "ai4os-ai4life-loader":
+        job["main_endpoint"] = "ui"  # instead of deepaas
+
     return job
 
 
@@ -208,11 +211,12 @@ def create_deployment(
     user_conf = utils.validate_conf(user_conf)
 
     # Check if the provided configuration is within the job quotas
-    # Skip this check with CVAT because it does not have a "hardware" section in the conf
-    if tool_name not in ["ai4os-cvat"]:
+    # We only do this for tools that have a "hardware" section in the conf
+    if "hardware" in user_conf.keys():
         quotas.check_jobwise(
             conf=user_conf,
             vo=vo,
+            item_name=tool_name,
         )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -364,10 +368,10 @@ def create_deployment(
             }
         )
 
-    # Deploy a Open Webui with vllm tool
+    # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4-llm":
-        # Check if user wants to deploy a vllm tool
 
+        # Check if user wants to deploy a vllm tool
         if user_conf["general"]["type"] != "open-webui":
             # Configuration for vllm and open webui - vllm deployment
 
@@ -375,23 +379,7 @@ def create_deployment(
                 exclude_tasks = ["open-webui"]
                 exclude_services = ["ui"]
 
-            # Enforce all vllm vars are defined
-            # vllm = {k: v for k, v in user_conf["vllm"].items()}
-            # if not all(vllm.values()):
-            #     raise HTTPException(
-            #         status_code=400,
-            #         detail="You must fill all vllm-related variables.",
-            #     )
-
-            # Replace the Nomad job template
-            job_title = re.sub(
-                r'[<>:"/\\|?* ]',
-                "_",
-                user_conf["general"]["title"][:45],
-            )  # make title foldername-friendly
-
             # Configure VLLM args
-
             vllm_args = []
 
             vllm_args.extend(["--dtype=half"])
@@ -425,6 +413,13 @@ def create_deployment(
             vllm_args_str = json.dumps(vllm_args)
             vllm_args_str = vllm_args_str[2:-2]
 
+            # Replace the Nomad job template
+            job_title = re.sub(
+                r'[<>:"/\\|?* ]',
+                "_",
+                user_conf["general"]["title"][:45],
+            )  # make title foldername-friendly
+
             nomad_conf = nomad_conf.safe_substitute(
                 {
                     "JOB_UUID": job_uuid,
@@ -445,10 +440,6 @@ def create_deployment(
                     "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
                 }
             )
-
-            # print(vllm_args)
-            # print(vllm_args_str)
-            # print(nomad_conf)
 
         else:
             # Configuration for open-webui deployment
@@ -485,24 +476,67 @@ def create_deployment(
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
 
-    services = nomad_conf["TaskGroups"][0]["Services"]
+        services = nomad_conf["TaskGroups"][0]["Services"]
 
-    tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
+        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
-    if user_conf["general"]["type"] == "vllm":
-        for t in tasks:
-            if t["Name"] == "vllm":
-                t["Name"] = "main"
-    else:
-        for t in tasks:
-            if t["Name"] == "open-webui":
-                t["Name"] = "main"
+        if user_conf["general"]["type"] == "vllm":
+            for t in tasks:
+                if t["Name"] == "vllm":
+                    t["Name"] = "main"
+        else:
+            for t in tasks:
+                if t["Name"] == "open-webui":
+                    t["Name"] = "main"
 
-    services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+        services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
 
-    print(nomad_conf)
+    # Deploy AI4Life tool
+    elif tool_name == "ai4os-ai4life-loader":
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][
+                    :45
+                ],  # keep only 45 first characters
+                "DESCRIPTION": user_conf["general"]["desc"][
+                    :1000
+                ],  # limit to 1K characters
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "AI4LIFE_MODEL": user_conf["general"]["model_id"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "GPU_NUM": user_conf["hardware"]["gpu_num"],
+                "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        usertask = [t for t in tasks if t["Name"] == "main"][0]
+
+        # Modify the GPU section
+        if user_conf["hardware"]["gpu_num"] <= 0:
+            # Delete GPU section in CPU deployments
+            usertask["Resources"]["Devices"] = None
+        else:
+            # If gpu_type not provided, remove constraint to GPU model
+            if not user_conf["hardware"]["gpu_type"]:
+                usertask["Resources"]["Devices"][0]["Constraints"] = None
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

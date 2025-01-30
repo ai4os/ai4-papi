@@ -206,7 +206,7 @@ def get_deployment(
         info["datacenter"] = Nomad.node.get_node(a["NodeID"])["Datacenter"]
 
         # Replace Nomad status with a more user-friendly status
-        # Final list includes: starting, down, running, complete, failed, ...
+        # Final list includes: starting, down, running, complete, failed, dead, ...
         # We use the status of the "main" task because it isn more relevant the the
         # status of the overall job (a['ClientStatus'])
         status = a["TaskStates"]["main"]["State"] if a.get("TaskStates") else "queued"
@@ -369,7 +369,7 @@ def delete_deployment(
     # If job is in stuck status, allow deleting with purge.
     # Most of the time, when a job is in this status, it is due to a platform error.
     # It gets stuck and cannot be deleted without purge
-    if info["status"] in ["queued", "complete", "failed", "error", "down"]:
+    if info["status"] in ["queued", "complete", "failed", "error", "down", "dead"]:
         purge = True
     else:
         purge = False

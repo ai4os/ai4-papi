@@ -65,8 +65,8 @@ job "module-${JOB_UUID}" {
     weight    = 100
   }
 
-  # Avoid rescheduling the job on **other** nodes during a network cut
-  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
+  # Avoid rescheduling the job if the job fails the first time
+  # This is done to avoid confusing users with cyclic job statuses
   reschedule {
     attempts  = 0
     unlimited = false
@@ -74,12 +74,11 @@ job "module-${JOB_UUID}" {
 
   group "usergroup" {
 
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
+    # Avoid rescheduling the job when the node fails:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
 
     network {
 
@@ -288,6 +287,9 @@ job "module-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${RCLONE_CONFIG_RSHARE_PASS}"
+        MLFLOW_TRACKING_URI         = "${MLFLOW_URI}"
+        MLFLOW_TRACKING_USERNAME    = "${MLFLOW_USERNAME}"
+        MLFLOW_TRACKING_PASSWORD    = "${MLFLOW_PASSWORD}"
       }
 
       resources {
@@ -328,7 +330,7 @@ job "module-${JOB_UUID}" {
       }
 
       env {
-        DURATION = "10m"  # kill job after 10 mins
+        DURATION = "10000d"  # do not kill UI (duration = 10K days)
         UI_PORT  = 80
       }
 

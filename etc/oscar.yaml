@@ -74,7 +74,8 @@ script: |-
 
   required = "2.5.0"  # minimum required DEEPaaS version
   out = subprocess.run(["deepaas-cli", "--version"], stdout=subprocess.PIPE)
-  current = out.stdout.decode("utf-8").split(" ")[0].split("-")[0]
+  last_line = out.stdout.decode("utf-8").strip().split("\n")[-1]
+  current = last_line.split("-")[0]  # remove '-dev' from version number
 
   if compare_versions(required, current) == 1:
       print(f"Error: DEEPaaS version must be >={required}. Current version is: {current}")
@@ -127,7 +128,7 @@ script: |-
     print("Something went wrong during the execution.")
     exit(1)
   EOF
-  
+
   if grep -q 'New output is' "service.log"
   then
     FILE_NAME_2=`cat service.log | grep 'New output is' | cut -f 5 -d ' '`

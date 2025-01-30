@@ -12,33 +12,37 @@ import ai4papi.conf as papiconf
 def check_jobwise(
     conf: dict,
     vo: str,
+    item_name: str = "",
 ):
-    # """
-    # Check the job configuration does not overflow the generic hardware limits.
-    # """
-    # # Retrieve generic quotas (vo-dependent)
-    # item_name = conf["general"]["docker_image"].split("/")[-1]
-    # ref = limit_resources(
-    #     item_name=item_name,
-    #     vo=vo,
-    # )
+    """
+    Check the job configuration does not overflow the generic hardware limits.
 
-    # # Compare with user options
-    # user_conf = conf["hardware"]
-    # for k in ref.keys():
-    #     if "range" in ref[k].keys():
-    #         if user_conf[k] < ref[k]["range"][0]:
-    #             raise HTTPException(
-    #                 status_code=400,
-    #                 detail=f"The parameter {k} should bigger or equal to {ref[k]['range'][0]}.",
-    #             )
-    #         if user_conf[k] > ref[k]["range"][1]:
-    #             raise HTTPException(
-    #                 status_code=400,
-    #                 detail=f"The parameter {k} should smaller or equal to {ref[k]['range'][1]}.",
-    #             )
+    Params:
+    ------
+    * conf: user configuration
+    * vo: user VO
+    * item_name: provide in case we look for a specific tool
+    """
+    # Retrieve generic quotas (vo-dependent)
+    ref = limit_resources(
+        item_name=item_name,
+        vo=vo,
+    )
 
-    print("check_jobwise")
+    # Compare with user options
+    user_conf = conf["hardware"]
+    for k in ref.keys():
+        if "range" in ref[k].keys():
+            if user_conf[k] < ref[k]["range"][0]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The parameter {k} should bigger or equal to {ref[k]['range'][0]}.",
+                )
+            if user_conf[k] > ref[k]["range"][1]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The parameter {k} should smaller or equal to {ref[k]['range'][1]}.",
+                )
 
 
 def check_userwise(

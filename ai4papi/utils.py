@@ -181,3 +181,13 @@ def retrieve_from_snapshots(
     raise HTTPException(
         status_code=404, detail="Could not find the deployment in the database."
     )
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=7 * 24 * 60 * 60))
+def ai4life_catalog():
+    """
+    Load the AI4Life catalog, after filtering the models that AI4EOSC can support.
+    """
+    url = "https://raw.githubusercontent.com/ai4os/ai4os-ai4life-loader/refs/heads/main/models/filtered_models.json"
+    response = requests.get(url)
+    return response.json()

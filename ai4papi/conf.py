@@ -101,6 +101,7 @@ tools_nomad2id = {
     "fl": "ai4os-federated-server",
     "cvat": "ai4os-cvat",
     "llm": "ai4-llm",
+    "ai4life": "ai4os-ai4life-loader",
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():

@@ -12,6 +12,7 @@ from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers import v1
+from ai4papi.routers.v1 import secrets as ai4secrets
 
 
 router = APIRouter(
@@ -216,6 +217,16 @@ def create_deployment(
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
+    # Retrieve MLflow credentials
+    secrets = ai4secrets.get_secrets(
+        vo=vo,
+        subpath="/services",
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials,
+        ),
+    )
+    mlflow_credentials = secrets.get("/services/mlflow/credentials", {})
+
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
@@ -249,6 +260,9 @@ def create_deployment(
             "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
             "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
             "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+            "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
+            "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
+            "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
             "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
             "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
             "TODAY": str(datetime.date.today()),
