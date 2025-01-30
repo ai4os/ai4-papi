@@ -88,6 +88,9 @@ job "tool-ai4life-${JOB_UUID}" {
       port "ui" {
         to = 80
       }
+      port "custom" {
+        to = 80
+      }
     }
 
     service {
@@ -110,6 +113,16 @@ job "tool-ai4life-${JOB_UUID}" {
       ]
     }
 
+    service {
+      name = "${JOB_UUID}-custom"
+      port = "custom"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-custom.tls=true",
+        "traefik.http.routers.${JOB_UUID}-custom.rule=Host(`custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+      ]
+    }
+
     ephemeral_disk {
       size = ${DISK}
     }
@@ -120,10 +133,10 @@ job "tool-ai4life-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "ai4oshub/ai4os-ai4life-loader:latest"
+        image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         command    = "deep-start"
         args       = ["--deepaas"]
-        ports      = ["api"]
+        ports      = ["api", "custom"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
