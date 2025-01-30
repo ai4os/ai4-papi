@@ -9,7 +9,6 @@
 #  options: restricted set of values that the parameter can take (optional)
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
-
 general:
 
   title:
@@ -25,12 +24,8 @@ general:
   type:
     name: Deployment type
     value: 'both'
-    description: Type of the deployment. For example `llm`.
-    options: [
-      'vllm',
-      'open-webui',
-      'both'
-    ]
+    description: Sub-components to deploy.
+    options: ['both', 'vllm', 'open-webui']
 
   docker_image:
     name: Docker image
@@ -45,21 +40,21 @@ general:
 
 
 vllm:
-  
+
   gpu_memory_utilization:
-    name: GPU memory utilization 
-    value: 
+    name: GPU memory utilization
+    value:
     range: [0, 1]
-    description: Fraction of GPU memory to be used. 
+    description: Fraction of GPU memory to be used.
 
   max_model_length:
     name: Maximum model length
-    value: 
+    value:
     description: Maximum length of the model.
-    
+
   tensor_parallel_size:
     name: Tensor parrallel size
-    value: 
+    value:
     description: Number of tensor parrallel size.
 
   huggingface_token:
@@ -71,4 +66,3 @@ vllm:
     name: VLLM model
     value: 'Qwen/Qwen2.5-1.5B-Instruct'
     description: VLLM model to use.
-  
