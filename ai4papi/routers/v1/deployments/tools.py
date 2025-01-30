@@ -407,7 +407,7 @@ def create_deployment(
             if user_conf["vllm"]["max_model_length"] is not None:
                 vllm_args.extend(
                     [
-                        "--max_model_length",
+                        "--max_model_len",
                         user_conf["vllm"]["max_model_length"],
                     ]
                 )
