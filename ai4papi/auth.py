@@ -50,16 +50,14 @@ def get_user_info(token):
             detail="Invalid token",
         )
 
-    # Retrieve VOs the user belongs to
+    # Retrieve VOs the user belongs to (eg. "/Platform Access/vo.ai4eosc.eu")
     # VOs can be empty if the user does not belong to any VO, or the
-    # 'eduperson_entitlement wasn't correctly retrieved from the token
+    # 'group_membership' wasn't correctly retrieved from the token
     vos = []
-    for i in user_infos.get("eduperson_entitlement", []):
-        # Parse Virtual Organizations manually from URNs
-        # If more complexity is need in the future, check https://github.com/oarepo/urnparse
-        ent_i = re.search(r"group:(.+?):", i)
-        if ent_i:  # your entitlement has indeed a group `tag`
-            vos.append(ent_i.group(1))
+    for i in user_infos.get("group_membership", []):
+        vo = re.search(r"/Platform Access/(.*?)$", i)
+        if vo:
+            vos.append(vo.group(1))
 
     # Generate user info dict
     for k in ["sub", "iss", "name", "email"]:
@@ -74,6 +72,7 @@ def get_user_info(token):
         "name": user_infos.get("name"),
         "email": user_infos.get("email"),
         "vos": vos,
+        "groups": user_infos.get("group_membership"),
     }
 
     return out
