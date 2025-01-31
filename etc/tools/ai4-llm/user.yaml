@@ -27,18 +27,6 @@ general:
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-  docker_image:
-    name: Docker image
-    value: 'vllm/vllm-openai'
-    description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
-
-  docker_tag:
-    name: Docker tag
-    value: 'latest'
-    description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
-    options: ['latest']
-
-
 vllm:
 
   gpu_memory_utilization:
