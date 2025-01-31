@@ -408,7 +408,7 @@ def create_deployment(
                     ]
                 )
 
-            vllm_args.extend(["--model", user_conf["vllm"]["vllm_model"]])
+            vllm_args.extend(["--model", user_conf["vllm"]["modelname"]])
 
             vllm_args_str = json.dumps(vllm_args)
             vllm_args_str = vllm_args_str[2:-2]

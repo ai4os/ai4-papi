@@ -41,16 +41,16 @@ vllm:
     description: Maximum length of the model.
 
   tensor_parallel_size:
-    name: Tensor parrallel size
+    name: Tensor parallel size
     value:
-    description: Number of tensor parrallel size.
+    description: Number of tensor parallel size.
 
   huggingface_token:
     name: Huggingface token
     value: ''
     description: Huggingface token to use.
 
-  vllm_model:
-    name: VLLM model
+  modelname:
+    name: LLM name
     value: 'Qwen/Qwen2.5-1.5B-Instruct'
-    description: VLLM model to use.
+    description: Large Language Model to use.
