@@ -370,6 +370,23 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4-llm":
+        # Create a api key secret for the vllm deployment
+        api_token = secrets.token_hex()
+        _ = ai4secrets.create_secret(
+            vo=vo,
+            secret_path=f"deployments/{job_uuid}/llm/api-token",
+            secret_data={"token": api_token},
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
+
+        # Create a Vault token so that the deployment can access the api key
+        vault_token = ai4secrets.create_vault_token(
+            jwt=authorization.credentials,
+            issuer=auth_info["issuer"],
+            ttl="365d",  # 1 year expiration date
+        )
 
         # Check if user wants to deploy a vllm tool
         if user_conf["general"]["type"] != "open-webui":
@@ -437,6 +454,8 @@ def create_deployment(
                     "BASE_DOMAIN": base_domain,
                     "HOSTNAME": job_uuid,
                     "VLLM_ARGS": vllm_args_str,
+                    "API_TOKEN": api_token,
+                    "VAULT_TOKEN": vault_token,
                     "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
                 }
             )

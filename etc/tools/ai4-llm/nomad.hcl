@@ -121,14 +121,12 @@ job "tool-llm-${JOB_UUID}" {
       config {
         image   = "ghcr.io/open-webui/open-webui:main"
         ports   = ["ui"]
-  			# args    = ["--restart", "always"]
-        volumes = ["open-webui:/app/backend/data"]
       }
 
       env {
-        OPENAI_API_KEY      = "EMPTY"
+        OPENAI_API_KEY      = "${API_TOKEN}"
         OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
-        WEBUI_AUTH          = false
+        WEBUI_AUTH          = true
       }
 
       resources {  # UI needs a fair amount of resources because it's also doing RAG
@@ -144,11 +142,11 @@ job "tool-llm-${JOB_UUID}" {
         image   = "vllm/vllm-openai:latest"
         ports   = ["vllm"]
         args    = ["${VLLM_ARGS}"] # For V100 GPUs
-        volumes = ["~/.cache/huggingface:/root/.cache/huggingface"]
       }
 
       env {
         HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
+        VLLM_API_KEY = "${API_TOKEN}"
       }
 
       resources {
