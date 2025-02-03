@@ -27,18 +27,6 @@ general:
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-  docker_image:
-    name: Docker image
-    value: 'vllm/vllm-openai'
-    description: Docker image to be used. For example `deephdc/deep-oc-image-classification-tf`.
-
-  docker_tag:
-    name: Docker tag
-    value: 'latest'
-    description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
-    options: ['latest']
-
-
 vllm:
 
   gpu_memory_utilization:
@@ -53,16 +41,16 @@ vllm:
     description: Maximum length of the model.
 
   tensor_parallel_size:
-    name: Tensor parrallel size
+    name: Tensor parallel size
     value:
-    description: Number of tensor parrallel size.
+    description: Number of tensor parallel size.
 
   huggingface_token:
     name: Huggingface token
     value: ''
     description: Huggingface token to use.
 
-  vllm_model:
-    name: VLLM model
+  modelname:
+    name: LLM name
     value: 'Qwen/Qwen2.5-1.5B-Instruct'
-    description: VLLM model to use.
+    description: Large Language Model to use.

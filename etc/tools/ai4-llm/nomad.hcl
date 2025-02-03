@@ -141,7 +141,7 @@ job "tool-llm-${JOB_UUID}" {
       config {
         image   = "vllm/vllm-openai:latest"
         ports   = ["vllm"]
-        args    = ["${VLLM_ARGS}"] # For V100 GPUs
+        args    = ${VLLM_ARGS}
       }
 
       env {

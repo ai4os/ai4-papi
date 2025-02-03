@@ -1,11 +1,11 @@
 from copy import deepcopy
+import json
 import re
 import secrets
 import types
 from types import SimpleNamespace
 from typing import Tuple, Union
 import uuid
-import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -396,121 +396,60 @@ def create_deployment(
                 exclude_tasks = ["open-webui"]
                 exclude_services = ["ui"]
 
-            # Configure VLLM args
-            vllm_args = []
-
-            vllm_args.extend(["--dtype=half"])
-
-            if user_conf["vllm"]["gpu_memory_utilization"] is not None:
-                vllm_args.extend(
-                    [
-                        "--gpu_memory_utilization",
-                        user_conf["vllm"]["gpu_memory_utilization"],
-                    ]
-                )
-
-            if user_conf["vllm"]["max_model_length"] is not None:
-                vllm_args.extend(
-                    [
-                        "--max_model_len",
-                        user_conf["vllm"]["max_model_length"],
-                    ]
-                )
-
-            if user_conf["vllm"]["tensor_parallel_size"] is not None:
-                vllm_args.extend(
-                    [
-                        "--tensor_parallel_size",
-                        user_conf["vllm"]["tensor_parallel_size"],
-                    ]
-                )
-
-            vllm_args.extend(["--model", user_conf["vllm"]["vllm_model"]])
-
-            vllm_args_str = json.dumps(vllm_args)
-            vllm_args_str = vllm_args_str[2:-2]
-
-            # Replace the Nomad job template
-            job_title = re.sub(
-                r'[<>:"/\\|?* ]',
-                "_",
-                user_conf["general"]["title"][:45],
-            )  # make title foldername-friendly
-
-            nomad_conf = nomad_conf.safe_substitute(
-                {
-                    "JOB_UUID": job_uuid,
-                    "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-                    "PRIORITY": priority,
-                    "OWNER": auth_info["id"],
-                    "OWNER_NAME": auth_info["name"],
-                    "OWNER_EMAIL": auth_info["email"],
-                    "TITLE": user_conf["general"]["title"][
-                        :45
-                    ],  # keep only 45 first characters
-                    "DESCRIPTION": user_conf["general"]["desc"][
-                        :1000
-                    ],  # limit to 1K characters
-                    "BASE_DOMAIN": base_domain,
-                    "HOSTNAME": job_uuid,
-                    "VLLM_ARGS": vllm_args_str,
-                    "API_TOKEN": api_token,
-                    "VAULT_TOKEN": vault_token,
-                    "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
-                }
-            )
-
-        else:
-            # Configuration for open-webui deployment
-
-            exclude_tasks = ["vllm"]
-            exclude_services = ["vllm"]
-
-            nomad_conf = nomad_conf.safe_substitute(
-                {
-                    "JOB_UUID": job_uuid,
-                    "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-                    "PRIORITY": priority,
-                    "OWNER": auth_info["id"],
-                    "OWNER_NAME": auth_info["name"],
-                    "OWNER_EMAIL": auth_info["email"],
-                    "TITLE": user_conf["general"]["title"][
-                        :45
-                    ],  # keep only 45 first characters
-                    "DESCRIPTION": user_conf["general"]["desc"][
-                        :1000
-                    ],  # limit to 1K characters
-                    "BASE_DOMAIN": base_domain,
-                    "HOSTNAME": job_uuid,
-                }
-            )
+        # Configure VLLM args
+        vllm_args = []
+        vllm_args += ["--dtype=half"]
+        vllm_args += ["--model", user_conf["vllm"]["modelname"]]
+        conf2vllm = {
+            "gpu_memory_utilization": "gpu_memory_utilization",
+            "max_model_length": "max_model_len",
+            "tensor_parallel_size": "tensor_parallel_size",
+        }
+        for k, v in conf2vllm.items():
+            if user_conf["vllm"][k] is not None:
+                vllm_args += [f"--{v}", user_conf["vllm"][k]]
 
         # Replace the Nomad job template
-        job_title = re.sub(
-            r'[<>:"/\\|?* ]',
-            "_",
-            user_conf["general"]["title"][:45],
-        )  # make title foldername-friendly
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "VLLM_ARGS": json.dumps(vllm_args),
+                "API_TOKEN": api_token,
+                "VAULT_TOKEN": vault_token,
+                "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
+            }
+        )
 
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
+        # Define what to exclude
+        if user_conf["general"]["type"] == "vllm":
+            exclude_tasks = ["open-webui"]
+            exclude_services = ["ui"]
+        elif user_conf["general"]["type"] == "open-webui":
+            exclude_tasks = ["vllm"]
+            exclude_services = ["vllm"]
+
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
-
-        services = nomad_conf["TaskGroups"][0]["Services"]
-
         tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
-        if user_conf["general"]["type"] == "vllm":
-            for t in tasks:
-                if t["Name"] == "vllm":
-                    t["Name"] = "main"
-        else:
-            for t in tasks:
-                if t["Name"] == "open-webui":
-                    t["Name"] = "main"
-
+        services = nomad_conf["TaskGroups"][0]["Services"]
         services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+
+        # Rename first task as main task
+        # TODO: in Nomad job, move LLM to first task
+        t = tasks[0]
+        t["Name"] = "main"
 
     # Deploy AI4Life tool
     elif tool_name == "ai4os-ai4life-loader":

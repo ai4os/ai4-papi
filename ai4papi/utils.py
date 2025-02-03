@@ -55,18 +55,18 @@ def validate_conf(conf):
     """
     # Check that the Dockerhub image belongs either to "deephdc" or "ai4oshub"
     # or that it points to our Harbor instance (eg. CVAT)
-    # image = conf.get("general", {}).get("docker_image")
-    # if image:
-    #     if image.split("/")[0] not in [
-    #         "deephdc",
-    #         "ai4oshub",
-    #         "registry.services.ai4os.eu",
-    #     ]:
-    #         raise HTTPException(
-    #             status_code=400,
-    #             detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
-    #             DockerHub organizations or be hosted in the project's Harbor.",
-    #         )
+    image = conf.get("general", {}).get("docker_image")
+    if image:
+        if image.split("/")[0] not in [
+            "deephdc",
+            "ai4oshub",
+            "registry.services.ai4os.eu",
+        ]:
+            raise HTTPException(
+                status_code=400,
+                detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
+                DockerHub organizations or be hosted in the project's Harbor.",
+            )
 
     # Check datasets_info list
     datasets = conf.get("storage", {}).get("datasets")
