@@ -23,21 +23,12 @@ I also had to replace the following meta fields, otherwise when retrieving the
 job info the ${env_var} where not being replaced. I'm having to do something similar
 with ${meta.domain} but I don't want to extend it to env_vars just to support CVAT.
 
-To avoid too much disruption, I'm only changing this inside the service field
-- ${NOMAD_META_job_uuid} --> ${JOB_UUID}
-- ${NOMAD_META_cvat_hostname} --> ${meta.domain}-${BASE_DOMAIN}
-
 Do not use: image = "${NOMAD_META_cvat_server_image}" for the "main" task (i.e. cvat_server),
 otherwise the Dashboard will show that (unreplaced) variable in the Docker image field. To avoid disruption,
 exact values for all the image specifications is used instead of Nomad metadata.
 
 [1]: https://github.com/ai4os/ai4os-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
 [2]: https://stackoverflow.com/a/56957750/18471590
-
-Note:
-In several part of the job we use the old name of the repo (ai4os/ai4-cvat) which
-should redirect fine to the new repo name (ai4os/ai4os-cvat)
-But it is important nevertheless to keep it in mind, just in case.
 
 */
 
@@ -59,9 +50,6 @@ job "tool-cvat-${JOB_UUID}" {
     # CVAT-specific metadata
     force_pull_img_cvat_server         = true
     force_pull_img_cvat_ui             = true
-    cvat_branch                        = "v2.25.0-AI4OS"
-    cvat_hostname                      = "${meta.domain}-${BASE_DOMAIN}"
-    job_uuid                           = "${JOB_UUID}"
     restore_from                       = "${RESTORE_FROM}"
     backup_name                        = "${BACKUP_NAME}"
     cvat_allow_static_cache            = "no"
@@ -142,7 +130,7 @@ job "tool-cvat-${JOB_UUID}" {
     prevent_reschedule_on_lost = true
 
     ephemeral_disk {
-      size = 4096
+      size = 32768
     }
 
     network {
@@ -204,9 +192,9 @@ job "tool-cvat-${JOB_UUID}" {
       port = "ui"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`)"
+        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ui.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`)"
       ]
     }
 
@@ -215,9 +203,9 @@ job "tool-cvat-${JOB_UUID}" {
       port = "server"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/api/`, `/static/`, `/admin`, `/documentation/`, `/django-rq`)"
+        "traefik.http.routers.${JOB_UUID}-server.tls=true",
+        "traefik.http.routers.${JOB_UUID}-server.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-server.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/api/`, `/static/`, `/admin`, `/documentation/`, `/django-rq`)"
       ]
     }
 
@@ -226,15 +214,15 @@ job "tool-cvat-${JOB_UUID}" {
       port = "grafana"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/analytics`)",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-auth.forwardauth.address=http://${NOMAD_HOST_ADDR_server}/analytics",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-auth.forwardauth.authRequestHeaders=Cookie,Authorization",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-strip-prefix.stripprefix.prefixes=/analytics",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.middlewares=${NOMAD_META_job_uuid}-grafana-analytics-auth@consulcatalog,${NOMAD_META_job_uuid}-grafana-analytics-strip-prefix@consulcatalog",
-        "traefik.services.${NOMAD_META_job_uuid}-grafana.loadbalancer.servers.url=${NOMAD_HOST_ADDR_grafana}",
-        "traefik.services.${NOMAD_META_job_uuid}-grafana.loadbalancer.passHostHeader=false"
+        "traefik.http.routers.${JOB_UUID}-grafana.tls=true",
+        "traefik.http.routers.${JOB_UUID}-grafana.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-grafana.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/analytics`)",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-auth.forwardauth.address=http://${NOMAD_HOST_ADDR_server}/analytics",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-auth.forwardauth.authRequestHeaders=Cookie,Authorization",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-strip-prefix.stripprefix.prefixes=/analytics",
+        "traefik.http.routers.${JOB_UUID}-grafana.middlewares=${JOB_UUID}-grafana-analytics-auth@consulcatalog,${JOB_UUID}-grafana-analytics-strip-prefix@consulcatalog",
+        "traefik.services.${JOB_UUID}-grafana.loadbalancer.servers.url=${NOMAD_HOST_ADDR_grafana}",
+        "traefik.services.${JOB_UUID}-grafana.loadbalancer.passHostHeader=false"
       ]
     }
 
@@ -245,6 +233,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -310,10 +302,6 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/entrypoint.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "synclocal" {
@@ -323,6 +311,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -369,15 +361,15 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
-        tarbals='cache_db data db events inmem_db keys'
+        tarbals='cache_db data db events inmem_db keys logs'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         for tarbal in $tarbals; do
           rm -rf $LOCAL_PATH/$tarbal
           mkdir -p $LOCAL_PATH/$tarbal
-          if [[ $tarbal == "data" || $tarbal == "keys" ]]; then
-            chown -R 1000 $LOCAL_PATH/data
-            chgrp -R 1000 $LOCAL_PATH/data
-            chmod -R 750 $LOCAL_PATH/data
+          if [[ $tarbal == "data" || $tarbal == "keys" || $tarbal == "logs"  ]]; then
+            chown -R 1000 $LOCAL_PATH/$tarbal
+            chgrp -R 1000 $LOCAL_PATH/$tarbal
+            chmod -R 750 $LOCAL_PATH/$tarbal
           fi
         done
         if [ -z "$${RESTORE_FROM}" ]; then
@@ -402,10 +394,6 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/sync_local.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "syncremote" {
@@ -415,6 +403,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -463,7 +455,7 @@ job "tool-cvat-${JOB_UUID}" {
         #!/usr/bin/env bash
         TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
         BACKUP_NAME="$${BACKUP_NAME}_$${TS}"
-        tarbals='cache_db data db events inmem_db keys'
+        tarbals='cache_db data db events inmem_db keys logs'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         echo "creating a CVAT backup $$BACKUP_NAME ..."
         if [[ -d $LOCAL_PATH/$$BACKUP_NAME ]]; then
@@ -487,16 +479,13 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/sync_remote.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "clickhouse" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
+        cpu = 1000
         memory = 4096
       }
       env {
@@ -556,6 +545,10 @@ job "tool-cvat-${JOB_UUID}" {
     task "grafana" {
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 300
+        memory = 2048
+      }
       env {
         CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
         CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
@@ -568,7 +561,7 @@ job "tool-cvat-${JOB_UUID}" {
         GF_AUTH_ANONYMOUS_ORG_ROLE = "Admin"
         GF_AUTH_DISABLE_LOGIN_FORM = true
         GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS = "grafana-clickhouse-datasource"
-        GF_SERVER_ROOT_URL = "http://${NOMAD_META_job_uuid}.${NOMAD_META_cvat_hostname}/analytics"
+        GF_SERVER_ROOT_URL = "http://${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/analytics"
         GF_INSTALL_PLUGINS = "https://github.com/grafana/clickhouse-datasource/releases/download/v4.0.8/grafana-clickhouse-datasource-4.0.8.linux_amd64.zip;grafana-clickhouse-datasource"
         GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH = "/var/lib/grafana/dashboards/all_events.json"
       }
@@ -611,15 +604,15 @@ job "tool-cvat-${JOB_UUID}" {
         ]
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/all_events.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/all_events.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/management.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/management.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/grafana/dashboards/monitoring.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/monitoring.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       template {
@@ -660,6 +653,10 @@ job "tool-cvat-${JOB_UUID}" {
     task "db" {
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
         POSTGRES_USER = "root"
         POSTGRES_DB = "cvat"
@@ -681,8 +678,8 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "120s" # double the time of the periodic dump (60s, see --save argument below)
       resources { # https://redis.io/docs/latest/operate/rs/installing-upgrading/install/plan-deployment/hardware-requirements/
-        cores = 1
-        memory = 5120
+        cpu = 100
+        memory = 2048
       }
       config {
         image = "redis:7.2.3-alpine"
@@ -702,7 +699,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
+        cpu = 100
         memory = 5120
       }
       config {
@@ -721,7 +718,8 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        memory = 1024
+        cpu = 100
+        memory = 2048
       }
       env {
         CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
@@ -741,7 +739,7 @@ job "tool-cvat-${JOB_UUID}" {
         }
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_branch}/components/analytics/vector/vector.toml"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/vector/vector.toml"
         destination = "local/etc/vector/"
       }
     }
@@ -750,7 +748,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
+        cpu = 300
         memory = 4096
       }
       env {
@@ -764,7 +762,7 @@ job "tool-cvat-${JOB_UUID}" {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
         CVAT_ANALYTICS = "1"
         CVAT_BASE_URL = ""
-        CVAT_HOST = "${NOMAD_META_job_uuid}.${NOMAD_META_cvat_hostname}"
+        CVAT_HOST = "${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}"
         CVAT_LOG_IMPORT_ERRORS = "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
@@ -787,12 +785,12 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["server"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share"
         ]
         command = "init"
@@ -812,8 +810,8 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
@@ -831,12 +829,12 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["utils"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -855,7 +853,7 @@ job "tool-cvat-${JOB_UUID}" {
       kill_timeout = "30s"
       resources {
         cores = 1
-        memory = 1024
+        memory = 4096
       }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
@@ -872,12 +870,12 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_import"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -896,7 +894,7 @@ job "tool-cvat-${JOB_UUID}" {
       kill_timeout = "30s"
       resources {
         cores = 1
-        memory = 1024
+        memory = 4096
       }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
@@ -918,13 +916,13 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_export"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/log",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -941,8 +939,8 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
@@ -959,12 +957,12 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_annotation"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -981,6 +979,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
         CVAT_LOG_IMPORT_ERRORS =  "true"
@@ -996,13 +998,13 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_webhooks"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/log",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -1018,6 +1020,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
         CVAT_LOG_IMPORT_ERRORS =  "true"
@@ -1033,13 +1039,13 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_quality_reports"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/log",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -1056,8 +1062,8 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
@@ -1079,13 +1085,13 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_analytics_reports"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/log",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -1094,6 +1100,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
+    # https://github.com/cvat-ai/cvat/issues/8983 - this container needs access to the shared volume
     task "worker_chunks" {
       lifecycle {
         hook = "poststart"
@@ -1101,6 +1108,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cores = 1
+        memory = 4096
+      }
       env {
         CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
         CVAT_LOG_IMPORT_ERRORS =  "true"
@@ -1116,17 +1127,18 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-server"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_chunks"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/keys",
-          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/log",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
+          "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share"
         ]
         command = "run"
         args = [
-          "worker.quality_reports"
+          "worker.chunks"
         ]
       }
     }
@@ -1158,7 +1170,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       config {
-        image = "ai4oshub/ai4os-cvat:v2.25.0-ai4os-ui"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-ui"
         force_pull = "${NOMAD_META_force_pull_img_cvat_ui}"
         ports = ["ui"]
       }
