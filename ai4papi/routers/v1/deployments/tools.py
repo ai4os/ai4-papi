@@ -380,16 +380,8 @@ def create_deployment(
 
         # Configure VLLM args
         vllm_args = []
-        vllm_args += ["--dtype=half"]
-        vllm_args += ["--model", user_conf["vllm"]["modelname"]]
-        conf2vllm = {
-            "gpu_memory_utilization": "gpu_memory_utilization",
-            "max_model_length": "max_model_len",
-            "tensor_parallel_size": "tensor_parallel_size",
-        }
-        for k, v in conf2vllm.items():
-            if user_conf["vllm"][k] is not None:
-                vllm_args += [f"--{v}", user_conf["vllm"][k]]
+        vllm_args += ["--model", user_conf["general"]["modelname"]]
+        vllm_args += ["--dtype", "float16"]  # bfloat16 is only supported in GPU with compute capability starting from 8.0 (T4 has 7.5).
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
@@ -406,7 +398,7 @@ def create_deployment(
                 "HOSTNAME": job_uuid,
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
-                "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
+                # "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
             }
         )
 

@@ -27,31 +27,11 @@ general:
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-vllm:
-
-  gpu_memory_utilization:
-    name: GPU memory utilization
-    value:
-    range: [0, 1]
-    description: Fraction of GPU memory to be used.
-
-  max_model_length:
-    name: Maximum model length
-    value:
-    description: Maximum length of the model.
-
-  tensor_parallel_size:
-    name: Tensor parallel size
-    value:
-    description: Number of tensor parallel size.
-
-  huggingface_token:
-    name: Huggingface token
-    value: ''
-    description: Huggingface token to use.
-
   modelname:
-    name: LLM name
+    name: LLM modelname
     value: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
     description: Large Language Model to use.
-    options: ['deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', 'Qwen/Qwen2.5-1.5B-Instruct']
+    options: [
+      'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B',
+      'Qwen/Qwen2.5-1.5B-Instruct',
+      ]

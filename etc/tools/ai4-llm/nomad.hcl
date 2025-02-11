@@ -119,13 +119,13 @@ job "tool-llm-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image   = "vllm/vllm-openai:latest"
-        ports   = ["vllm"]
-        args    = ${VLLM_ARGS}
+        image = "vllm/vllm-openai:latest"
+        ports = ["vllm"]
+        args  = ${VLLM_ARGS}
       }
 
       env {
-        HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
+        # HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
         VLLM_API_KEY = "${API_TOKEN}"
       }
 
@@ -153,8 +153,8 @@ job "tool-llm-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image   = "ghcr.io/open-webui/open-webui:main"
-        ports   = ["ui"]
+        image = "ghcr.io/open-webui/open-webui:main"
+        ports = ["ui"]
       }
 
       env {
