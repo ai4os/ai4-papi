@@ -381,7 +381,10 @@ def create_deployment(
         # Configure VLLM args
         vllm_args = []
         vllm_args += ["--model", user_conf["general"]["modelname"]]
-        vllm_args += ["--dtype", "float16"]  # bfloat16 is only supported in GPU with compute capability starting from 8.0 (T4 has 7.5).
+        vllm_args += [
+            "--dtype",
+            "float16",
+        ]  # bfloat16 is only supported in GPU with compute capability starting from 8.0 (T4 has 7.5).
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
