@@ -159,7 +159,7 @@ job "tool-llm-${JOB_UUID}" {
           constraint {
             attribute = "${device.model}"
             operator  = "="
-            value     = "Tesla V100-PCIE-32GB"
+            value     = "Tesla T4"
           }
 
         }

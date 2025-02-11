@@ -52,5 +52,6 @@ vllm:
 
   modelname:
     name: LLM name
-    value: 'Qwen/Qwen2.5-1.5B-Instruct'
+    value: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
     description: Large Language Model to use.
+    options: ['deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B', 'Qwen/Qwen2.5-1.5B-Instruct']
