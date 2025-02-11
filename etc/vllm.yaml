@@ -1,0 +1,24 @@
+---
+
+# In non-quantized models, we have to specify "--dtype float16" because the default
+# bfloat16 is only supported in GPUs with compute capability +8.0 (NVIDIA T4 has 7.5).
+
+models:
+
+  deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B:
+
+     args: [
+      "--dtype", "float16"
+    ]
+
+  Qwen/Qwen2.5-1.5B-Instruct:
+
+     args: [
+      "--dtype", "float16"
+    ]
+
+  Qwen/Qwen2.5-7B-Instruct-AWQ:
+
+    args: [
+      "--quantization", "awq",
+    ]

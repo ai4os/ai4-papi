@@ -199,6 +199,10 @@ def create_deployment(
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
+    #TODO: given that some parts of the configuration are dynamically generated
+    # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog
+    # We have to apply conversion to only keep the values
+    # Same goes for modules
 
     # Update values conf in case we received a submitted conf
     if conf is not None:
@@ -379,12 +383,10 @@ def create_deployment(
         )
 
         # Configure VLLM args
+        model_id = user_conf["general"]["model_id"]
         vllm_args = []
-        vllm_args += ["--model", user_conf["general"]["modelname"]]
-        vllm_args += [
-            "--dtype",
-            "float16",
-        ]  # bfloat16 is only supported in GPU with compute capability starting from 8.0 (T4 has 7.5).
+        vllm_args += ["--model", model_id]
+        vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(

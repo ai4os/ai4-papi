@@ -67,6 +67,11 @@ def get_config(
         if models:
             conf["hardware"]["gpu_type"]["options"] += models
 
+    if item_name == "ai4-llm":
+        models = list(papiconf.VLLM["models"].keys())
+        conf["general"]["model_id"]["options"] = models
+        conf["general"]["model_id"]["value"] = models[0]
+
     return conf
 
 

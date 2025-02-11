@@ -111,6 +111,10 @@ for tool in TOOLS.keys():
 with open(paths["conf"] / "oscar.yaml", "r") as f:
     OSCAR_TMPL = Template(f.read())
 
+# vLLM conf
+with open(paths["conf"] / "vllm.yaml", "r") as f:
+    VLLM = yaml.safe_load(f)
+
 # Try-me endpoints
 nmd = load_nomad_job(paths["conf"] / "try_me" / "nomad.hcl")
 TRY_ME = {

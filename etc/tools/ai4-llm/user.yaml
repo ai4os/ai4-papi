@@ -27,11 +27,8 @@ general:
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-  modelname:
+  model_id:
     name: LLM modelname
-    value: 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B'
-    description: Large Language Model to use.
-    options: [
-      'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B',
-      'Qwen/Qwen2.5-1.5B-Instruct',
-      ]
+    value: ''
+    description: Large Language Model to use (retrieve from Hugginface).
+    options: []
