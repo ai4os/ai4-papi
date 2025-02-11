@@ -199,7 +199,7 @@ def create_deployment(
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
-    #TODO: given that some parts of the configuration are dynamically generated
+    # TODO: given that some parts of the configuration are dynamically generated
     # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog
     # We have to apply conversion to only keep the values
     # Same goes for modules
