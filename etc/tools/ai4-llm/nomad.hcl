@@ -114,26 +114,6 @@ job "tool-llm-${JOB_UUID}" {
       size = 4096
     }
 
-    task "open-webui" {
-
-      driver = "docker"
-
-      config {
-        image   = "ghcr.io/open-webui/open-webui:main"
-        ports   = ["ui"]
-      }
-
-      env {
-        OPENAI_API_KEY      = "${API_TOKEN}"
-        OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
-        WEBUI_AUTH          = true
-      }
-
-      resources {  # UI needs a fair amount of resources because it's also doing RAG
-        memory = 8000
-     }
-   }
-
     task "vllm" {
 
       driver = "docker"
@@ -150,6 +130,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       resources {
+        cores  = 8
         memory = 16000
 
         device "gpu" {
@@ -166,5 +147,27 @@ job "tool-llm-${JOB_UUID}" {
       }
 
     }
+
+    task "open-webui" {
+
+      driver = "docker"
+
+      config {
+        image   = "ghcr.io/open-webui/open-webui:main"
+        ports   = ["ui"]
+      }
+
+      env {
+        OPENAI_API_KEY      = "${API_TOKEN}"
+        OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
+        WEBUI_AUTH          = true
+      }
+
+      resources {  # UI needs a fair amount of resources because it's also doing RAG
+        cores  = 4
+        memory = 8000
+     }
+   }
+
   }
 }

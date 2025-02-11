@@ -133,10 +133,9 @@ class Catalog:
         for m in modules:
             try:
                 meta1 = self.get_metadata(m)
-            except Exception as e:
+            except Exception:
                 # Avoid breaking the whole method if failing to retrieve a module
                 print(f"Error retrieving metadata: {m}")
-                print(e)
                 continue
             meta = {k: v for k, v in meta1.items() if k not in ignore}  # filter keys
             meta["name"] = m

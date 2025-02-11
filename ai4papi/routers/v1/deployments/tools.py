@@ -230,9 +230,6 @@ def create_deployment(
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
-    exclude_tasks = []
-    exclude_services = []
-
     # Deploy a Federated server
     if tool_name == "ai4os-federated-server":
         # Create a default secret for the Federated Server
@@ -374,27 +371,12 @@ def create_deployment(
         api_token = secrets.token_hex()
         _ = ai4secrets.create_secret(
             vo=vo,
-            secret_path=f"deployments/{job_uuid}/llm/api-token",
+            secret_path=f"deployments/{job_uuid}/llm/vllm",
             secret_data={"token": api_token},
             authorization=SimpleNamespace(
                 credentials=authorization.credentials,
             ),
         )
-
-        # Create a Vault token so that the deployment can access the api key
-        vault_token = ai4secrets.create_vault_token(
-            jwt=authorization.credentials,
-            issuer=auth_info["issuer"],
-            ttl="365d",  # 1 year expiration date
-        )
-
-        # Check if user wants to deploy a vllm tool
-        if user_conf["general"]["type"] != "open-webui":
-            # Configuration for vllm and open webui - vllm deployment
-
-            if user_conf["general"]["type"] == "vllm":
-                exclude_tasks = ["open-webui"]
-                exclude_services = ["ui"]
 
         # Configure VLLM args
         vllm_args = []
@@ -424,7 +406,6 @@ def create_deployment(
                 "HOSTNAME": job_uuid,
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
-                "VAULT_TOKEN": vault_token,
                 "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
             }
         )
@@ -439,6 +420,8 @@ def create_deployment(
         elif user_conf["general"]["type"] == "open-webui":
             exclude_tasks = ["vllm"]
             exclude_services = ["vllm"]
+        else:
+            exclude_tasks, exclude_services = [], []
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
@@ -447,7 +430,6 @@ def create_deployment(
         services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
 
         # Rename first task as main task
-        # TODO: in Nomad job, move LLM to first task
         t = tasks[0]
         t["Name"] = "main"
 
