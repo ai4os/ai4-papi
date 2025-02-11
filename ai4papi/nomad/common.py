@@ -115,6 +115,7 @@ def get_deployment(
     info["docker_image"] = usertask["Config"]["image"]
     command = usertask["Config"].get("command", "")
     args = usertask["Config"].get("args", [])
+    args[:] = [str(a) for a in args]
     info["docker_command"] = f"{command} {' '.join(args)}".strip()
 
     # Add endpoints
