@@ -44,7 +44,6 @@ def get_config(
 
     # Fill with correct Docker image and tags
     if item_name in ["ai4os-federated-server"]:
-
         # Parse docker registry
         registry = metadata["links"]["docker_image"]
         repo, image = registry.split("/")[-2:]
