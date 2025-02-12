@@ -125,7 +125,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       env {
-        # HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
+        HUGGING_FACE_HUB_TOKEN = "${HUGGINGFACE_TOKEN}"
         VLLM_API_KEY = "${API_TOKEN}"
       }
 

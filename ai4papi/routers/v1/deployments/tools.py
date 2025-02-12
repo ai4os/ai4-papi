@@ -371,6 +371,20 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4-llm":
+
+        # Configure VLLM args
+        model_id = user_conf["general"]["model_id"]
+        vllm_args = []
+        vllm_args += ["--model", model_id]
+        vllm_args += papiconf.VLLM["models"][model_id]["args"]
+
+        # Check if HF token is needed
+        if papiconf.VLLM["models"][model_id]["needs_HF_token"] and not user_conf["general"]["huggingface_token"]:
+            raise HTTPException(
+                status_code=400,
+                detail="This model requires a valid Huggingface token for deployment.",
+            )
+
         # Create a api key secret for the vllm deployment
         api_token = secrets.token_hex()
         _ = ai4secrets.create_secret(
@@ -381,12 +395,6 @@ def create_deployment(
                 credentials=authorization.credentials,
             ),
         )
-
-        # Configure VLLM args
-        model_id = user_conf["general"]["model_id"]
-        vllm_args = []
-        vllm_args += ["--model", model_id]
-        vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
@@ -403,7 +411,7 @@ def create_deployment(
                 "HOSTNAME": job_uuid,
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
-                # "HUGGINGFACE_TOKEN": user_conf["vllm"]["huggingface_token"],
+                "HUGGINGFACE_TOKEN": user_conf["general"]["huggingface_token"],
             }
         )
 

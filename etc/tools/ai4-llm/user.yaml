@@ -30,5 +30,10 @@ general:
   model_id:
     name: LLM modelname
     value: ''
-    description: Large Language Model to use (retrieve from Hugginface).
+    description: Large Language Model to use (retrieve from Huggingface).
     options: []
+
+  HF_token:
+    name: Huggingface token
+    value: ''
+    description: Huggingface token, needed for the deployment of some gated models.

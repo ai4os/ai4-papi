@@ -6,19 +6,19 @@
 models:
 
   deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B:
-
-     args: [
+    needs_HF_token: False
+    args: [
       "--dtype", "float16"
     ]
 
   Qwen/Qwen2.5-1.5B-Instruct:
-
-     args: [
+    needs_HF_token: False
+    args: [
       "--dtype", "float16"
     ]
 
   Qwen/Qwen2.5-7B-Instruct-AWQ:
-
+    needs_HF_token: False
     args: [
       "--quantization", "awq",
     ]
