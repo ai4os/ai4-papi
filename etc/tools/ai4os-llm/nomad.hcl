@@ -169,5 +169,74 @@ job "tool-llm-${JOB_UUID}" {
      }
    }
 
+
+    task "create-admin" {
+      # Open WebUI does not allow to create admin from configuration, so we have to
+      # to make an HTTP call to create it, in order not to leave the UI vulnerable
+
+      lifecycle {
+        hook    = "poststart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "python:slim-bullseye"
+        command    = "bash"
+        args       = ["local/create_admin.sh"]
+      }
+
+      env {
+        OPEN_WEBUI_URL = "https://ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}"
+        NAME           = "${OWNER_NAME}"
+        EMAIL          = "${OWNER_EMAIL}"
+        PASSWORD       = "${OPEN_WEBUI_PASSWORD}"
+      }
+
+      template {
+        data = <<-EOF
+        #!/bin/bash
+
+        pip install requests
+
+        python -c """
+        import os
+        import time
+
+        import requests
+
+
+        # Define the URL
+        base_url = os.getenv('OPEN_WEBUI_URL')
+
+        # Define the JSON data
+        data = {
+            'name': os.getenv('NAME'),
+            'email': os.getenv('EMAIL'),
+            'password': os.getenv('PASSWORD'),
+            'profile_image_url': '/user.png'
+        }
+
+        # Make the POST request (we repeat it because Open WebUI can take some time to warm)
+        while True:
+            r = requests.post(f'{base_url}/api/v1/auths/signup', json=data)
+            if not r.ok:
+                print(f'Error: status code {r.status_code}')
+                time.sleep(1)
+            else:
+                break
+
+        print(f'Status Code: {r.status_code}')
+        print(f'Response Content: {r.text}')
+        """
+        EOF
+        destination = "local/create_admin.sh"
+      }
+
+
+    }
+
   }
 }

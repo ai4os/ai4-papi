@@ -371,6 +371,12 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
+        if not user_conf["general"]["ui_password"]:
+            raise HTTPException(
+                status_code=400,
+                detail="A password is required to deploy this tool.",
+            )
+
         # Configure VLLM args
         model_id = user_conf["general"]["model_id"]
         vllm_args = []
@@ -431,6 +437,7 @@ def create_deployment(
                 "API_TOKEN": api_token,
                 "API_ENDPOINT": api_endpoint,
                 "HUGGINGFACE_TOKEN": user_conf["general"]["HF_token"],
+                "OPEN_WEBUI_PASSWORD": user_conf["general"]["ui_password"],
             }
         )
 
@@ -439,7 +446,7 @@ def create_deployment(
 
         # Define what to exclude
         if user_conf["general"]["type"] == "vllm":
-            exclude_tasks = ["open-webui"]
+            exclude_tasks = ["open-webui", "create-admin"]
             exclude_services = ["ui"]
         elif user_conf["general"]["type"] == "open-webui":
             exclude_tasks = ["vllm"]

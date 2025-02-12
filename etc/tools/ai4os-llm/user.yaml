@@ -33,6 +33,11 @@ general:
     description: Large Language Model to use (retrieve from Huggingface).
     options: []
 
+  ui_password:
+    name: Open WebUI password
+    value: ''
+    description: Admin password for Open WebUI
+
   HF_token:
     name: Huggingface token
     value: ''
