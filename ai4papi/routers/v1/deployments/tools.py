@@ -370,7 +370,7 @@ def create_deployment(
         )
 
     # Deploy a OpenWebUI+vllm tool
-    elif tool_name == "ai4-llm":
+    elif tool_name == "ai4os-llm":
         # Configure VLLM args
         model_id = user_conf["general"]["model_id"]
         vllm_args = []
