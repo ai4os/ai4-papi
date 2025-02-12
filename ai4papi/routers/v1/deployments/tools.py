@@ -380,7 +380,7 @@ def create_deployment(
         # Check if HF token is needed
         if (
             papiconf.VLLM["models"][model_id]["needs_HF_token"]
-            and not user_conf["general"]["huggingface_token"]
+            and not user_conf["general"]["HF_token"]
         ):
             raise HTTPException(
                 status_code=400,
