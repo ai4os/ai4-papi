@@ -387,16 +387,32 @@ def create_deployment(
                 detail="This model requires a valid Huggingface token for deployment.",
             )
 
-        # Create a api key secret for the vllm deployment
-        api_token = secrets.token_hex()
-        _ = ai4secrets.create_secret(
-            vo=vo,
-            secret_path=f"deployments/{job_uuid}/llm/vllm",
-            secret_data={"token": api_token},
-            authorization=SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
-        )
+        # Check is conditions are met to deploy Open WebUI as standalone
+        elif user_conf["general"]["type"] == "open-webui":
+            if not (
+                user_conf["general"]["openai_api_key"]
+                and user_conf["general"]["openai_api_url"]
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="You need to define an OpenAI key and url to deploy Open WebUI as standalone.",
+                )
+            api_token = user_conf["general"]["openai_api_key"]
+            api_endpoint = user_conf["general"]["openai_api_url"]
+        else:
+            # Create a api key secret for the vLLM deployment
+            api_token = secrets.token_hex()
+            _ = ai4secrets.create_secret(
+                vo=vo,
+                secret_path=f"deployments/{job_uuid}/llm/vllm",
+                secret_data={"token": api_token},
+                authorization=SimpleNamespace(
+                    credentials=authorization.credentials,
+                ),
+            )
+            api_endpoint = (
+                f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
+            )
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
@@ -413,6 +429,7 @@ def create_deployment(
                 "HOSTNAME": job_uuid,
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
+                "API_ENDPOINT": api_endpoint,
                 "HUGGINGFACE_TOKEN": user_conf["general"]["HF_token"],
             }
         )

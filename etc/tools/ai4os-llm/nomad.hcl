@@ -159,7 +159,7 @@ job "tool-llm-${JOB_UUID}" {
 
       env {
         OPENAI_API_KEY      = "${API_TOKEN}"
-        OPENAI_API_BASE_URL = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1"
+        OPENAI_API_BASE_URL = "${API_ENDPOINT}"
         WEBUI_AUTH          = true
       }
 

@@ -36,4 +36,14 @@ general:
   HF_token:
     name: Huggingface token
     value: ''
-    description: Huggingface token, needed for the deployment of some gated models.
+    description: Needed for the deployment of some gated models.
+
+  openai_api_key:
+    name: OpenAI API key
+    value: ''
+    description: Needed when deploying Open WebUI as standalone.
+
+  openai_api_url:
+    name: OpenAI API base url
+    value: ''
+    description: Needed when deploying Open WebUI as standalone.
