@@ -371,7 +371,6 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4-llm":
-
         # Configure VLLM args
         model_id = user_conf["general"]["model_id"]
         vllm_args = []
@@ -379,7 +378,10 @@ def create_deployment(
         vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
         # Check if HF token is needed
-        if papiconf.VLLM["models"][model_id]["needs_HF_token"] and not user_conf["general"]["huggingface_token"]:
+        if (
+            papiconf.VLLM["models"][model_id]["needs_HF_token"]
+            and not user_conf["general"]["huggingface_token"]
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="This model requires a valid Huggingface token for deployment.",
