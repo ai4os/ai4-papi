@@ -413,7 +413,7 @@ def create_deployment(
                 "HOSTNAME": job_uuid,
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
-                "HUGGINGFACE_TOKEN": user_conf["general"]["huggingface_token"],
+                "HUGGINGFACE_TOKEN": user_conf["general"]["HF_token"],
             }
         )
 
