@@ -10,7 +10,6 @@
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
 general:
-
   title:
     name: Deployment title
     value: ''
@@ -21,6 +20,7 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+vllm:
   type:
     name: Deployment type
     value: 'both'

@@ -69,8 +69,8 @@ def get_config(
 
     if item_name == "ai4os-llm":
         models = list(papiconf.VLLM["models"].keys())
-        conf["general"]["model_id"]["options"] = models
-        conf["general"]["model_id"]["value"] = models[0]
+        conf["vllm"]["model_id"]["options"] = models
+        conf["vllm"]["model_id"]["value"] = models[0]
 
     return conf
 
