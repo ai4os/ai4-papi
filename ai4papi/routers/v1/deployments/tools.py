@@ -371,17 +371,21 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
-        if not user_conf["general"]["ui_password"]:
-            raise HTTPException(
-                status_code=400,
-                detail="A password is required to deploy this tool.",
-            )
-
         # Configure VLLM args
         model_id = user_conf["general"]["model_id"]
         vllm_args = []
         vllm_args += ["--model", model_id]
         vllm_args += papiconf.VLLM["models"][model_id]["args"]
+
+        # Check if a password is needed
+        if (
+            user_conf["general"]["type"] != "vllm"
+            and not user_conf["general"]["ui_password"]
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="A password is required to deploy this tool.",
+            )
 
         # Check if HF token is needed
         if (
