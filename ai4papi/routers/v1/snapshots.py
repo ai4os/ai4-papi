@@ -114,7 +114,7 @@ def create_snapshot(
     total_size = sum([s["size"] for s in snapshots])
     if total_size > (10 * 10**9):
         raise HTTPException(
-            status_code=401,
+            status_code=400,
             detail="You have exceeded the 10 GB quota. Please delete some snapshots before creating a new one.",
         )
 
@@ -130,7 +130,7 @@ def create_snapshot(
     )
     if job_info["status"] != "running":
         raise HTTPException(
-            status_code=401,
+            status_code=400,
             detail='You cannot make a snapshot of a job that has a status different than "running".',
         )
 
