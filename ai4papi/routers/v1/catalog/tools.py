@@ -49,7 +49,7 @@ def get_config(
         repo = "ai4oshub"
 
     # Fill with correct Docker image and tags
-    if item_name in ["ai4os-federated-server"]:
+    if item_name in ["ai4os-federated-server", "ai4os-ai4life-loader"]:
         conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
         tags = retrieve_docker_tags(image=image, repo=repo)
