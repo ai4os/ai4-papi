@@ -221,7 +221,8 @@ class Catalog:
             # validation. So we have to validate them, just in case we have naughty users.
             if metadata:
                 try:
-                    schema = ai4_metadata.get_schema("2.0.0")
+                    version = ai4_metadata.get_latest_version()
+                    schema = ai4_metadata.get_schema(version)
                     ai4_metadata.validate.validate(instance=metadata, schema=schema)
                 except Exception:
                     error = (

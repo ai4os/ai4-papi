@@ -378,10 +378,7 @@ def create_deployment(
         vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
         # Check if a password is needed
-        if (
-            user_conf["vllm"]["type"] != "vllm"
-            and not user_conf["vllm"]["ui_password"]
-        ):
+        if user_conf["vllm"]["type"] != "vllm" and not user_conf["vllm"]["ui_password"]:
             raise HTTPException(
                 status_code=400,
                 detail="A password is required to deploy this tool.",
@@ -487,6 +484,8 @@ def create_deployment(
                 ],  # limit to 1K characters
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "DOCKER_TAG": user_conf["general"]["docker_tag"],
                 "AI4LIFE_MODEL": user_conf["general"]["model_id"],
                 "CPU_NUM": user_conf["hardware"]["cpu_num"],
                 "RAM": user_conf["hardware"]["ram"],
