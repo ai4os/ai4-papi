@@ -275,9 +275,16 @@ The pattern for the subfolders follows:
     Also contains the generic quotas for hardware (see `range` parameter).
   - `nomad.hcl`: additional non-customizable values (eg. ports)
 
-### Implementation notes
+### Contributing
 
-This repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
 We provide some [default VScode configuration](.vscode) to make the development workflow smoother.
 
-We use [Precommit](https://pre-commit.com/) locally to enforce format in commits. Then use [Precommit.CI](https://pre-commit.ci/) to enforce it at the Github level.
+The repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
+We use [Pre-commit](https://pre-commit.com/) to enforce correct formatting in new contributions.
+To automatically run locally the pre-commit checks before committing, install the custom pre-commit workflow:
+
+```bash
+pre-commit install
+```
+
+For contributors that do not run it locally, we use [Pre-commit.CI](https://pre-commit.ci/) to enforce formatting at the Github level.
