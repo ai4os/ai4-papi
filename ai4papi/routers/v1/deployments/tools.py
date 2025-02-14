@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 import re
 import secrets
 import types
@@ -198,6 +199,10 @@ def create_deployment(
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
+    # TODO: given that some parts of the configuration are dynamically generated
+    # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog
+    # We have to apply conversion to only keep the values
+    # Same goes for modules
 
     # Update values conf in case we received a submitted conf
     if conf is not None:
@@ -210,8 +215,8 @@ def create_deployment(
     user_conf = utils.validate_conf(user_conf)
 
     # Check if the provided configuration is within the job quotas
-    # Skip this check with CVAT because it does not have a "hardware" section in the conf
-    if tool_name not in ["ai4os-cvat"]:
+    # We only do this for tools that have a "hardware" section in the conf
+    if "hardware" in user_conf.keys():
         quotas.check_jobwise(
             conf=user_conf,
             vo=vo,
@@ -364,10 +369,103 @@ def create_deployment(
             }
         )
 
+    # Deploy a OpenWebUI+vllm tool
+    elif tool_name == "ai4os-llm":
+        # Configure VLLM args
+        model_id = user_conf["vllm"]["model_id"]
+        vllm_args = []
+        vllm_args += ["--model", model_id]
+        vllm_args += papiconf.VLLM["models"][model_id]["args"]
+
+        # Check if a password is needed
+        if user_conf["vllm"]["type"] != "vllm" and not user_conf["vllm"]["ui_password"]:
+            raise HTTPException(
+                status_code=400,
+                detail="A password is required to deploy this tool.",
+            )
+
+        # Check if HF token is needed
+        if (
+            papiconf.VLLM["models"][model_id]["needs_HF_token"]
+            and not user_conf["vllm"]["HF_token"]
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="This model requires a valid Huggingface token for deployment.",
+            )
+
+        # Check is conditions are met to deploy Open WebUI as standalone
+        elif user_conf["vllm"]["type"] == "open-webui":
+            if not (
+                user_conf["vllm"]["openai_api_key"]
+                and user_conf["vllm"]["openai_api_url"]
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="You need to define an OpenAI key and url to deploy Open WebUI as standalone.",
+                )
+            api_token = user_conf["vllm"]["openai_api_key"]
+            api_endpoint = user_conf["vllm"]["openai_api_url"]
+        else:
+            # Create a api key secret for the vLLM deployment
+            api_token = secrets.token_hex()
+            _ = ai4secrets.create_secret(
+                vo=vo,
+                secret_path=f"deployments/{job_uuid}/llm/vllm",
+                secret_data={"token": api_token},
+                authorization=SimpleNamespace(
+                    credentials=authorization.credentials,
+                ),
+            )
+            api_endpoint = (
+                f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
+            )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "VLLM_ARGS": json.dumps(vllm_args),
+                "API_TOKEN": api_token,
+                "API_ENDPOINT": api_endpoint,
+                "HUGGINGFACE_TOKEN": user_conf["vllm"]["HF_token"],
+                "OPEN_WEBUI_PASSWORD": user_conf["vllm"]["ui_password"],
+            }
+        )
+
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
-    # Deploy a CVAT tool
+        # Define what to exclude
+        if user_conf["vllm"]["type"] == "vllm":
+            exclude_tasks = ["open-webui", "create-admin"]
+            exclude_services = ["ui"]
+        elif user_conf["vllm"]["type"] == "open-webui":
+            exclude_tasks = ["vllm"]
+            exclude_services = ["vllm"]
+        else:
+            exclude_tasks, exclude_services = [], []
+
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
+
+        services = nomad_conf["TaskGroups"][0]["Services"]
+        services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+
+        # Rename first task as main task
+        t = tasks[0]
+        t["Name"] = "main"
+
+    # Deploy AI4Life tool
     elif tool_name == "ai4os-ai4life-loader":
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
