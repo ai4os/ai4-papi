@@ -259,8 +259,8 @@ job "module-${JOB_UUID}" {
       config {
         force_pull = true
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        command    = "deep-start"
-        args       = ["--${SERVICE}"]
+        command    = "/bin/bash"
+        args       = ["-c", "ln -s /storage /srv; deep-start --${SERVICE}"]
         ports      = ["api", "monitor", "ide", "custom"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
