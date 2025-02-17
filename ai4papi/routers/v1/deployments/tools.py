@@ -373,28 +373,28 @@ def create_deployment(
     elif tool_name == "ai4os-llm":
         vllm_args = []
 
-        if user_conf["vllm"]["type"] == "open-webui":
+        if user_conf["llm"]["type"] == "open-webui":
             # Check if user has provided OpenAPI key/url
             if not (
-                user_conf["vllm"]["openai_api_key"]
-                and user_conf["vllm"]["openai_api_url"]
+                user_conf["llm"]["openai_api_key"]
+                and user_conf["llm"]["openai_api_url"]
             ):
                 raise HTTPException(
                     status_code=400,
                     detail="You need to define an OpenAI key and url to deploy Open WebUI as standalone.",
                 )
-            api_token = user_conf["vllm"]["openai_api_key"]
-            api_endpoint = user_conf["vllm"]["openai_api_url"]
+            api_token = user_conf["llm"]["openai_api_key"]
+            api_endpoint = user_conf["llm"]["openai_api_url"]
 
-        if user_conf["vllm"]["type"] in ["openwebui", "both"]:
+        if user_conf["llm"]["type"] in ["openwebui", "both"]:
             # Check if user has provided a password
-            if not user_conf["vllm"]["ui_password"]:
+            if not user_conf["llm"]["ui_password"]:
                 raise HTTPException(
                     status_code=400,
                     detail="A password is required to deploy this tool.",
                 )
 
-        if user_conf["vllm"]["type"] in ["vllm", "both"]:
+        if user_conf["llm"]["type"] in ["vllm", "both"]:
             # Create a OpenAPI key secret for the vLLM deployment
             api_token = secrets.token_hex()
             _ = ai4secrets.create_secret(
@@ -410,14 +410,14 @@ def create_deployment(
             )
 
             # Configure VLLM args
-            model_id = user_conf["vllm"]["model_id"]
+            model_id = user_conf["llm"]["model_id"]
             vllm_args += ["--model", model_id]
             vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
             # Check if HF token is needed
             if (
                 papiconf.VLLM["models"][model_id]["needs_HF_token"]
-                and not user_conf["vllm"]["HF_token"]
+                and not user_conf["llm"]["HF_token"]
             ):
                 raise HTTPException(
                     status_code=400,
@@ -440,8 +440,8 @@ def create_deployment(
                 "VLLM_ARGS": json.dumps(vllm_args),
                 "API_TOKEN": api_token,
                 "API_ENDPOINT": api_endpoint,
-                "HUGGINGFACE_TOKEN": user_conf["vllm"]["HF_token"],
-                "OPEN_WEBUI_PASSWORD": user_conf["vllm"]["ui_password"],
+                "HUGGINGFACE_TOKEN": user_conf["llm"]["HF_token"],
+                "OPEN_WEBUI_PASSWORD": user_conf["llm"]["ui_password"],
             }
         )
 
@@ -449,10 +449,10 @@ def create_deployment(
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
         # Define what to exclude
-        if user_conf["vllm"]["type"] == "vllm":
+        if user_conf["llm"]["type"] == "vllm":
             exclude_tasks = ["open-webui", "create-admin"]
             exclude_services = ["ui"]
-        elif user_conf["vllm"]["type"] == "open-webui":
+        elif user_conf["llm"]["type"] == "open-webui":
             exclude_tasks = ["vllm"]
             exclude_services = ["vllm"]
         else:

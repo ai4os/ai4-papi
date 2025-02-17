@@ -20,7 +20,7 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
-vllm:
+llm:
   type:
     name: Deployment type
     value: 'both'
