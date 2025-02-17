@@ -371,31 +371,10 @@ def create_deployment(
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
-        # Configure VLLM args
-        model_id = user_conf["vllm"]["model_id"]
         vllm_args = []
-        vllm_args += ["--model", model_id]
-        vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
-        # Check if a password is needed
-        if user_conf["vllm"]["type"] != "vllm" and not user_conf["vllm"]["ui_password"]:
-            raise HTTPException(
-                status_code=400,
-                detail="A password is required to deploy this tool.",
-            )
-
-        # Check if HF token is needed
-        if (
-            papiconf.VLLM["models"][model_id]["needs_HF_token"]
-            and not user_conf["vllm"]["HF_token"]
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail="This model requires a valid Huggingface token for deployment.",
-            )
-
-        # Check is conditions are met to deploy Open WebUI as standalone
-        elif user_conf["vllm"]["type"] == "open-webui":
+        if user_conf["vllm"]["type"] == "open-webui":
+            # Check if user has provided OpenAPI key/url
             if not (
                 user_conf["vllm"]["openai_api_key"]
                 and user_conf["vllm"]["openai_api_url"]
@@ -406,8 +385,17 @@ def create_deployment(
                 )
             api_token = user_conf["vllm"]["openai_api_key"]
             api_endpoint = user_conf["vllm"]["openai_api_url"]
-        else:
-            # Create a api key secret for the vLLM deployment
+
+        if user_conf["vllm"]["type"] in ["openwebui", "both"]:
+            # Check if user has provided a password
+            if not user_conf["vllm"]["ui_password"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="A password is required to deploy this tool.",
+                )
+
+        if user_conf["vllm"]["type"] in ["vllm", "both"]:
+            # Create a OpenAPI key secret for the vLLM deployment
             api_token = secrets.token_hex()
             _ = ai4secrets.create_secret(
                 vo=vo,
@@ -420,6 +408,21 @@ def create_deployment(
             api_endpoint = (
                 f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
             )
+
+            # Configure VLLM args
+            model_id = user_conf["vllm"]["model_id"]
+            vllm_args += ["--model", model_id]
+            vllm_args += papiconf.VLLM["models"][model_id]["args"]
+
+            # Check if HF token is needed
+            if (
+                papiconf.VLLM["models"][model_id]["needs_HF_token"]
+                and not user_conf["vllm"]["HF_token"]
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="This model requires a valid Huggingface token for deployment.",
+                )
 
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
