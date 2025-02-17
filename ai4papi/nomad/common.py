@@ -137,7 +137,7 @@ def get_deployment(
         if label == "deepaas":
             label = "api"
 
-        info["endpoints"][label] = f"http://{url}"
+        info["endpoints"][label] = f"https://{url}"
 
     # Add '/ui' to deepaas endpoint
     # If in the future we support other APIs, this will have to be removed.
