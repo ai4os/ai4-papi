@@ -112,10 +112,10 @@ def create_snapshot(
         vo=vo,
     )
     total_size = sum([s["size"] for s in snapshots])
-    if total_size > (10 * 10**9):
+    if total_size > (15 * 10**9):
         raise HTTPException(
             status_code=400,
-            detail="You have exceeded the 10 GB quota. Please delete some snapshots before creating a new one.",
+            detail="You have exceeded the 15 GB quota. Please delete some snapshots before creating a new one.",
         )
 
     # Load module configuration
