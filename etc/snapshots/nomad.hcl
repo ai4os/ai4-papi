@@ -59,7 +59,7 @@ input_job_id=${TARGET_JOB_ID}
 
 container_ids=$(sudo docker ps -q)
 
-size_limit=$((10 * 1024 * 1024 * 1024))  # 10 GB en bytes
+size_limit=$((${SIZE_LIMIT_GB} * 1024 * 1024 * 1024))  # convert to bytes
 
 for container_id in $container_ids; do
 
@@ -79,10 +79,10 @@ for container_id in $container_ids; do
                           echo "$container_size"
 
                           if [ "$container_size" -gt "$size_limit" ]; then
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is more than 10 GB."
+                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, limit is ${SIZE_LIMIT_GB} GB."
                                   exit 1
                           else
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, which is less than 10 GB."
+                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB."
                                   exit 0
                           fi
 

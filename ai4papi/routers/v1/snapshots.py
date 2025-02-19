@@ -155,6 +155,7 @@ def create_snapshot(
             "SUBMIT_TIME": now.strftime("%Y-%m-%d %X"),
             "HARBOR_ROBOT_USER": papiconf.HARBOR_USER,
             "HARBOR_ROBOT_PASSWORD": papiconf.HARBOR_PASS,
+            "SIZE_LIMIT_GB": 10,
             "VO": vo,
         }
     )
@@ -372,7 +373,7 @@ def get_nomad_snapshots(
         if size_error:
             tmp["status"] = "failed"
             tmp["error_msg"] = (
-                "The deployment is too big to make a snapshot. Please delete some data to make it lighter."
+                "The deployment is too big to make a snapshot. Please delete some data or move it to '/storage' to make it lighter."
             )
 
         elif upload_error:
