@@ -20,6 +20,11 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+  co2:
+    name: CO2 emissions monitoring
+    value: False
+    options: [True, False]
+
   docker_image:
     name: Docker image
     value: 'ai4oshub/ai4os-federated-server'

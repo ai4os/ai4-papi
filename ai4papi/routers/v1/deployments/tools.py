@@ -263,6 +263,7 @@ def create_deployment(
                 "DESCRIPTION": user_conf["general"]["desc"][
                     :1000
                 ],  # limit to 1K characters
+                "CODE_CARBON": user_conf["general"]["co2"],
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
                 "DOCKER_IMAGE": user_conf["general"]["docker_image"],
