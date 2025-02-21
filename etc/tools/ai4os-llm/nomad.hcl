@@ -119,9 +119,10 @@ job "tool-llm-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image = "vllm/vllm-openai:latest"
-        ports = ["vllm"]
-        args  = ${VLLM_ARGS}
+        force_pull = true
+        image      = "vllm/vllm-openai:latest"
+        ports      = ["vllm"]
+        args       = ${VLLM_ARGS}
       }
 
       env {
@@ -153,8 +154,9 @@ job "tool-llm-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image = "ghcr.io/open-webui/open-webui:main"
-        ports = ["ui"]
+        force_pull = true
+        image      = "ghcr.io/open-webui/open-webui:main"
+        ports      = ["ui"]
       }
 
       env {
