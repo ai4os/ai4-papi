@@ -369,6 +369,9 @@ def create_deployment(
             }
         )
 
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
         vllm_args = []
