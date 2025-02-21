@@ -21,7 +21,7 @@ that ENV variable.'
 
 # Only use mandatory config parameters, otherwise use defaults
 tools_config = {
-    # "ai4os-federated-server": {},
+    "ai4os-federated-server": {},
     "ai4os-cvat": {
         "general": {
             "cvat_username": "mock_user",
@@ -41,8 +41,9 @@ tools_config = {
         },
     },
     "ai4os-llm": {
-        "general": {
+        "llm": {
             "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+            "ui_password": "papi-test",
         },
     },
 }
