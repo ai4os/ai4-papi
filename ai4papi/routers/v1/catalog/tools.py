@@ -4,7 +4,7 @@ import types
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import quotas
+from ai4papi import quotas, utils, nomad
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
@@ -35,26 +35,37 @@ def get_config(
     # Retrieve tool metadata
     metadata = self.get_metadata(item_name)
 
-    # Parse docker registry
-    registry = metadata["links"]["docker_image"]
-    repo, image = registry.split("/")[-2:]
-    if repo not in ["deephdc", "ai4oshub"]:
-        repo = "ai4oshub"
-
-    # Fill with correct Docker image and tags (not needed for CVAT because hardcoded)
-    if item_name != "ai4os-cvat":
-        conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
-
-        tags = retrieve_docker_tags(image=image, repo=repo)
-        conf["general"]["docker_tag"]["options"] = tags
-        conf["general"]["docker_tag"]["value"] = tags[0]
-
     # Modify the resources limits for a given user or VO
     if conf.get("hardware", None):
         conf["hardware"] = quotas.limit_resources(
             item_name=item_name,
             vo=vo,
         )
+
+    # Parse docker registry
+    registry = metadata["links"]["docker_image"]
+    repo, image = registry.split("/")[-2:]
+    if repo not in ["deephdc", "ai4oshub"]:
+        repo = "ai4oshub"
+
+    # Fill with correct Docker image and tags
+    if item_name in ["ai4os-federated-server"]:
+        conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+
+        tags = retrieve_docker_tags(image=image, repo=repo)
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
+
+    if item_name == "ai4os-ai4life-loader":
+        ai4life_catalog = utils.ai4life_catalog()
+        models = [m["id"] for m in ai4life_catalog.values()]
+        conf["general"]["model_id"]["options"] = models
+        conf["general"]["model_id"]["value"] = models[0]
+
+        # Fill with available GPU models in the cluster
+        models = nomad.common.get_gpu_models(vo)
+        if models:
+            conf["hardware"]["gpu_type"]["options"] += models
 
     return conf
 

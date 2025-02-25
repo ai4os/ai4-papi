@@ -88,6 +88,20 @@ def get_deployments(
 
     return sorted_jobs
 
+def remove_job_endpoints(
+    job,
+    endpoints=[]
+):
+    """ Remove useless endpoints (they all point to same url)
+    """
+    job["endpoints"] = {
+        k: v for k, v in job["endpoints"].items() if k not in endpoints
+    }
+    if job["active_endpoints"]:
+        job["active_endpoints"] = [
+            k for k in job["active_endpoints"] if k not in endpoints
+        ]
+    return job
 
 @router.get("/{deployment_uuid}")
 def get_deployment(
@@ -138,23 +152,10 @@ def get_deployment(
 
     # Additional checks
     if tool_id == "ai4os-cvat":
-        # Remove useless endpoints (they all point to same url)
-        ignore = ["server", "grafana"]
-        job["endpoints"] = {
-            k: v for k, v in job["endpoints"].items() if k not in ignore
-        }
-        if job["active_endpoints"]:
-            job["active_endpoints"] = [
-                k for k in job["active_endpoints"] if k not in ignore
-            ]
+        job = remove_job_endpoints(job, endpoints = ["server", "grafana"])
 
-    if tool_id == 'ai4os-nvflare':
-        # Remove useless endpoints (they all point to same url)
-        # TODO
-        ignore = []
-        job["endpoints"] = {k: v for k, v in job["endpoints"].items() if k not in ignore}
-        if job["active_endpoints"]:
-            job["active_endpoints"] = [k for k in job["active_endpoints"] if k not in ignore]
+    if tool_id == "ai4os-ai4life-loader":
+        job["main_endpoint"] = "ui"  # instead of deepaas
 
     return job
 
@@ -225,6 +226,7 @@ def create_deployment(
         quotas.check_jobwise(
             conf=user_conf,
             vo=vo,
+            item_name=tool_name,
         )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -423,6 +425,51 @@ def create_deployment(
 
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
+
+    # Deploy a CVAT tool
+    elif tool_name == "ai4os-ai4life-loader":
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][
+                    :45
+                ],  # keep only 45 first characters
+                "DESCRIPTION": user_conf["general"]["desc"][
+                    :1000
+                ],  # limit to 1K characters
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "AI4LIFE_MODEL": user_conf["general"]["model_id"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "GPU_NUM": user_conf["hardware"]["gpu_num"],
+                "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        usertask = [t for t in tasks if t["Name"] == "main"][0]
+
+        # Modify the GPU section
+        if user_conf["hardware"]["gpu_num"] <= 0:
+            # Delete GPU section in CPU deployments
+            usertask["Resources"]["Devices"] = None
+        else:
+            # If gpu_type not provided, remove constraint to GPU model
+            if not user_conf["hardware"]["gpu_type"]:
+                usertask["Resources"]["Devices"][0]["Constraints"] = None
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

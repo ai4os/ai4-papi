@@ -129,4 +129,34 @@ rdel = tools.delete_deployment(
 assert isinstance(rdel, dict)
 assert "status" in rdel.keys()
 
+
+print("  Testing AI4Life loader")
+
+# Create tool
+rcreate = tools.create_deployment(
+    vo="vo.ai4eosc.eu",
+    tool_name="ai4os-ai4life-loader",
+    conf={
+        "general": {
+            "title": "AI4Life test",
+            "model_id": "happy-elephant",
+        },
+    },
+    authorization=SimpleNamespace(credentials=token),
+)
+assert isinstance(rcreate, dict)
+assert "job_ID" in rcreate.keys()
+assert rdep["status"] != "error"
+
+time.sleep(0.2)  # Nomad takes some time to allocate deployment
+
+# Delete tool
+rdel = tools.delete_deployment(
+    vo="vo.ai4eosc.eu",
+    deployment_uuid=rcreate["job_ID"],
+    authorization=SimpleNamespace(credentials=token),
+)
+assert isinstance(rdel, dict)
+assert "status" in rdel.keys()
+
 print("Deployments (tools) tests passed!")
