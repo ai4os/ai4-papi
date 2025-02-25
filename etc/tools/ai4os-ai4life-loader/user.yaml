@@ -30,6 +30,18 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+
+  docker_image:
+    name: Docker image
+    value: 'ai4oshub/ai4os-ai4life-loader'
+    description: Docker image to be used.
+
+  docker_tag:
+    name: Docker tag
+    value: 'latest'
+    description: Docker tag to use. Tags are module dependent.
+    options: ['latest']
+
   model_id:
     name: AI4Life model ID
     value: ''
