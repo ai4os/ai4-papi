@@ -196,6 +196,14 @@ def create_deployment(
             detail="This ID does not correspond to an available tool.",
         )
 
+    # Check if your are allowed to deploy the tool
+    restrictions = {"ai4os-llm": ["vo.imagine-ai.eu"]}
+    if vo in restrictions.get(tool_name, []):
+        raise HTTPException(
+            status_code=403,
+            detail="Your VO doesn't allow to deploy this tool.",
+        )
+
     # Load tool configuration
     nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
