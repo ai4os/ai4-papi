@@ -150,6 +150,7 @@ job "tool-nvflare-${JOB_UUID}" {
     ephemeral_disk {
       size = ${DISK}
     }
+    
 # uncomment for persistence
 #     task "storagetask" {
 #       lifecycle {
@@ -386,4 +387,3 @@ job "tool-nvflare-${JOB_UUID}" {
 
   }
 }
-

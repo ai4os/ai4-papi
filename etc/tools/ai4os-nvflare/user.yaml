@@ -22,70 +22,67 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
-  hostname:
-    name: Hostname
-    value: ''
-    description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
+nvflare:
 
-  nvfl_version:
+  version:
     name: NVFlare version
     value: '2.5-Stifo'
     options: ['2.5.0', '2.5-Stifo']
     description: Select a version of the NVFlare.
 
-  nvfl_dashboard_username:
+  dashboard_username:
     name: NVFlare Dashboard username
     value: ''
     description: Select a username / email for admin in your NVFlare Dashboard instance.
 
-  nvfl_dashboard_password:
+  dashboard_password:
     name: NVFlare Dashboard password
     value: ''
     description: Select a password for admin in your NVFlare Dashboard instance.
 
-  nvfl_dashboard_project_short_name:
+  dashboard_project_short_name:
     name: NVFlare project short name
     value: ''
     description: NVFlare project short name (maximum 16 characters, at top left, and used in certs)
 
-  nvfl_dashboard_project_title:
+  dashboard_project_title:
     name: NVFlare project title
     value: ''
     description: NVFlare project title (on home page)
 
-  nvfl_dashboard_project_description:
+  dashboard_project_description:
     name: NVFlare project description
     value: ''
     description: NVFlare project description
 
-  nvfl_dashboard_project_app_location:
+  dashboard_project_app_location:
     name: NVFlare project docker image download link
     value: 'registry.services.ai4os.eu/ai4oshub/ai4os-nvflare-client:2.5-Stifo'
     description: NVFlare project docker image download link
 
-  nvfl_dashboard_project_starting_date:
+  dashboard_project_starting_date:
     name: NVFlare project start date
     value: ''
     description: NVFlare project start date
 
-  nvfl_dashboard_project_end_date:
+  dashboard_project_end_date:
     name: NVFlare project end date
     value: ''
     description: NVFlare project end date
 
-  nvfl_dashboard_project_public:
+  dashboard_project_public:
     name: Make NVFlare project public
     value: false
     options: [true, false]
     description: If the project is public, user signup is enabled
 
-  nvfl_dashboard_project_frozen:
+  dashboard_project_frozen:
     name: Make NVFlare project frozen
     value: false
     options: [true, false]
     description: Once all the project values including the application configuartion and server configurations are set, freeze the project to create certificates based on the server configurations and allow users to download startup kits
 
-  nvfl_server_jupyter_password:
+  server_jupyter_password:
     name: Jupyter Lab password
     value: ''
     description: Select a password for Jupyter Lab at the NVFlare Federated Server instance
