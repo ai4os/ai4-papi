@@ -89,16 +89,6 @@ def get_deployments(
     return sorted_jobs
 
 
-def remove_job_endpoints(job, endpoints=[]):
-    """Remove useless endpoints (they all point to same url)"""
-    job["endpoints"] = {k: v for k, v in job["endpoints"].items() if k not in endpoints}
-    if job["active_endpoints"]:
-        job["active_endpoints"] = [
-            k for k in job["active_endpoints"] if k not in endpoints
-        ]
-    return job
-
-
 @router.get("/{deployment_uuid}")
 def get_deployment(
     vo: str,
@@ -148,7 +138,15 @@ def get_deployment(
 
     # Additional checks
     if tool_id == "ai4os-cvat":
-        job = remove_job_endpoints(job, endpoints=["server", "grafana"])
+        # Remove useless endpoints (they all point to same url)
+        ignore = ["server", "grafana"]
+        job["endpoints"] = {
+            k: v for k, v in job["endpoints"].items() if k not in ignore
+        }
+        if job["active_endpoints"]:
+            job["active_endpoints"] = [
+                k for k in job["active_endpoints"] if k not in ignore
+            ]
 
     if tool_id == "ai4os-ai4life-loader":
         job["main_endpoint"] = "ui"  # instead of deepaas
