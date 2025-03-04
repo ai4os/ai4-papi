@@ -119,6 +119,11 @@ configuration:
     value: False
     options: [True, False]
 
+  mp:
+    name: Metric privacy
+    value: False
+    options: [True, False]
+
   noise_mult:
     name: Noise multiplier
     value: 1

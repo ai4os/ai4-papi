@@ -300,6 +300,7 @@ def create_deployment(
                 "FEDAVGM_SERVER_FL": user_conf["configuration"]["fl"],
                 "FEDAVGM_SERVER_MOMENTUM": user_conf["configuration"]["momentum"],
                 "DP": user_conf["configuration"]["dp"],
+                "METRIC_PRIVACY": user_conf["configuration"]["mp"],
                 "NOISE_MULT": user_conf["configuration"]["noise_mult"],
                 "SAMPLED_CLIENTS": user_conf["configuration"]["sampled_clients"],
                 "CLIP_NORM": user_conf["configuration"]["clip_norm"],
