@@ -17,23 +17,11 @@ job "tool-nvflare-${JOB_UUID}" {
   priority  = "${PRIORITY}"
 
   meta {
-    owner                             = "${OWNER}"  # user-id from OIDC
-    owner_name                        = "${OWNER_NAME}"
-    owner_email                       = "${OWNER_EMAIL}"
-    title                             = "${TITLE}"
-    description                       = "${DESCRIPTION}"
-    force_pull_images                 = true
-    meta_domain												= "${meta.domain}"
-    #
-    # rclone
-    #
-    RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
-    RCLONE_CONFIG_RSHARE_TYPE          = "webdav"
-    RCLONE_CONFIG_RSHARE_URL           = "${RCLONE_CONFIG_RSHARE_URL}"
-    RCLONE_CONFIG_RSHARE_VENDOR        = "${RCLONE_CONFIG_RSHARE_VENDOR}"
-    RCLONE_CONFIG_RSHARE_USER          = "${RCLONE_CONFIG_RSHARE_USER}"
-    RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
-    RCLONE_REMOTE_PATH                 = "${RCLONE_REMOTE_PATH}/${JOB_UUID}"
+    owner       = "${OWNER}"  # user-id from OIDC
+    owner_name  = "${OWNER_NAME}"
+    owner_email = "${OWNER_EMAIL}"
+    title       = "${TITLE}"
+    description = "${DESCRIPTION}"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -65,7 +53,7 @@ job "tool-nvflare-${JOB_UUID}" {
     attribute = "${meta.namespace}"
     operator  = "regexp"
     value     = "ai4eosc"
-    weight    = -50  # anti-affinity for ai4eosc clients
+    weight    = -100  # anti-affinity for ai4eosc clients
   }
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
@@ -74,7 +62,7 @@ job "tool-nvflare-${JOB_UUID}" {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
-    weight    = 50
+    weight    = 100
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut
@@ -86,7 +74,14 @@ job "tool-nvflare-${JOB_UUID}" {
 
   group "usergroup" {
 
+    # Avoid rescheduling the job when the node fails:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
+
     network {
+
       port "dashboard" {
         to = 80
       }
@@ -118,8 +113,8 @@ job "tool-nvflare-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls=true",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl",
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",  #TODO: check Stefan
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl", #TODO: check Stefan
         "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
@@ -150,84 +145,17 @@ job "tool-nvflare-${JOB_UUID}" {
     ephemeral_disk {
       size = ${DISK}
     }
-    
-# uncomment for persistence
-#     task "storagetask" {
-#       lifecycle {
-#         hook = "prestart"
-#         sidecar = "true"
-#       }
-#       driver = "docker"
-#       kill_timeout = "30s"
-#       env {
-#         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
-#         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
-#         RCLONE_CONFIG_RSHARE_URL    = "${NOMAD_META_RCLONE_CONFIG_RSHARE_URL}"
-#         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
-#         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
-#         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-#         REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
-#         LOCAL_PATH                  = "/storage"
-#       }
-#       config {
-#         force_pull  = true
-#         image       = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
-#         privileged  = true
-#         mount {
-#           type = "bind"
-#           target = "/srv/.rclone/rclone.conf"
-#           source = "local/rclone.conf"
-#           readonly = false
-#         }
-#         mount {
-#           type = "bind"
-#           target = "/mount_storage.sh"
-#           source = "local/mount_storage.sh"
-#           readonly = false
-#         }
-#         volumes = [
-#           "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared",
-#         ]
-#       }
-#       template {
-#         data = <<-EOF
-#         [ai4eosc-share]
-#         type = webdav
-#         url = https://share.services.ai4os.eu/remote.php/dav
-#         vendor = nextcloud
-#         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
-#         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
-#         EOF
-#         destination = "local/rclone.conf"
-#       }
-#       template {
-#         data = <<-EOF
-#         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-#         dirs='dashboard server'
-#         for dir in $dirs; do
-#             echo "initializing: $LOCAL_PATH/$dir"
-#             rm -rf $LOCAL_PATH/$dir
-#             mkdir -p $LOCAL_PATH/$dir
-#             echo "initializing: $REMOTE_PATH/$dir"
-#             rclone mkdir --log-level DEBUG $REMOTE_PATH/$dir
-#         done
-#         echo "mounting storage: $REMOTE_PATH <+> $LOCAL_PATH"
-#         rclone mount --log-level DEBUG $REMOTE_PATH $LOCAL_PATH \
-#             --allow-non-empty \
-#             --allow-other \
-#             --vfs-cache-mode full
-#         EOF
-#         destination = "local/mount_storage.sh"
-#       }
-#       resources {
-#         cpu    = 50        # minimum number of CPU MHz is 2
-#         memory = 2000
-#       }
-#     }
 
     task "dashboard" {
-      # TODO: persistence - adjust wsgi.py of the NVFLARE Dashboad to recover from an existing DB
+
       driver = "docker"
+
+      config {
+        image      = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
+        force_pull = true
+        ports      = ["dashboard"]
+      }
+
       env {
         NVFL_CREDENTIAL="${NVFL_DASHBOARD_USERNAME}:${NVFL_DASHBOARD_PASSWORD}"
         NVFL_SERVER1="${NVFL_DASHBOARD_SERVER_SERVER1}"
@@ -244,24 +172,15 @@ job "tool-nvflare-${JOB_UUID}" {
         NVFL_PROJECT_FROZEN=${NVFL_DASHBOARD_PROJECT_FROZEN}
         VARIABLE_NAME="app"
       }
-      config {
-        image = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
-        force_pull = "${NOMAD_META_force_pull_images}"
-        ports = ["dashboard"]
-        # uncomment for persistence
-        #volumes = [
-        #  "..${NOMAD_ALLOC_DIR}/data/storage/dashboard:/var/tmp/nvflare/dashboard:rshared",
-        #]
-      }
     }
 
     task "main" {
-      # TODO: persistence
+
       lifecycle {
         hook = "poststart"
         sidecar = "true"
       }
-      driver = "docker"
+
       template {
         data = <<-EOF
         #!/bin/bash
@@ -331,8 +250,8 @@ job "tool-nvflare-${JOB_UUID}" {
         destination = "local/init_fl_server.sh"
         perms = "750"
       }
+
       template {
-        # TODO: ServerApp.password config is deprecated in 2.0. Use PasswordIdentityProvider.hashed_password
         data = <<-EOF
         #!/bin/bash
         ./init_fl_server.sh
@@ -347,19 +266,21 @@ job "tool-nvflare-${JOB_UUID}" {
         destination = "local/entrypoint.sh"
         perms = "750"
       }
+
+      driver = "docker"
+
       config {
-        image = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
-        force_pull = "${NOMAD_META_force_pull_images}"
-        ports = ["server-fl", "server-admin", "server-jupyter"]
-        shm_size = ${SHARED_MEMORY}
+        image      = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
+        command    = "/bin/bash"
+        args       = [ "-c", "/workspace/entrypoint.sh"]
+        force_pull = true
+        ports      = ["server-fl", "server-admin", "server-jupyter"]
+        shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
           size = "${DISK}M"
         }
-        # uncomment for persistence
-        #volumes = [
-        #  "..${NOMAD_ALLOC_DIR}/data/storage/server/tf:/tf:rshared",
-        #]
+
         mount {
           type = "bind"
           target = "/workspace/init_fl_server.sh"
@@ -372,18 +293,14 @@ job "tool-nvflare-${JOB_UUID}" {
           source = "local/entrypoint.sh"
           readonly = true
         }
-        command = "/bin/bash"
-        args = [
-          "-c",
-          "/workspace/entrypoint.sh"
-        ]
       }
+
       resources {
-        cores  = ${CPU_NUM}
-        memory = ${RAM}
+        cores      = ${CPU_NUM}
+        memory     = ${RAM}
         memory_max = ${RAM}
       }
-    }
 
+    }
   }
 }
