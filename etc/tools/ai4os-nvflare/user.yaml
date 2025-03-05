@@ -27,65 +27,39 @@ nvflare:
   version:
     name: NVFlare version
     value: '2.5-Stifo'
-    options: ['2.5.0', '2.5-Stifo']
+    options: ['2.5.0', '2.5-Stifo']  #TODO: check with Stefan
     description: Select a version of the NVFlare.
 
-  dashboard_username:
+  username:
     name: NVFlare Dashboard username
     value: ''
     description: Select a username / email for admin in your NVFlare Dashboard instance.
 
-  dashboard_password:
-    name: NVFlare Dashboard password
+  password:
+    name: NVFlare password
     value: ''
-    description: Select a password for admin in your NVFlare Dashboard instance.
+    description: Admin password for both the Dashboard and the Jupyter server instance.
 
-  dashboard_project_short_name:
-    name: NVFlare project short name
-    value: ''
-    description: NVFlare project short name (maximum 16 characters, at top left, and used in certs)
-
-  dashboard_project_title:
-    name: NVFlare project title
-    value: ''
-    description: NVFlare project title (on home page)
-
-  dashboard_project_description:
-    name: NVFlare project description
-    value: ''
-    description: NVFlare project description
-
-  dashboard_project_app_location:
+  app_location: #TODO: wait until Fahimeh uploads tutorials
     name: NVFlare project docker image download link
     value: 'registry.services.ai4os.eu/ai4oshub/ai4os-nvflare-client:2.5-Stifo'
     description: NVFlare project docker image download link
 
-  dashboard_project_starting_date:
+  starting_date:
     name: NVFlare project start date
     value: ''
     description: NVFlare project start date
 
-  dashboard_project_end_date:
+  end_date:
     name: NVFlare project end date
     value: ''
     description: NVFlare project end date
 
-  dashboard_project_public:
+  public_project:
     name: Make NVFlare project public
-    value: false
-    options: [true, false]
-    description: If the project is public, user signup is enabled
-
-  dashboard_project_frozen:
-    name: Make NVFlare project frozen
-    value: false
-    options: [true, false]
-    description: Once all the project values including the application configuartion and server configurations are set, freeze the project to create certificates based on the server configurations and allow users to download startup kits
-
-  server_jupyter_password:
-    name: Jupyter Lab password
-    value: ''
-    description: Select a password for Jupyter Lab at the NVFlare Federated Server instance
+    value: False
+    options: [False, True]
+    description: If the project is public, user sign-up is enabled. Otherwise the admin enables the users.
 
 hardware:
   cpu_num:

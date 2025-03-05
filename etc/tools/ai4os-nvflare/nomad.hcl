@@ -157,19 +157,19 @@ job "tool-nvflare-${JOB_UUID}" {
       }
 
       env {
-        NVFL_CREDENTIAL="${NVFL_DASHBOARD_USERNAME}:${NVFL_DASHBOARD_PASSWORD}"
-        NVFL_SERVER1="${NVFL_DASHBOARD_SERVER_SERVER1}"
-        NVFL_HA_MODE="${NVFL_DASHBOARD_SERVER_HA_MODE}"
-        NVFL_OVERSEER="${NVFL_DASHBOARD_SERVER_OVERSEER}"
-        NVFL_SERVER2="${NVFL_DASHBOARD_SERVER_SERVER2}"
-        NVFL_PROJECT_SHORT_NAME="${NVFL_DASHBOARD_PROJECT_SHORT_NAME}"
-        NVFL_PROJECT_TITLE="${NVFL_DASHBOARD_PROJECT_TITLE}"
-        NVFL_PROJECT_DESCRIPTION="${NVFL_DASHBOARD_PROJECT_DESCRIPTION}"
-        NVFL_PROJECT_APP_LOCATION="${NVFL_DASHBOARD_PROJECT_APP_LOCATION}"
-        NVFL_PROJECT_STARTING_DATE="${NVFL_DASHBOARD_PROJECT_STARTING_DATE}"
-        NVFL_PROJECT_END_DATE="${NVFL_DASHBOARD_PROJECT_END_DATE}"
-        NVFL_PROJECT_PUBLIC=${NVFL_DASHBOARD_PROJECT_PUBLIC}
-        NVFL_PROJECT_FROZEN=${NVFL_DASHBOARD_PROJECT_FROZEN}
+        NVFL_CREDENTIAL="${NVFL_USERNAME}:${NVFL_PASSWORD}"
+        NVFL_SERVER1="${NVFL_SERVER1}"
+        NVFL_HA_MODE="False"
+        NVFL_OVERSEER=""
+        NVFL_SERVER2=""
+        NVFL_PROJECT_SHORT_NAME="${NVFL_SHORTNAME}"
+        NVFL_PROJECT_TITLE="${TITLE}"
+        NVFL_PROJECT_DESCRIPTION="${DESCRIPTION}"
+        NVFL_PROJECT_APP_LOCATION="${NVFL_APP_LOCATION}"
+        NVFL_PROJECT_STARTING_DATE="${NVFL_STARTING_DATE}"
+        NVFL_PROJECT_END_DATE="${NVFL_END_DATE}"
+        NVFL_PROJECT_PUBLIC=${NVFL_PUBLIC_PROJECT}
+        NVFL_PROJECT_FROZEN=true
         VARIABLE_NAME="app"
       }
     }
@@ -195,7 +195,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -X POST \
               -L \
               -H 'Content-type: application/json' \
-              -d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
+              -d '{"email":"'${NVFL_USERNAME}'", "password": "'${NVFL_PASSWORD}'"}' \
               https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/login \
           )
           status=$(jq -r ".status" <<<"$resp")
@@ -256,7 +256,7 @@ job "tool-nvflare-${JOB_UUID}" {
         #!/bin/bash
         ./init_fl_server.sh
         jupyter-lab \
-          --ServerApp.password=`python3 -c "from jupyter_server.auth import passwd; print(passwd('${NVFL_SERVER_JUPYTER_PASSWORD}'))"` \
+          --ServerApp.password=`python3 -c "from jupyter_server.auth import passwd; print(passwd('${NVFL_PASSWORD}'))"` \
           --port=8888 \
           --ip=0.0.0.0 \
           --notebook-dir=/tf \

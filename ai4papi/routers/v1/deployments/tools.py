@@ -385,60 +385,23 @@ def create_deployment(
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
                 "OWNER_EMAIL": auth_info["email"],
-                "TITLE": user_conf["general"]["title"][
-                    :45
-                ],  # keep only 45 first characters
-                "DESCRIPTION": user_conf["general"]["desc"][
-                    :1000
-                ],  # limit to 1K characters
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
                 "CPU_NUM": user_conf["hardware"]["cpu_num"],
                 "RAM": user_conf["hardware"]["ram"],
                 "DISK": user_conf["hardware"]["disk"],
                 "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
-                # Limit at 50% of RAM memory, in bytes
                 "NVFL_VERSION": user_conf["nvflare"]["version"],
-                "NVFL_SERVER_JUPYTER_PASSWORD": user_conf["nvflare"][
-                    "server_jupyter_password"
-                ],
-                "NVFL_DASHBOARD_USERNAME": user_conf["nvflare"]["dashboard_username"],
-                "NVFL_DASHBOARD_PASSWORD": user_conf["nvflare"]["dashboard_password"],
-                "NVFL_DASHBOARD_SERVER_SERVER1": "%s-server.${meta.domain}-%s"
-                % (job_uuid, base_domain),
-                "NVFL_DASHBOARD_SERVER_HA_MODE": False,
-                "NVFL_DASHBOARD_SERVER_OVERSEER": "",
-                "NVFL_DASHBOARD_SERVER_SERVER2": "",
-                "NVFL_DASHBOARD_PROJECT_SHORT_NAME": user_conf["nvflare"][
-                    "dashboard_project_short_name"
-                ],
-                "NVFL_DASHBOARD_PROJECT_TITLE": user_conf["nvflare"][
-                    "dashboard_project_title"
-                ],
-                "NVFL_DASHBOARD_PROJECT_DESCRIPTION": user_conf["nvflare"][
-                    "dashboard_project_description"
-                ],
-                "NVFL_DASHBOARD_PROJECT_APP_LOCATION": user_conf["nvflare"][
-                    "dashboard_project_app_location"
-                ],
-                "NVFL_DASHBOARD_PROJECT_STARTING_DATE": user_conf["nvflare"][
-                    "dashboard_project_starting_date"
-                ],
-                "NVFL_DASHBOARD_PROJECT_END_DATE": user_conf["nvflare"][
-                    "dashboard_project_end_date"
-                ],
-                "NVFL_DASHBOARD_PROJECT_PUBLIC": user_conf["nvflare"][
-                    "dashboard_project_public"
-                ],
-                "NVFL_DASHBOARD_PROJECT_FROZEN": user_conf["nvflare"][
-                    "dashboard_project_frozen"
-                ],
-                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
-                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
-                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
-                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
-                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
-                "RCLONE_REMOTE_PATH": user_conf["storage"]["rclone_remote_path"],
+                "NVFL_USERNAME": user_conf["nvflare"]["username"],
+                "NVFL_PASSWORD": user_conf["nvflare"]["password"],
+                "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
+                "NVFL_SHORTNAME": user_conf["general"]["title"][:12],
+                "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
+                "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
+                "NVFL_END_DATE": user_conf["nvflare"]["end_date"],
+                "NVFL_PUBLIC_PROJECT": user_conf["nvflare"]["public_project"],
             }
         )
 
