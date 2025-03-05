@@ -21,8 +21,6 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
  button where you can copy paste your token. So you will be able to access authenticated methods from the interface.
 """
 
-import re
-
 from fastapi import HTTPException
 from flaat.fastapi import Flaat
 
@@ -50,14 +48,18 @@ def get_user_info(token):
             detail="Invalid token",
         )
 
-    # Retrieve VOs the user belongs to (eg. "/Platform Access/vo.ai4eosc.eu")
-    # VOs can be empty if the user does not belong to any VO, or the
-    # 'group_membership' wasn't correctly retrieved from the token
-    vos = []
-    for i in user_infos.get("group_membership", []):
-        vo = re.search(r"/Platform Access/(.*?)$", i)
-        if vo:
-            vos.append(vo.group(1))
+    # Create a group dictionary where keys are the access levels and values are the
+    # projects that enabled the user into that access level.
+    # eg. {"platform-access": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
+    groups = {}
+    for i in user_infos.get("groups", []):
+        i = i.split(":")
+        access = i[0]  # eg. "platform-access"
+        project = i[1] if len(i) > 1 else None  # eg. "vo.ai4eosc.eu"
+        v = groups.get(access, [])
+        if project:
+            v.append(project)
+        groups[access] = v
 
     # Generate user info dict
     for k in ["sub", "iss", "name", "email"]:
@@ -66,13 +68,13 @@ def get_user_info(token):
                 status_code=401,
                 detail=f"You token should have scopes for {k}.",
             )
+
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
         "issuer": user_infos.get("iss"),  # URL of the access token issuer
         "name": user_infos.get("name"),
         "email": user_infos.get("email"),
-        "vos": vos,
-        "groups": user_infos.get("group_membership"),
+        "groups": groups,
     }
 
     return out
