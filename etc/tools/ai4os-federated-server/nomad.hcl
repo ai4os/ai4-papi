@@ -155,6 +155,7 @@ job "tool-fl-${JOB_UUID}" {
         FEDAVGM_SERVER_FL               = "${FEDAVGM_SERVER_FL}"
         FEDAVGM_SERVER_MOMENTUM         = "${FEDAVGM_SERVER_MOMENTUM}"
         DP                              = "${DP}"
+        METRIC_PRIVACY                  = "${METRIC_PRIVACY}"
         NOISE_MULT                      = "${NOISE_MULT}"
         SAMPLED_CLIENTS                 = "${SAMPLED_CLIENTS}"
         CLIP_NORM                       = "${CLIP_NORM}"
