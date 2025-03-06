@@ -46,6 +46,7 @@ def get_deployments(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Retrieve all jobs in namespace
     jobs = nomad.get_deployments(
@@ -96,6 +97,7 @@ def get_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
@@ -124,6 +126,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
@@ -217,6 +220,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Delete deployment
     r = nomad.delete_deployment(

@@ -101,7 +101,7 @@ def create_snapshot(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -186,7 +186,7 @@ def delete_snapshot(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Check is the snapshot is in the "completed" list (Harbor)
     snapshots = get_harbor_snapshots(

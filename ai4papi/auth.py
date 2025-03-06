@@ -80,14 +80,23 @@ def get_user_info(token):
     return out
 
 
-def check_vo_membership(
-    requested_vo,
-    user_vos,
+def check_authorization(
+    auth_info: dict,
+    requested_vo: str = None,
+    access_level: str = "platform-access",
 ):
     """
-    Check that the user has access to the VO he is asking for.
+    Check that the user has permissions to use the resource (usually "platform-access")
+    and check he indeed belongs to the requested VO if one is specified.
     """
-    if requested_vo not in user_vos:
+    if access_level not in auth_info["groups"].keys():
+        raise HTTPException(
+            status_code=401,
+            detail=f"Your user has not the required access level to use this resource: {access_level}.",
+        )
+
+    user_vos = auth_info["groups"][access_level]
+    if requested_vo and (requested_vo not in user_vos):
         raise HTTPException(
             status_code=401,
             detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}.",
