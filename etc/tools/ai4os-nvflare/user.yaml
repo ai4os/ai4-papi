@@ -24,12 +24,6 @@ general:
 
 nvflare:
 
-  version:
-    name: NVFlare version
-    value: '2.5-Stifo'
-    options: ['2.5.0', '2.5-Stifo']  #TODO: check with Stefan
-    description: Select a version of the NVFlare.
-
   username:
     name: NVFlare Dashboard username
     value: ''
@@ -40,10 +34,16 @@ nvflare:
     value: ''
     description: Admin password for both the Dashboard and the Jupyter server instance.
 
-  app_location: #TODO: wait until Fahimeh uploads tutorials
+  app_location:
     name: NVFlare project docker image download link
     value: 'registry.services.ai4os.eu/ai4oshub/ai4os-nvflare-client:2.5-Stifo'
     description: NVFlare project docker image download link
+
+  public_project:
+    name: Make NVFlare project public
+    value: False
+    options: [False, True]
+    description: If the project is public, user sign-up is enabled. Otherwise the admin enables the users.
 
   starting_date:
     name: NVFlare project start date
@@ -54,12 +54,6 @@ nvflare:
     name: NVFlare project end date
     value: ''
     description: NVFlare project end date
-
-  public_project:
-    name: Make NVFlare project public
-    value: False
-    options: [False, True]
-    description: If the project is public, user sign-up is enabled. Otherwise the admin enables the users.
 
 hardware:
   cpu_num:
