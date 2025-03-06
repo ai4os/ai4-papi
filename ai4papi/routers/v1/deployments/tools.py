@@ -206,13 +206,6 @@ def create_deployment(
             reference=user_conf,
         )
 
-    # NVIDIA Flare
-    # use the value of nvfl_dashboard_project_app_location for the docker_image parameter
-    if tool_name == "ai4os-nvflare" and "docker_image" not in user_conf["general"]:
-        user_conf["general"]["docker_image"] = user_conf["nvflare"][
-            "dashboard_project_app_location"
-        ]
-
     # Utils validate conf
     user_conf = utils.validate_conf(user_conf)
 
@@ -393,7 +386,7 @@ def create_deployment(
                 "RAM": user_conf["hardware"]["ram"],
                 "DISK": user_conf["hardware"]["disk"],
                 "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
-                "NVFL_VERSION": user_conf["nvflare"]["version"],
+                "NVFL_VERSION": "2.5-Stifo",
                 "NVFL_USERNAME": user_conf["nvflare"]["username"],
                 "NVFL_PASSWORD": user_conf["nvflare"]["password"],
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
