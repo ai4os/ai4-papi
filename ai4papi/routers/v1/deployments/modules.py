@@ -283,6 +283,7 @@ def create_deployment(
     # Modify the GPU section
     if user_conf["hardware"]["gpu_num"] <= 0:
         # Delete GPU section in CPU deployments
+        usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
         usertask["Resources"]["Devices"] = None
     else:
         # If gpu_type not provided, remove constraint to GPU model

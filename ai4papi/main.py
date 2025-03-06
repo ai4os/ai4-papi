@@ -6,12 +6,13 @@ from contextlib import asynccontextmanager
 import fastapi
 import uvicorn
 
-from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from fastapi.responses import FileResponse
-from ai4papi.routers import v1
-from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
+
+from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
+from ai4papi.routers import v1
+from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
 
 
 description = (
@@ -55,6 +56,7 @@ app = fastapi.FastAPI(
     title="AI4EOSC Platform API",
     description=description,
     lifespan=lifespan,
+    version=f"{papi_branch}@{papi_commit[:5]}",
 )
 
 app.add_middleware(

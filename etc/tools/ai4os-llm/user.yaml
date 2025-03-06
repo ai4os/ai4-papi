@@ -1,0 +1,54 @@
+---
+# User customizable configuration to make a deployment in Nomad.
+# Additional non-customizable values (eg. ports) are hardcoded in `job.nomad`.
+
+# All conf parameters follow the same structure:
+# varname:
+#  name: name of the parameter to be displayed to end user (mandatory)
+#  value: (default) value of the parameter (mandatory)
+#  options: restricted set of values that the parameter can take (optional)
+#  description: some comments on the parameter to be displayed to the end user (optional)
+
+general:
+  title:
+    name: Deployment title
+    value: ''
+    description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
+
+  desc:
+    name: Deployment description
+    value: ''
+    description: Provide some additional extended information about this deployment.
+
+llm:
+  type:
+    name: Deployment type
+    value: 'both'
+    description: Sub-components to deploy.
+    options: ['both', 'vllm', 'open-webui']
+
+  model_id:
+    name: LLM modelname
+    value: ''
+    description: Large Language Model to use (retrieve from Huggingface).
+    options: []
+
+  ui_password:
+    name: Open WebUI password
+    value: ''
+    description: Admin password for Open WebUI
+
+  HF_token:
+    name: Huggingface token
+    value: ''
+    description: Needed for the deployment of some gated models.
+
+  openai_api_key:
+    name: OpenAI API key
+    value: ''
+    description: Needed when deploying Open WebUI as standalone.
+
+  openai_api_url:
+    name: OpenAI API base url
+    value: ''
+    description: Needed when deploying Open WebUI as standalone.
