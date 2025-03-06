@@ -9,6 +9,9 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
+gpu_specs = {}
+
+
 def get_config(
     self,
     item_name: str,
@@ -64,10 +67,39 @@ def get_config(
         vo=vo,
     )
 
+    # Modify default hardware value with user preferences, as long as they are within
+    # the allowed limits
+    resources = metadata.get("resources", {}).get("inference", {})
+    meta2conf = {
+        "cpu": "cpu_num",
+        "gpu": "gpu_num",
+        "memory_MB": "ram",
+        "storage_MB": "disk",
+    }
+    for k, v in meta2conf.items():
+        if resources.get(k):
+            conf["hardware"]["value"] = min(
+                resources[k], conf["hardware"][v]["range"][1]
+            )
+
     # Fill with available GPU models in the cluster
-    models = nomad.common.get_gpu_models(vo)
-    if models:
-        conf["hardware"]["gpu_type"]["options"] += models
+    # Additionally filter out models that do not meet user requirements
+    nomad_models = nomad.common.get_gpu_models(vo)
+    models = []
+    for m in nomad_models:
+        if m not in gpu_specs.keys():
+            print(f"Nomad model not found in PAPI GPU specs table: {m}")
+            continue
+        if (r := resources.get("gpu_memory_MB")) and r > gpu_specs[m]["memory_MB"]:
+            continue
+        if (r := resources.get("gpu_compute_capability")) and (
+            r > gpu_specs[m]["compute_capability"]
+        ):
+            continue
+        models.append(m)
+    conf["hardware"]["gpu_type"]["options"] += models
+
+    # TODO: add a warning message in case requirements could not be met by the Platform
 
     return conf
 
