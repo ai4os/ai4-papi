@@ -232,7 +232,7 @@ def create_deployment(
         )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
-    job_uuid = uuid.uuid1()
+    job_uuid = str(uuid.uuid1())
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
     if vo == "training.egi.eu":
@@ -404,7 +404,7 @@ def create_deployment(
                 "NVFL_USERNAME": user_conf["nvflare"]["username"],
                 "NVFL_PASSWORD": user_conf["nvflare"]["password"],
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
-                "NVFL_SHORTNAME": user_conf["general"]["title"][:12],
+                "NVFL_SHORTNAME": job_uuid[:16],
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
                 "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
                 "NVFL_END_DATE": user_conf["nvflare"]["end_date"],

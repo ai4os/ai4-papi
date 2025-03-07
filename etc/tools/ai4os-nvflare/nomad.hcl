@@ -22,7 +22,7 @@ job "tool-nvflare-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
-    meta_domain = "${meta.domain}"
+    meta_domain = "${meta.domain}"  # needed in the template (NOMAD_META_meta_domain)
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -114,8 +114,8 @@ job "tool-nvflare-${JOB_UUID}" {
       tags = [
         "traefik.enable=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls=true",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",  #TODO: check Stefan
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl", #TODO: check Stefan
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
@@ -163,7 +163,7 @@ job "tool-nvflare-${JOB_UUID}" {
         NVFL_HA_MODE="False"
         NVFL_OVERSEER=""
         NVFL_SERVER2=""
-        NVFL_PROJECT_SHORT_NAME="${NVFL_SHORTNAME}"
+        NVFL_PROJECT_SHORT_NAME="${NVFL_SHORTNAME}"  # this cannot be an empty string, otherwise the job fails
         NVFL_PROJECT_TITLE="${TITLE}"
         NVFL_PROJECT_DESCRIPTION="${DESCRIPTION}"
         NVFL_PROJECT_APP_LOCATION="${NVFL_APP_LOCATION}"
