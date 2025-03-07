@@ -383,6 +383,13 @@ def create_deployment(
 
     # Deploy an NVFlare Federated server and Dashboard
     elif tool_name == "ai4os-nvflare":
+        # Enforce having NVFLARE credentials
+        if not (user_conf["nvflare"]["username"] and user_conf["nvflare"]["password"]):
+            raise HTTPException(
+                status_code=400,
+                detail="You must provide credentials for NVFLARE.",
+            )
+
         # Replace the Nomad job template
         nomad_conf = nomad_conf.safe_substitute(
             {
