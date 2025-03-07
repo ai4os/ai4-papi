@@ -22,6 +22,7 @@ job "tool-nvflare-${JOB_UUID}" {
     owner_email = "${OWNER_EMAIL}"
     title       = "${TITLE}"
     description = "${DESCRIPTION}"
+    meta_domain = "${meta.domain}"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -188,6 +189,7 @@ job "tool-nvflare-${JOB_UUID}" {
         sleep_time=10
         retries=10
         fl_server_dir=''
+        nvfl_dashboard_url="https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}"
         while [[ $retries > 0 ]]; do
           # 1) login to the dashboard
           resp=$( \
@@ -196,7 +198,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -L \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_USERNAME}'", "password": "'${NVFL_PASSWORD}'"}' \
-              https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/login \
+              ${nvfl_dashboard_url}/api/v1/login \
           )
           status=$(jq -r ".status" <<<"$resp")
           if [ "$status" != "ok" ]; then
@@ -217,7 +219,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -H 'Authorization: Bearer '$access_token \
               -H 'Content-type: application/json' \
               -d '{"pin":"'$PIN'"}' \
-              https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/servers/1/blob \
+              ${nvfl_dashboard_url}/api/v1/servers/1/blob \
           )
           filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
           if [ ! -f $filename ]; then
