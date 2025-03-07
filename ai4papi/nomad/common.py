@@ -124,12 +124,20 @@ def get_deployment(
         label = s["PortLabel"]
 
         # Iterate through tags to find `Host` tag
+        url = "missing-endpoint"
         for t in s["Tags"]:
-            try:
-                url = re.search(r"Host\(`(.+?)`", t).group(1)
+            patterns = [
+                r"Host\(`(.+?)`",
+                r"HostSNI\(`(.+?)`",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, t)
+                if match:
+                    url = match.group(1)
+                    break
+
+            if url != "missing-endpoint":
                 break
-            except Exception:
-                url = "missing-endpoint"
 
         # Old deployments had network ports with names [deepaas, ide, monitor]
         # instead of [api, ide, monitor] so we have to manually replace them
