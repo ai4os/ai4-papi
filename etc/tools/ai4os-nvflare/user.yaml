@@ -45,6 +45,12 @@ nvflare:
     options: [False, True]
     description: If the project is public, user sign-up is enabled. Otherwise the admin enables the users.
 
+  frozen_project:
+    name: Freeze the NVFLARE configuration
+    value: False
+    options: [False, True]
+    description: Forbid changing the configuration parameters after the project has been created.
+
   starting_date:
     name: NVFlare project start date
     value: ''

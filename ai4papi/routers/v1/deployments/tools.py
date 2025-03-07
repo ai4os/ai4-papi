@@ -415,6 +415,7 @@ def create_deployment(
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
                 "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
                 "NVFL_END_DATE": user_conf["nvflare"]["end_date"],
+                "NVFL_FROZEN_PROJECT": user_conf["nvflare"]["frozen_project"],
                 "NVFL_PUBLIC_PROJECT": user_conf["nvflare"]["public_project"],
             }
         )
