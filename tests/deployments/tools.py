@@ -46,6 +46,12 @@ tools_config = {
             "ui_password": "papi-test",
         },
     },
+    "ai4os-nvflare": {
+        "nvflare": {
+            "username": "mock_user",
+            "password": "mock_password",
+        },
+    },
 }
 
 for tname, tconfig in tools_config.items():
