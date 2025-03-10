@@ -73,6 +73,7 @@ for tname, tconfig in tools_config.items():
     assert "job_ID" in rdep.keys()
     assert rdep["job_ID"] == rcreate["job_ID"]
     assert rdep["status"] != "error"
+    assert rdep["tool_name"]
 
     # Retrieve all tools
     rdeps = tools.get_deployments(
