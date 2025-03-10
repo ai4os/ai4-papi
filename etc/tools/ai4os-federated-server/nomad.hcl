@@ -159,6 +159,7 @@ job "tool-fl-${JOB_UUID}" {
         NOISE_MULT                      = "${NOISE_MULT}"
         SAMPLED_CLIENTS                 = "${SAMPLED_CLIENTS}"
         CLIP_NORM                       = "${CLIP_NORM}"
+        CODE_CARBON                     = "${CODE_CARBON}"
       }
 
       resources {
