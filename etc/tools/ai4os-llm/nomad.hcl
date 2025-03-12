@@ -136,7 +136,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       resources {
-        cores  = 2
+        cores  = 8
         memory = 16000
 
         device "gpu" {
