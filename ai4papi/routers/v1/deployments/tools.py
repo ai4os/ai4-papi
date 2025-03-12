@@ -466,7 +466,7 @@ def create_deployment(
             exclude_tasks = ["open-webui", "create-admin"]
             exclude_services = ["ui"]
         elif user_conf["llm"]["type"] == "open-webui":
-            exclude_tasks = ["vllm"]
+            exclude_tasks = ["vllm", "check_vllm_startup"]
             exclude_services = ["vllm"]
         else:
             exclude_tasks, exclude_services = [], []

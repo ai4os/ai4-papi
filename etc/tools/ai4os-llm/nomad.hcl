@@ -116,6 +116,11 @@ job "tool-llm-${JOB_UUID}" {
 
     task "vllm" {
 
+      lifecycle {
+        hook    = "prestart"
+        sidecar = true
+      }
+
       driver = "docker"
 
       config {
@@ -131,7 +136,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       resources {
-        cores  = 8
+        cores  = 2
         memory = 16000
 
         device "gpu" {
@@ -148,6 +153,68 @@ job "tool-llm-${JOB_UUID}" {
       }
 
     }
+
+    task "check_vllm_startup" {
+          
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "python:slim-bullseye"
+        command    = "bash"
+        args       = ["local/get_models.sh"]
+      }
+
+      env {
+        VLLM_ENDPOINT = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1/models"
+        TOKEN = "${API_TOKEN}"
+      }
+
+      template {
+        data = <<-EOF
+        #!/bin/bash
+
+        pip install requests
+
+        python -c '
+        import requests
+        import os
+        import time
+
+        VLLM_ENDPOINT = os.environ["VLLM_ENDPOINT"]
+        TOKEN = os.environ["TOKEN"]
+
+        headers = {
+            "Authorization": f"Bearer {TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        attempts = 0
+        delay = 2
+
+        while True:
+            response = requests.get(VLLM_ENDPOINT, headers=headers)
+            if response.status_code == 200:
+                exit(0)
+            else:
+                attempts += 1
+                print(f"Attempt {attempts}")
+                time.sleep(delay)
+        '
+        EOF
+        destination = "local/get_models.sh"
+      }
+
+      resources {
+        cores = 2
+        memory = 256
+      }
+    }   
 
     task "open-webui" {
 
