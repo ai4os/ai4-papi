@@ -31,7 +31,7 @@ def check_jobwise(
 
     # Compare with user options
     user_conf = conf["hardware"]
-    for k in ref.keys():
+    for k in (k for k in ref.keys() if k in user_conf.keys()):
         if "range" in ref[k].keys():
             if user_conf[k] < ref[k]["range"][0]:
                 raise HTTPException(
