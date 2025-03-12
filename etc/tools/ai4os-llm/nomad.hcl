@@ -136,7 +136,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       resources {
-        cores  = 8
+        cores  = 4
         memory = 16000
 
         device "gpu" {
@@ -155,7 +155,7 @@ job "tool-llm-${JOB_UUID}" {
     }
 
     task "check_vllm_startup" {
-          
+
       lifecycle {
         hook    = "prestart"
         sidecar = false
@@ -199,7 +199,7 @@ job "tool-llm-${JOB_UUID}" {
 
         with requests.Session() as session:
             session.headers.update(headers)
-            
+
             while True:
                 response = session.get(VLLM_ENDPOINT)
                 if response.ok:
@@ -214,7 +214,7 @@ job "tool-llm-${JOB_UUID}" {
         EOF
         destination = "local/get_models.sh"
       }
-    }   
+    }
 
     task "open-webui" {
 
@@ -234,7 +234,7 @@ job "tool-llm-${JOB_UUID}" {
 
       resources {  # UI needs a fair amount of resources because it's also doing RAG
         cores  = 4
-        memory = 8000
+        memory = 16000
      }
    }
 
