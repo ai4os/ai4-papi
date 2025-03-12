@@ -209,11 +209,6 @@ job "tool-llm-${JOB_UUID}" {
         EOF
         destination = "local/get_models.sh"
       }
-
-      resources {
-        cores = 2
-        memory = 256
-      }
     }   
 
     task "open-webui" {
