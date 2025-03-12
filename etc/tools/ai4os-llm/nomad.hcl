@@ -202,11 +202,13 @@ job "tool-llm-${JOB_UUID}" {
             
             while True:
                 response = session.get(VLLM_ENDPOINT)
-                if response.status_code == 200:
+                if response.ok:
+                    print(f"Success | Status code: {response.status_code}")
+                    print(f"{response.text}")
                     exit(0)
                 else:
                     attempts += 1
-                    print(f"Attempt {attempts}")
+                    print(f"Attempt nº {attempts} | Status code: {response.status_code}")
                     time.sleep(delay)
         '
         EOF
