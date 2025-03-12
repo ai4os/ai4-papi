@@ -197,14 +197,17 @@ job "tool-llm-${JOB_UUID}" {
         attempts = 0
         delay = 2
 
-        while True:
-            response = requests.get(VLLM_ENDPOINT, headers=headers)
-            if response.status_code == 200:
-                exit(0)
-            else:
-                attempts += 1
-                print(f"Attempt {attempts}")
-                time.sleep(delay)
+        with requests.Session() as session:
+            session.headers.update(headers)
+            
+            while True:
+                response = session.get(VLLM_ENDPOINT)
+                if response.status_code == 200:
+                    exit(0)
+                else:
+                    attempts += 1
+                    print(f"Attempt {attempts}")
+                    time.sleep(delay)
         '
         EOF
         destination = "local/get_models.sh"
