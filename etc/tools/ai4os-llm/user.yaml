@@ -20,14 +20,13 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
-llm:
   type:
     name: Deployment type
     value: 'both'
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-  model_id:
+  vllm_model_id:
     name: LLM modelname
     value: ''
     description: Large Language Model to use (retrieve from Huggingface).
