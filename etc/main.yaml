@@ -17,8 +17,7 @@ auth:
 
     - https://ai4life.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
-    - https://dashboard-ai4eosc-nomad.placeholder-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
-    # - https://dashboard-ai4eosc-nomad.ifca-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
+    - https://dashboard-ai4eosc-nomad.placeholder-deployments.cloud.ai4eosc.eu  # Deploy API as Nomad job
     - http://localhost:8080
 
   OP:  # OIDC providers
