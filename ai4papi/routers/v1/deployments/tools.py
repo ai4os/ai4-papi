@@ -244,7 +244,6 @@ def create_deployment(
         # Create a Vault token so that the deployment can access the Federated secret
         vault_token = ai4secrets.create_vault_token(
             jwt=authorization.credentials,
-            issuer=auth_info["issuer"],
             ttl="365d",  # 1 year expiration date
         )
 
