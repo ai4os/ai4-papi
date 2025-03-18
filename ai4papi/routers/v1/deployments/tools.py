@@ -290,9 +290,7 @@ def create_deployment(
                 "VAULT_TOKEN": vault_token,
                 "FEDERATED_ROUNDS": user_conf["flower"]["rounds"],
                 "FEDERATED_METRIC": user_conf["flower"]["metric"],
-                "FEDERATED_MIN_FIT_CLIENTS": user_conf["flower"][
-                    "min_fit_clients"
-                ],
+                "FEDERATED_MIN_FIT_CLIENTS": user_conf["flower"]["min_fit_clients"],
                 "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["flower"][
                     "min_available_clients"
                 ],
