@@ -69,6 +69,13 @@ def get_user_info(token):
                 detail=f"You token should have scopes for {k}.",
             )
 
+    # Check audiences (needed for Vault)
+    if "account" not in user_infos.get("aud"):
+        raise HTTPException(
+            status_code=401,
+            detail="You token should have 'account' in audiences.",
+        )
+
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
         "issuer": user_infos.get("iss"),  # URL of the access token issuer
