@@ -28,7 +28,7 @@ general:
 
   vllm_model_id:
     name: LLM modelname
-    value: ''
+    value: 'Qwen2.5-7B-Instruct-AWQ'
     description: Large Language Model to use (retrieve from Huggingface).
     options: []
 
