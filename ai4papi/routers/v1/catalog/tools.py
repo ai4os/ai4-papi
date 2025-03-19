@@ -3,6 +3,7 @@ import types
 
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
+import natsort
 
 from ai4papi import quotas, utils, nomad
 import ai4papi.conf as papiconf
@@ -53,6 +54,14 @@ def get_config(
 
         # Retrieve Docker tags
         tags = retrieve_docker_tags(image=image, repo=repo)
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
+
+    if item_name == "ai4os-dev-env":
+        # For dev-env, order the tags in "Z-A" order instead of "newest"
+        # This is done because builds are done in parallel, so "newest" is meaningless
+        # (Z-A + natsort) allows to show more recent semver first
+        tags = natsort.natsorted(tags)[::-1]
         conf["general"]["docker_tag"]["options"] = tags
         conf["general"]["docker_tag"]["value"] = tags[0]
 

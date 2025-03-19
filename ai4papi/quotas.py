@@ -47,7 +47,7 @@ def check_jobwise(
 
 def check_userwise(
     conf: dict,
-    deployments: dict,
+    deployments: list,
 ):
     """
     Check the job configuration does not overflow the generic hardware limits.

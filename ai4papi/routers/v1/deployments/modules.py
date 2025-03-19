@@ -13,6 +13,7 @@ import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
+from ai4papi.routers.v1 import deployments as ai4_deployments
 
 
 router = APIRouter(
@@ -194,8 +195,15 @@ def create_deployment(
         vo=vo,
     )
 
-    # Check if the provided configuration is within the user quotas
-    deployments = get_deployments(
+    # Check if requested hardware is within the user total quota (summing modules and
+    # tools)
+    modules_deps = get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    tools_deps = ai4_deployments.tools.get_deployments(
         vos=[vo],
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
@@ -203,7 +211,7 @@ def create_deployment(
     )
     quotas.check_userwise(
         conf=user_conf,
-        deployments=deployments,
+        deployments=modules_deps + tools_deps,
     )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -218,14 +226,21 @@ def create_deployment(
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
     # Retrieve MLflow credentials
-    secrets = ai4secrets.get_secrets(
+    user_secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath="/services",
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials,
         ),
     )
-    mlflow_credentials = secrets.get("/services/mlflow/credentials", {})
+    mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
+
+    # Check IDE password length
+    if len(user_conf["general"]["jupyter_password"]) < 9:
+        raise HTTPException(
+            status_code=400,
+            detail="Your IDE needs a password of at least 9 characters.",
+        )
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
