@@ -52,7 +52,7 @@ def get_user_info(token):
     # projects that enabled the user into that access level.
     # eg. {"platform-access": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
     groups = {}
-    for i in user_infos.get("groups", []):
+    for i in user_infos.get("realm_access", {}).get("roles", []):
         i = i.split(":")
         access = i[0]  # eg. "platform-access"
         project = i[1] if len(i) > 1 else None  # eg. "vo.ai4eosc.eu"
