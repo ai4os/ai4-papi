@@ -9,9 +9,7 @@
 #  options: restricted set of values that the parameter can take (optional)
 #  description: some comments on the parameter to be displayed to the end user (optional)
 
-
 general:
-
   title:
     name: Deployment title
     value: ''
@@ -23,7 +21,6 @@ general:
     description: Provide some additional extended information about this deployment.
 
 nvflare:
-
   username:
     name: NVFlare Dashboard username
     value: ''
@@ -54,12 +51,12 @@ nvflare:
   starting_date:
     name: NVFlare project start date
     value: ''
-    description: NVFlare project start date
+    description: NVFlare project start date (DD/MM/YY)
 
   end_date:
     name: NVFlare project end date
     value: ''
-    description: NVFlare project end date
+    description: NVFlare project end date (DD/MM/YY)
 
 hardware:
   cpu_num:
