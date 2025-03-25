@@ -260,7 +260,7 @@ job "tool-llm-${JOB_UUID}" {
       env {
         OPEN_WEBUI_URL = "https://ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}"
         NAME           = "${OWNER_NAME}"
-        EMAIL          = "${OWNER_EMAIL}"
+        EMAIL          = "${OPEN_WEBUI_USERNAME}"
         PASSWORD       = "${OPEN_WEBUI_PASSWORD}"
       }
 
