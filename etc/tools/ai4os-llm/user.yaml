@@ -27,9 +27,9 @@ llm:
     description: Sub-components to deploy.
     options: ['both', 'vllm', 'open-webui']
 
-  model_id:
+  vllm_model_id:
     name: LLM modelname
-    value: ''
+    value: 'Qwen2.5-7B-Instruct-AWQ'
     description: Large Language Model to use (retrieve from Huggingface).
     options: []
 
