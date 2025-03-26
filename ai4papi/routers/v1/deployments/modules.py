@@ -1,6 +1,7 @@
 from copy import deepcopy
 import datetime
 import os
+import subprocess
 import types
 from typing import Tuple, Union
 import uuid
@@ -325,6 +326,15 @@ def create_deployment(
     if not all(rclone.values()):
         exclude_tasks = ["storage_mount", "storage_cleanup", "dataset_download"]
     else:
+        # Obscure rclone password on behalf of user
+        obscured = subprocess.run(
+            [f"rclone obscure {user_conf['storage']['rclone_password']}"],
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
+
         # If datasets provided, replicate 'dataset_download' task as many times as needed
         if user_conf["storage"]["datasets"]:
             download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]
