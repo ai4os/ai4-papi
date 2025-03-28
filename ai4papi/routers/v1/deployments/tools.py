@@ -400,6 +400,12 @@ def create_deployment(
             api_endpoint = user_conf["llm"]["openai_api_url"]
 
         if user_conf["llm"]["type"] in ["openwebui", "both"]:
+            # Check if user has provided a username
+            if not user_conf["llm"]["ui_username"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="A username is required to deploy this tool.",
+                )
             # Check if user has provided a password
             if not user_conf["llm"]["ui_password"]:
                 raise HTTPException(
@@ -454,6 +460,7 @@ def create_deployment(
                 "API_TOKEN": api_token,
                 "API_ENDPOINT": api_endpoint,
                 "HUGGINGFACE_TOKEN": user_conf["llm"]["HF_token"],
+                "OPEN_WEBUI_USERNAME": user_conf["llm"]["ui_username"],
                 "OPEN_WEBUI_PASSWORD": user_conf["llm"]["ui_password"],
             }
         )
