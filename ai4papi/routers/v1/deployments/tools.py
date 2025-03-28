@@ -88,6 +88,20 @@ def get_deployments(
 
     return sorted_jobs
 
+def remove_job_endpoints(
+    job,
+    endpoints=[]
+):
+    """ Remove useless endpoints (they all point to same url)
+    """
+    job["endpoints"] = {
+        k: v for k, v in job["endpoints"].items() if k not in endpoints
+    }
+    if job["active_endpoints"]:
+        job["active_endpoints"] = [
+            k for k in job["active_endpoints"] if k not in endpoints
+        ]
+    return job
 
 @router.get("/{deployment_uuid}")
 def get_deployment(
@@ -138,15 +152,7 @@ def get_deployment(
 
     # Additional checks
     if tool_id == "ai4os-cvat":
-        # Remove useless endpoints (they all point to same url)
-        ignore = ["server", "grafana"]
-        job["endpoints"] = {
-            k: v for k, v in job["endpoints"].items() if k not in ignore
-        }
-        if job["active_endpoints"]:
-            job["active_endpoints"] = [
-                k for k in job["active_endpoints"] if k not in ignore
-            ]
+        job = remove_job_endpoints(job, endpoints = ["server", "grafana"])
 
     if tool_id == "ai4os-ai4life-loader":
         job["main_endpoint"] = "ui"  # instead of deepaas
@@ -205,6 +211,11 @@ def create_deployment(
             submitted=conf,
             reference=user_conf,
         )
+
+    # NVIDIA Flare
+    # use the value of nvfl_dashboard_project_app_location for the docker_image parameter
+    if tool_name == "ai4os-nvflare" and "docker_image" not in user_conf["general"]:
+        user_conf["general"]["docker_image"] = user_conf["general"]["nvfl_dashboard_project_app_location"]
 
     # Utils validate conf
     user_conf = utils.validate_conf(user_conf)
@@ -361,6 +372,54 @@ def create_deployment(
                 "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
                 "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
                 "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+    # Deploy an NVFlare Federated server and Dashboard
+    elif tool_name == "ai4os-nvflare":
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],  # keep only 45 first characters
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],  # limit to 1K characters
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "NVFL_VERSION": user_conf["general"]["nvfl_version"],
+                "NVFL_SERVER_JUPYTER_PASSWORD": user_conf["general"]["nvfl_server_jupyter_password"],
+                "NVFL_DASHBOARD_USERNAME": user_conf["general"]["nvfl_dashboard_username"],
+                "NVFL_DASHBOARD_PASSWORD": user_conf["general"]["nvfl_dashboard_password"],
+                "NVFL_DASHBOARD_SERVER_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
+                "NVFL_DASHBOARD_SERVER_HA_MODE": False,
+                "NVFL_DASHBOARD_SERVER_OVERSEER": "",
+                "NVFL_DASHBOARD_SERVER_SERVER2": "",
+                "NVFL_DASHBOARD_PROJECT_SHORT_NAME": user_conf["general"]["nvfl_dashboard_project_short_name"],
+                "NVFL_DASHBOARD_PROJECT_TITLE": user_conf["general"]["nvfl_dashboard_project_title"],
+                "NVFL_DASHBOARD_PROJECT_DESCRIPTION": user_conf["general"]["nvfl_dashboard_project_description"],
+                "NVFL_DASHBOARD_PROJECT_APP_LOCATION": user_conf["general"]["nvfl_dashboard_project_app_location"],
+                "NVFL_DASHBOARD_PROJECT_STARTING_DATE": user_conf["general"]["nvfl_dashboard_project_starting_date"],
+                "NVFL_DASHBOARD_PROJECT_END_DATE": user_conf["general"]["nvfl_dashboard_project_end_date"],
+                "NVFL_DASHBOARD_PROJECT_PUBLIC": user_conf["general"]["nvfl_dashboard_project_public"],
+                "NVFL_DASHBOARD_PROJECT_FROZEN": user_conf["general"]["nvfl_dashboard_project_frozen"],
+                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
+                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
+                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
+                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
+                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+                "RCLONE_REMOTE_PATH": user_conf["storage"]["rclone_remote_path"]
             }
         )
 
