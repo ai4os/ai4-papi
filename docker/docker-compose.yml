@@ -12,11 +12,14 @@ services:
             - PAPI_GITHUB_TOKEN=************************
             - MAILING_TOKEN=****************************
             - HARBOR_ROBOT_PASSWORD=********************
+            - PAPI_JENKINS_TOKEN=***********************
+            - PAPI_PROVENANCE_TOKEN=********************
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting
         ports:
             - 8080:80
+
 
     ai4-papi-dev:
         image: "registry.services.ai4os.eu/ai4os/ai4-papi:dev"
@@ -28,6 +31,8 @@ services:
             - PAPI_GITHUB_TOKEN=************************
             - MAILING_TOKEN=****************************
             - HARBOR_ROBOT_PASSWORD=********************
+            - PAPI_JENKINS_TOKEN=***********************
+            - PAPI_PROVENANCE_TOKEN=********************
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting

@@ -1,0 +1,64 @@
+---
+# User customizable configuration to make a deployment in Nomad.
+# Additional non-customizable values (eg. ports) are hardcoded in `job.nomad`.
+
+# All conf parameters follow the same structure:
+# varname:
+#  name: name of the parameter to be displayed to end user (mandatory)
+#  value: (default) value of the parameter (mandatory)
+#  options: restricted set of values that the parameter can take (optional)
+#  description: some comments on the parameter to be displayed to the end user (optional)
+
+# CPU/RAM limits are based on the current have GPU flavours we (IFCA) have deployed:
+# * g13-gpuib-8-86:
+#     - 8 GPUs Nvidia Tesla T4
+#     - 86 VCPUs --> ~9.6 cores / gpu (reserving 10% for the node)
+#     - 351 GB RAM --> ~40 GB / gpu (reserving 10% for the node)
+# * g12-gpuib-2-64:
+#     - 2 GPUs Nvidia Tesla V100
+#     - 64 VCPUs --> ~28 cores / gpu (reserving 10% for the node)
+#     - 127 GB RAM --> ~57 GB / gpu (reserving 10% for the node)
+
+general:
+  title:
+    name: Deployment title
+    value: ''
+    description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
+
+  desc:
+    name: Deployment description
+    value: ''
+    description: Provide some additional extended information about this deployment.
+
+  model_id:
+    name: AI4Life model ID
+    value: ''
+    description: AI4Life model ID.
+    options: []
+
+hardware:
+  cpu_num:
+    name: Number of CPUs
+    value: 4
+    range: [1, 10]
+
+  gpu_num:
+    name: Number of GPUs
+    value: 0
+    range: [0, 1]
+
+  gpu_type:
+    name: GPU model
+    value: ''
+    options: ['']
+    description: Fill this field only if you have a *hard* requirement for a given kind of GPU model.
+
+  ram:
+    name: RAM memory (in MB)
+    value: 8000
+    range: [2000, 40000]
+
+  disk:
+    name: Disk memory (in MB)
+    value: 10000
+    range: [1000, 50000]

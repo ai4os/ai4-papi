@@ -63,6 +63,17 @@ oscar:
       endpoint:  https://inference-walton.cloud.imagine-ai.eu
       cluster_id: oscar-imagine-cluster
 
+    vo.ai4life.eu:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
+
     training.egi.eu:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
+
+mlflow:
+
+    vo.ai4eosc.eu: https://mlflow.cloud.ai4eosc.eu/
+    vo.imagine-ai.eu: https://mlflow.cloud.imagine-ai.eu/
+    vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
+    training.egi.eu: https://mlflow.cloud.ai4eosc.eu/

@@ -65,8 +65,8 @@ job "module-${JOB_UUID}" {
     weight    = 100
   }
 
-  # Avoid rescheduling the job on **other** nodes during a network cut
-  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
+  # Avoid rescheduling the job if the job fails the first time
+  # This is done to avoid confusing users with cyclic job statuses
   reschedule {
     attempts  = 0
     unlimited = false
@@ -74,12 +74,11 @@ job "module-${JOB_UUID}" {
 
   group "usergroup" {
 
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
+    # Avoid rescheduling the job when the node fails:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
 
     network {
 
@@ -91,6 +90,12 @@ job "module-${JOB_UUID}" {
       }
       port "ide" {
         to = 8888
+      }
+      port "ui" {
+        to = 80
+      }
+      port "custom" {
+        to = 80
       }
     }
 
@@ -121,6 +126,26 @@ job "module-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ide.tls=true",
         "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+      ]
+    }
+
+    service {
+      name = "${JOB_UUID}-ui"
+      port = "ui"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+      ]
+    }
+
+    service {
+      name = "${JOB_UUID}-custom"
+      port = "custom"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-custom.tls=true",
+        "traefik.http.routers.${JOB_UUID}-custom.rule=Host(`custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -203,6 +228,7 @@ job "module-${JOB_UUID}" {
       driver = "docker"
 
       config {
+        force_pull = true
         image = "registry.services.ai4os.eu/ai4os/docker-mail:client"
       }
 
@@ -235,7 +261,7 @@ job "module-${JOB_UUID}" {
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         command    = "deep-start"
         args       = ["--${SERVICE}"]
-        ports      = ["api", "monitor", "ide"]
+        ports      = ["api", "monitor", "ide", "custom"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         volumes    = [
@@ -244,6 +270,13 @@ job "module-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
+
+        # # This will be added later on, if the job is meant to be deployed in Harbor
+        # auth {
+        #   username = "harbor_user"
+        #   password = "harbor_password"
+        # }
+
       }
 
       env {
@@ -254,6 +287,9 @@ job "module-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${RCLONE_CONFIG_RSHARE_PASS}"
+        MLFLOW_TRACKING_URI         = "${MLFLOW_URI}"
+        MLFLOW_TRACKING_USERNAME    = "${MLFLOW_USERNAME}"
+        MLFLOW_TRACKING_PASSWORD    = "${MLFLOW_PASSWORD}"
       }
 
       resources {
@@ -273,6 +309,43 @@ job "module-${JOB_UUID}" {
 
         }
       }
+    }
+
+    task "ui" { # DEEPaaS UI (Gradio)
+
+      # Run as post-start to make sure DEEPaaS up before launching the UI
+      lifecycle {
+        hook    = "poststart"
+        sidecar = true
+      }
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui:latest"
+        ports      = ["ui"]
+        shm_size   = 250000000   # 250MB
+        memory_hard_limit = 500  # MB
+      }
+
+      env {
+        DURATION = "10000d"  # do not kill UI (duration = 10K days)
+        UI_PORT  = 80
+      }
+
+      resources {
+        cpu        = 500  # MHz
+        memory     = 500  # MB
+        memory_max = 500  # MB
+      }
+
+      # Do not try to restart a try-me job if it raises error (module incompatible with Gradio UI)
+      restart {
+        attempts = 0
+        mode     = "fail"
+      }
+
     }
 
     task "storage_cleanup" {

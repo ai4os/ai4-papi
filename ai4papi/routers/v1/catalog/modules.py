@@ -13,26 +13,26 @@ def get_config(
     self,
     item_name: str,
     vo: str,
-    ):
+):
     # Check if module exists
     modules = self.get_items()
     if item_name not in modules.keys():
         raise HTTPException(
             status_code=400,
             detail=f"{item_name} is not an available module.",
-            )
+        )
 
     # Retrieve module configuration
-    conf = deepcopy(papiconf.MODULES['user']['full'])
+    conf = deepcopy(papiconf.MODULES["user"]["full"])
 
     # Retrieve module metadata
     metadata = self.get_metadata(item_name)
 
     # Parse docker registry
-    registry = metadata['links']['docker_image']
-    repo, image = registry.split('/')[-2:]
-    if repo not in ['deephdc', 'ai4oshub']:
-        repo = 'ai4oshub'
+    registry = metadata["links"]["docker_image"]
+    repo, image = registry.split("/")[-2:]
+    if repo not in ["deephdc", "ai4oshub"]:
+        repo = "ai4oshub"
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
@@ -43,7 +43,7 @@ def get_config(
     conf["general"]["docker_tag"]["value"] = tags[0]
 
     # Custom conf for development environment
-    if item_name == 'ai4os-dev-env':
+    if item_name == "ai4os-dev-env":
         # For dev-env, order the tags in "Z-A" order instead of "newest"
         # This is done because builds are done in parallel, so "newest" is meaningless
         # (Z-A + natsort) allows to show more recent semver first
@@ -52,12 +52,14 @@ def get_config(
         conf["general"]["docker_tag"]["value"] = tags[0]
 
         # Use VS Code (Coder OSS) in the development container
-        conf["general"]["service"]["value"] = 'vscode'
-        conf["general"]["service"]["options"].insert(0, 'vscode')
-        conf["general"]["service"]["options"].remove('deepaas')  # no models installed in dev
+        conf["general"]["service"]["value"] = "vscode"
+        conf["general"]["service"]["options"].insert(0, "vscode")
+        conf["general"]["service"]["options"].remove(
+            "deepaas"
+        )  # no models installed in dev
 
     # Modify the resources limits for a given user or VO
-    conf['hardware'] = quotas.limit_resources(
+    conf["hardware"] = quotas.limit_resources(
         item_name=item_name,
         vo=vo,
     )
@@ -71,7 +73,8 @@ def get_config(
 
 
 Modules = Catalog(
-    repo='ai4os-hub/modules-catalog',
+    repo="ai4os-hub/modules-catalog",
+    item_type="module",
 )
 Modules.get_config = types.MethodType(get_config, Modules)
 
@@ -85,25 +88,31 @@ router.add_api_route(
     "",
     Modules.get_filtered_list,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/detail",
     Modules.get_summary,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/tags",
     Modules.get_tags,
     methods=["GET"],
     deprecated=True,
-    )
+)
 router.add_api_route(
     "/{item_name}/metadata",
     Modules.get_metadata,
     methods=["GET"],
-    )
+)
 router.add_api_route(
     "/{item_name}/config",
     Modules.get_config,
     methods=["GET"],
-    )
+)
+
+router.add_api_route(
+    "/{item_name}/refresh",
+    Modules.refresh_metadata_cache_entry,
+    methods=["PUT"],
+)

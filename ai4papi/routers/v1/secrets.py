@@ -29,22 +29,22 @@ def vault_client(jwt, issuer):
     Common init steps of Vault client
     """
     # Check we are using EGI Check-In prod
-    if issuer != 'https://aai.egi.eu/auth/realms/egi':
+    if issuer != "https://aai.egi.eu/auth/realms/egi":
         raise HTTPException(
             status_code=400,
-            detail="Secrets are only compatible with EGI Check-In Production OIDC " \
-                   "provider.",
-            )
+            detail="Secrets are only compatible with EGI Check-In Production OIDC "
+            "provider.",
+        )
 
     # Init the Vault client
     client = hvac.Client(
         url=VAULT_ADDR,
-        )
+    )
     client.auth.jwt.jwt_login(
         role=VAULT_ROLE,
         jwt=jwt,
         path=VAULT_AUTH_PATH,
-        )
+    )
 
     return client
 
@@ -52,8 +52,8 @@ def vault_client(jwt, issuer):
 def create_vault_token(
     jwt,
     issuer,
-    ttl='1h',
-    ):
+    ttl="1h",
+):
     """
     Create a Vault token from a JWT.
 
@@ -70,7 +70,7 @@ def create_vault_token(
     # So instead of creating a child token, we have to *extend* login token.
     client.auth.token.renew_self(increment=ttl)
 
-    #TODO: for extra security we should only allow reading/listing from a given subpath.
+    # TODO: for extra security we should only allow reading/listing from a given subpath.
     # - Restrict to read/list can be done with user roles
     # - Restricting subpaths might not be done because policies are static (and
     #   deployment paths are dynamic). In addition only admins can create policies)
@@ -86,12 +86,11 @@ def recursive_path_builder(client, kv_list):
 
     # if any list items end in '/' return 1
     for li in kv_list[:]:
-        if li[-1] == '/':
+        if li[-1] == "/":
             r = client.secrets.kv.v1.list_secrets(
-                path=li,
-                mount_point=VAULT_MOUNT_POINT
+                path=li, mount_point=VAULT_MOUNT_POINT
             )
-            append_list = r['data']['keys']
+            append_list = r["data"]["keys"]
             for new_item in append_list:
                 kv_list.append(li + new_item)
             # remove list item ending in '/'
@@ -108,9 +107,9 @@ def recursive_path_builder(client, kv_list):
 @router.get("")
 def get_secrets(
     vo: str,
-    subpath: str = '',
+    subpath: str = "",
     authorization=Depends(security),
-    ):
+):
     """
     Returns a list of secrets belonging to a user.
 
@@ -123,28 +122,27 @@ def get_secrets(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Init the Vault client
     client = vault_client(
         jwt=authorization.credentials,
-        issuer=auth_info['issuer'],
+        issuer=auth_info["issuer"],
     )
 
     # Check subpath syntax
-    if not subpath.startswith('/'):
-        subpath = '/' + subpath
-    if not subpath.endswith('/'):
-        subpath += '/'
+    if not subpath.startswith("/"):
+        subpath = "/" + subpath
+    if not subpath.endswith("/"):
+        subpath += "/"
 
     # Retrieve initial level-0 secrets
     user_path = f"users/{auth_info['id']}/{vo}"
     try:
         r = client.secrets.kv.v1.list_secrets(
-            path = user_path + subpath,
-            mount_point=VAULT_MOUNT_POINT
+            path=user_path + subpath, mount_point=VAULT_MOUNT_POINT
         )
-        seed_list = r['data']['keys']
+        seed_list = r["data"]["keys"]
     except hvac.exceptions.InvalidPath:
         # InvalidPath is raised when there are no secrets available
         return {}
@@ -163,8 +161,8 @@ def get_secrets(
         )
 
         # Remove user-path prefix and save
-        secret_path = secret_path.replace(user_path, '')
-        out[secret_path] = r1['data']
+        secret_path = secret_path.replace(user_path, "")
+        out[secret_path] = r1["data"]
 
     return out
 
@@ -175,7 +173,7 @@ def create_secret(
     secret_path: str,
     secret_data: dict,
     authorization=Depends(security),
-    ):
+):
     """
     Creates a new secret or updates an existing one.
 
@@ -191,22 +189,22 @@ def create_secret(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Init the Vault client
     client = vault_client(
         jwt=authorization.credentials,
-        issuer=auth_info['issuer'],
+        issuer=auth_info["issuer"],
     )
 
     # Create secret
     client.secrets.kv.v1.create_or_update_secret(
         path=f"users/{auth_info['id']}/{vo}/{secret_path}",
-        mount_point='/secrets/',
+        mount_point="/secrets/",
         secret=secret_data,
     )
 
-    return {'status': 'success'}
+    return {"status": "success"}
 
 
 @router.delete("")
@@ -214,7 +212,7 @@ def delete_secret(
     vo: str,
     secret_path: str,
     authorization=Depends(security),
-    ):
+):
     """
     Delete a secret.
 
@@ -227,12 +225,12 @@ def delete_secret(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info['vos'])
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Init the Vault client
     client = vault_client(
         jwt=authorization.credentials,
-        issuer=auth_info['issuer'],
+        issuer=auth_info["issuer"],
     )
 
     # Delete secret
@@ -241,4 +239,4 @@ def delete_secret(
         mount_point=VAULT_MOUNT_POINT,
     )
 
-    return {'status': 'success'}
+    return {"status": "success"}

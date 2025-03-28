@@ -23,20 +23,12 @@ I also had to replace the following meta fields, otherwise when retrieving the
 job info the ${env_var} where not being replaced. I'm having to do something similar
 with ${meta.domain} but I don't want to extend it to env_vars just to support CVAT.
 
-To avoid too much disruption, I'm only changing this inside the service field
-- ${NOMAD_META_job_uuid} --> ${JOB_UUID}
-- ${NOMAD_META_cvat_hostname} --> ${meta.domain}-${BASE_DOMAIN}
-
-To avoid too much disruption, I'm only changing this in the "main" task (parameter `image`)
-- ${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom} --> registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS
+Do not use: image = "${NOMAD_META_cvat_server_image}" for the "main" task (i.e. cvat_server),
+otherwise the Dashboard will show that (unreplaced) variable in the Docker image field. To avoid disruption,
+exact values for all the image specifications is used instead of Nomad metadata.
 
 [1]: https://github.com/ai4os/ai4os-cvat/blob/v2.7.3-AI4OS/nomad/ai4-cvat.jobspec.nomad.hcl
 [2]: https://stackoverflow.com/a/56957750/18471590
-
-Note:
-In several part of the job we use the old name of the repo (ai4os/ai4-cvat) which
-should redirect fine to the new repo name (ai4os/ai4os-cvat)
-But it is important nevertheless to keep it in mind, just in case.
 
 */
 
@@ -58,25 +50,17 @@ job "tool-cvat-${JOB_UUID}" {
     # CVAT-specific metadata
     force_pull_img_cvat_server         = true
     force_pull_img_cvat_ui             = true
-    cvat_version                       = "v2.7.3"
-    cvat_version_custom                = "-AI4OS"
-    cvat_hostname                      = "${meta.domain}-${BASE_DOMAIN}"
-    job_uuid                           = "${JOB_UUID}"
     restore_from                       = "${RESTORE_FROM}"
     backup_name                        = "${BACKUP_NAME}"
+    cvat_allow_static_cache            = "no"
+    cvat_su_username                   = "${CVAT_USERNAME}"
+    cvat_su_password                   = "${CVAT_PASSWORD}"
 
-    grafana_clickhouse_plugin_version  = "3.3.0"
     smokescreen_opts                   = ""
-    clickhouse_image                   = "clickhouse/clickhouse-server:22.3-alpine"
-    db_image                           = "postgres:16.4-alpine"
-    grafana_image                      = "grafana/grafana-oss:9.3.6"
-    redis_image                        = "eqalpha/keydb:x86_64_v6.3.2"
-    ui_image                           = "registry.services.ai4os.eu/ai4os/ai4-cvat-ui"
-    opa_image                          = "openpolicyagent/opa:0.45.0-rootless"
-    vector_image                       = "timberio/vector:0.26.0-alpine"
-    server_image                       = "registry.services.ai4os.eu/ai4os/ai4-cvat-server"
-    su_username                        = "${CVAT_USERNAME}"
-    su_password                        = "${CVAT_PASSWORD}"
+
+    clickhouse_db                      = "cvat"
+    clickhouse_user                    = "user"
+    clickhouse_password                = "user"
 
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
     RCLONE_CONFIG_RSHARE_TYPE          = "webdav"
@@ -130,8 +114,8 @@ job "tool-cvat-${JOB_UUID}" {
     weight    = 50
   }
 
-  # Avoid rescheduling the job on **other** nodes during a network cut
-  # Command not working due to https://github.com/hashicorp/nomad/issues/16515
+  # Avoid rescheduling the job if the job fails the first time
+  # This is done to avoid confusing users with cyclic job statuses
   reschedule {
     attempts  = 0
     unlimited = false
@@ -139,15 +123,14 @@ job "tool-cvat-${JOB_UUID}" {
 
   group "usergroup" {
 
-    # Recover the job in the **original** node when the network comes back
-    # (after a network cut).
-    # If network cut lasts more than 10 days (240 hrs), job is restarted anyways.
-    # Do not increase too much this limit because we want to still be able to notice
-    # when nodes are truly removed from the cluster (not just temporarily lost).
-    max_client_disconnect = "240h"
+    # Avoid rescheduling the job when the node fails:
+    # * if the node is lost for good, you would need to manually redeploy,
+    # * if the node is unavailable due to a network cut, you will recover the job (and
+    #   your saved data) once the network comes back.
+    prevent_reschedule_on_lost = true
 
     ephemeral_disk {
-      size = 4096
+      size = 32768
     }
 
     network {
@@ -160,22 +143,25 @@ job "tool-cvat-${JOB_UUID}" {
       port "utils" {
         to = 8080
       }
-      port "worker-import" {
+      port "worker_import" {
         to = 8080
       }
-      port "worker-export" {
+      port "worker_export" {
         to = 8080
       }
-      port "worker-annotation" {
+      port "worker_annotation" {
         to = 8080
       }
-      port "worker-webhooks" {
+      port "worker_webhooks" {
         to = 8080
       }
-      port "worker-quality-reports" {
+      port "worker_quality_reports" {
         to = 8080
       }
-      port "worker-analytics-reports" {
+      port "worker_analytics_reports" {
+        to = 8080
+      }
+      port "worker_chunks" {
         to = 8080
       }
       port "opa" {
@@ -187,17 +173,14 @@ job "tool-cvat-${JOB_UUID}" {
       port "db" {
         to = 5432
       }
-      port "redis" {
+      port "redis_inmem" {
         to = 6379
       }
-      port "clickhouse_native" {
-        to = 9000
+      port "redis_ondisk" {
+        to = 6666
       }
       port "clickhouse_http" {
         to = 8123
-      }
-      port "clickhouse_inter_server" {
-        to = 9009
       }
       port "vector" {
         to = 80
@@ -209,9 +192,9 @@ job "tool-cvat-${JOB_UUID}" {
       port = "ui"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-ui.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`)"
+        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ui.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`)"
       ]
     }
 
@@ -220,9 +203,9 @@ job "tool-cvat-${JOB_UUID}" {
       port = "server"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-server.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/api/`, `/static/`, `/admin`, `/documentation/`, `/django-rq`)"
+        "traefik.http.routers.${JOB_UUID}-server.tls=true",
+        "traefik.http.routers.${JOB_UUID}-server.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-server.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/api/`, `/static/`, `/admin`, `/documentation/`, `/django-rq`)"
       ]
     }
 
@@ -231,15 +214,15 @@ job "tool-cvat-${JOB_UUID}" {
       port = "grafana"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.tls=true",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.entrypoints=websecure",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/analytics`)",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-auth.forwardauth.address=http://${NOMAD_HOST_ADDR_server}/analytics",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-auth.forwardauth.authRequestHeaders=Cookie,Authorization",
-        "traefik.http.middlewares.${NOMAD_META_job_uuid}-grafana-analytics-strip-prefix.stripprefix.prefixes=/analytics",
-        "traefik.http.routers.${NOMAD_META_job_uuid}-grafana.middlewares=${NOMAD_META_job_uuid}-grafana-analytics-auth@consulcatalog,${NOMAD_META_job_uuid}-grafana-analytics-strip-prefix@consulcatalog",
-        "traefik.services.${NOMAD_META_job_uuid}-grafana.loadbalancer.servers.url=${NOMAD_HOST_ADDR_grafana}",
-        "traefik.services.${NOMAD_META_job_uuid}-grafana.loadbalancer.passHostHeader=false"
+        "traefik.http.routers.${JOB_UUID}-grafana.tls=true",
+        "traefik.http.routers.${JOB_UUID}-grafana.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-grafana.rule=Host(`${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}`) && PathPrefix(`/analytics`)",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-auth.forwardauth.address=http://${NOMAD_HOST_ADDR_server}/analytics",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-auth.forwardauth.authRequestHeaders=Cookie,Authorization",
+        "traefik.http.middlewares.${JOB_UUID}-grafana-analytics-strip-prefix.stripprefix.prefixes=/analytics",
+        "traefik.http.routers.${JOB_UUID}-grafana.middlewares=${JOB_UUID}-grafana-analytics-auth@consulcatalog,${JOB_UUID}-grafana-analytics-strip-prefix@consulcatalog",
+        "traefik.services.${JOB_UUID}-grafana.loadbalancer.servers.url=${NOMAD_HOST_ADDR_grafana}",
+        "traefik.services.${JOB_UUID}-grafana.loadbalancer.passHostHeader=false"
       ]
     }
 
@@ -250,6 +233,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -315,10 +302,6 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/entrypoint.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "synclocal" {
@@ -328,6 +311,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -374,15 +361,15 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
-        tarbals='db data events redis'
+        tarbals='cache_db data db events inmem_db keys logs'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         for tarbal in $tarbals; do
           rm -rf $LOCAL_PATH/$tarbal
           mkdir -p $LOCAL_PATH/$tarbal
-          if [[ $tarbal == "data" ]]; then
-            chown -R 1000 $LOCAL_PATH/data
-            chgrp -R 1000 $LOCAL_PATH/data
-            chmod -R 750 $LOCAL_PATH/data
+          if [[ $tarbal == "data" || $tarbal == "keys" || $tarbal == "logs"  ]]; then
+            chown -R 1000 $LOCAL_PATH/$tarbal
+            chgrp -R 1000 $LOCAL_PATH/$tarbal
+            chmod -R 750 $LOCAL_PATH/$tarbal
           fi
         done
         if [ -z "$${RESTORE_FROM}" ]; then
@@ -407,10 +394,6 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/sync_local.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "syncremote" {
@@ -420,6 +403,10 @@ job "tool-cvat-${JOB_UUID}" {
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 500
+        memory = 4096
+      }
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -468,7 +455,7 @@ job "tool-cvat-${JOB_UUID}" {
         #!/usr/bin/env bash
         TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
         BACKUP_NAME="$${BACKUP_NAME}_$${TS}"
-        tarbals='db data events redis'
+        tarbals='cache_db data db events inmem_db keys logs'
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         echo "creating a CVAT backup $$BACKUP_NAME ..."
         if [[ -d $LOCAL_PATH/$$BACKUP_NAME ]]; then
@@ -492,26 +479,23 @@ job "tool-cvat-${JOB_UUID}" {
         EOF
         destination = "local/sync_remote.sh"
       }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
     }
 
     task "clickhouse" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
+        cpu = 1000
         memory = 4096
       }
       env {
-        CLICKHOUSE_DB = "cvat"
-        CLICKHOUSE_USER = "user"
-        CLICKHOUSE_PASSWORD = "user"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
       }
       config {
-        image = "${NOMAD_META_clickhouse_image}"
-        ports = ["clickhouse_native", "clickhouse_http", "clickhouse_inter_server"]
+        image = "clickhouse/clickhouse-server:23.11-alpine"
+        ports = ["clickhouse_http"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/events:/var/lib/clickhouse"
         ]
@@ -561,19 +545,28 @@ job "tool-cvat-${JOB_UUID}" {
     task "grafana" {
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 300
+        memory = 2048
+      }
       env {
+        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
+        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
         GF_PATHS_PROVISIONING = "/etc/grafana/provisioning"
         GF_AUTH_BASIC_ENABLED = false
         GF_AUTH_ANONYMOUS_ENABLED = true
         GF_AUTH_ANONYMOUS_ORG_ROLE = "Admin"
         GF_AUTH_DISABLE_LOGIN_FORM = true
         GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS = "grafana-clickhouse-datasource"
-        GF_SERVER_ROOT_URL = "http://${NOMAD_META_job_uuid}.${NOMAD_META_cvat_hostname}/analytics"
-        GF_INSTALL_PLUGINS = "https://github.com/grafana/clickhouse-datasource/releases/download/v${NOMAD_META_grafana_clickhouse_plugin_version}/grafana-clickhouse-datasource-${NOMAD_META_grafana_clickhouse_plugin_version}.linux_amd64.zip;grafana-clickhouse-datasource"
+        GF_SERVER_ROOT_URL = "http://${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/analytics"
+        GF_INSTALL_PLUGINS = "https://github.com/grafana/clickhouse-datasource/releases/download/v4.0.8/grafana-clickhouse-datasource-4.0.8.linux_amd64.zip;grafana-clickhouse-datasource"
         GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH = "/var/lib/grafana/dashboards/all_events.json"
       }
       config {
-        image = "${NOMAD_META_grafana_image}"
+        image = "grafana/grafana-oss:10.1.2"
         ports = ["grafana"]
         mount {
           type = "bind"
@@ -611,15 +604,15 @@ job "tool-cvat-${JOB_UUID}" {
         ]
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/all_events.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/all_events.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/management.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/management.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/grafana/dashboards/monitoring.json"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/grafana/dashboards/monitoring.json"
         destination = "local/var/lib/grafana/dashboards/"
       }
       template {
@@ -639,17 +632,18 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         apiVersion: 1
         datasources:
-          - name: ClickHouse
+          - name: 'ClickHouse'
             type: grafana-clickhouse-datasource
             isDefault: true
             jsonData:
-              defaultDatabase: cvat
-              port: ${NOMAD_HOST_PORT_clickhouse_native}
-              server: ${NOMAD_HOST_IP_clickhouse_native}
-              username: user
+              defaultDatabase: $$$${CLICKHOUSE_DB}
+              port: $$$${CLICKHOUSE_PORT}
+              server: $$$${CLICKHOUSE_HOST}
+              username: $$$${CLICKHOUSE_USER}
               tlsSkipVerify: false
+              protocol: http
             secureJsonData:
-              password: user
+              password: $$$${CLICKHOUSE_PASSWORD}
             editable: true
         EOF
         destination = "local/etc/grafana/provisioning/datasources/ds.yaml"
@@ -659,6 +653,10 @@ job "tool-cvat-${JOB_UUID}" {
     task "db" {
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
         POSTGRES_USER = "root"
         POSTGRES_DB = "cvat"
@@ -666,7 +664,7 @@ job "tool-cvat-${JOB_UUID}" {
         PGDATA = "/var/lib/postgresql/data/pgdata"
       }
       config {
-        image = "${NOMAD_META_db_image}"
+        image = "postgres:16.4-alpine"
         privileged = true
         force_pull = "false"
         ports = ["db"]
@@ -676,25 +674,42 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "redis" {
+    task "redis_inmem" {
+      driver = "docker"
+      kill_timeout = "120s" # double the time of the periodic dump (60s, see --save argument below)
+      resources { # https://redis.io/docs/latest/operate/rs/installing-upgrading/install/plan-deployment/hardware-requirements/
+        cpu = 100
+        memory = 2048
+      }
+      config {
+        image = "redis:7.2.3-alpine"
+        ports = ["redis_inmem"]
+        volumes = [
+          "..${NOMAD_ALLOC_DIR}/data/inmem_db:/data"
+        ]
+        command = "redis-server"
+        args = [
+          "--save", "60", "100",
+          "--appendonly", "yes",
+        ]
+      }
+    }
+
+    task "redis_ondisk" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
+        cpu = 100
         memory = 5120
       }
       config {
-        image = "${NOMAD_META_redis_image}"
-        ports = ["redis"]
+        image = "apache/kvrocks:2.7.0"
+        ports = ["redis_ondisk"]
         volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/redis:/data"
+          "..${NOMAD_ALLOC_DIR}/data/cache_db:/var/lib/kvrocks/data"
         ]
-        command = "keydb-server"
         args = [
-          "/etc/keydb/keydb.conf",
-          "--storage-provider", "flash", "/data/flash",
-          "--maxmemory", "5G",
-          "--maxmemory-policy", "allkeys-lfu"
+          "--dir", "/var/lib/kvrocks/data"
         ]
       }
     }
@@ -703,17 +718,18 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        memory = 1024
+        cpu = 100
+        memory = 2048
       }
       env {
-        CLICKHOUSE_DB = "cvat"
-        CLICKHOUSE_USER = "user"
-        CLICKHOUSE_PASSWORD = "user"
         CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
         CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
       }
       config {
-        image = "${NOMAD_META_vector_image}"
+        image = "timberio/vector:0.26.0-alpine"
         ports = ["vector"]
         mount {
           type = "bind"
@@ -723,7 +739,7 @@ job "tool-cvat-${JOB_UUID}" {
         }
       }
       artifact {
-        source = "https://github.com/ai4os/ai4-cvat/raw/${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}/components/analytics/vector/vector.toml"
+        source = "https://github.com/ai4os/ai4os-cvat/raw/v2.28.0-AI4OS/components/analytics/vector/vector.toml"
         destination = "local/etc/vector/"
       }
     }
@@ -732,41 +748,49 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
+        cpu = 300
         memory = 4096
       }
       env {
-        DJANGO_LOG_LEVEL = "INFO"
-        DJANGO_MODWSGI_EXTRA_ARGS = ""
         ALLOWED_HOSTS = "*"
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        ADAPTIVE_AUTO_ANNOTATION = "false"
+        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
+        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_ANALYTICS = "1"
+        CVAT_BASE_URL = ""
+        CVAT_HOST = "${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}"
+        CVAT_LOG_IMPORT_ERRORS = "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
-        ADAPTIVE_AUTO_ANNOTATION = "false"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
+        DJANGO_LOG_LEVEL = "INFO"
+        DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
+        DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
+        DJANGO_MODWSGI_EXTRA_ARGS = ""
+        DJANGO_SUPERUSER_PASSWORD = "${NOMAD_META_cvat_su_password}"
+        DJANGO_SUPERUSER_USERNAME = "${NOMAD_META_cvat_su_username}"
         IAM_OPA_ADDR = "${NOMAD_HOST_ADDR_opa}"
         IAM_OPA_HOST = "${NOMAD_HOST_IP_opa}"
         IAM_OPA_PORT = "${NOMAD_HOST_PORT_opa}"
         IAM_OPA_BUNDLE = "1"
         NUMPROCS = "2"
-        DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
-        DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
-        DJANGO_SUPERUSER_USERNAME = "${NOMAD_META_su_username}"
-        DJANGO_SUPERUSER_PASSWORD = "${NOMAD_META_su_password}"
-        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
-        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
-        CVAT_ANALYTICS = "1"
-        CVAT_BASE_URL = ""
-        CVAT_HOST = "${NOMAD_META_job_uuid}.${NOMAD_META_cvat_hostname}"
+        ONE_RUNNING_JOB_IN_QUEUE_PER_USER = "false"
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "registry.services.ai4os.eu/ai4os/ai4-cvat-server:v2.7.3-AI4OS"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["server"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share"
         ]
         command = "init"
@@ -786,27 +810,31 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
-        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
-        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_INMEM_PASSWORD = ""
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "1"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["utils"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -816,7 +844,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-import" {
+    task "worker_import" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
@@ -825,25 +853,29 @@ job "tool-cvat-${JOB_UUID}" {
       kill_timeout = "30s"
       resources {
         cores = 1
-        memory = 1024
+        memory = 4096
       }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "2"
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-import"]
+        ports = ["worker_import"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -853,7 +885,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-export" {
+    task "worker_export" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
@@ -862,25 +894,35 @@ job "tool-cvat-${JOB_UUID}" {
       kill_timeout = "30s"
       resources {
         cores = 1
-        memory = 1024
+        memory = 4096
       }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
+        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
+        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "2"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-export"]
+        ports = ["worker_export"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
-          "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -889,7 +931,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-annotation" {
+    task "worker_annotation" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
@@ -897,25 +939,30 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "1"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-annotation"]
+        ports = ["worker_annotation"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
           "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share",
         ]
         command = "run"
@@ -925,30 +972,39 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-webhooks" {
+    task "worker_webhooks" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "1"
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-webhooks"]
+        ports = ["worker_webhooks"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -957,29 +1013,39 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-quality-reports" {
+    task "worker_quality_reports" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
       }
       driver = "docker"
       kill_timeout = "30s"
+      resources {
+        cpu = 100
+        memory = 4096
+      }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "1"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-quality-reports"]
+        ports = ["worker_quality_reports"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -988,7 +1054,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
-    task "worker-analytics-reports" {
+    task "worker_analytics_reports" {
       lifecycle {
         hook = "poststart"
         sidecar = "true"
@@ -996,25 +1062,36 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       resources {
-        cores = 1
-        memory = 1024
+        cpu = 100
+        memory = 4096
       }
       env {
-        CVAT_REDIS_HOST = "${NOMAD_HOST_IP_redis}"
-        CVAT_REDIS_PORT = "${NOMAD_HOST_PORT_redis}"
-        CVAT_REDIS_PASSWORD = ""
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
         CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
         CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
+        CLICKHOUSE_HOST = "${NOMAD_HOST_IP_clickhouse_http}"
+        CLICKHOUSE_PORT = "${NOMAD_HOST_PORT_clickhouse_http}"
+        CLICKHOUSE_DB = "${NOMAD_META_clickhouse_db}"
+        CLICKHOUSE_USER = "${NOMAD_META_clickhouse_user}"
+        CLICKHOUSE_PASSWORD = "${NOMAD_META_clickhouse_password}"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
         NUMPROCS = "2"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "${NOMAD_META_server_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
-        ports = ["worker-analytics-reports"]
+        ports = ["worker_analytics_reports"]
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
         ]
         command = "run"
         args = [
@@ -1023,16 +1100,59 @@ job "tool-cvat-${JOB_UUID}" {
       }
     }
 
+    # https://github.com/cvat-ai/cvat/issues/8983 - this container needs access to the shared volume
+    task "worker_chunks" {
+      lifecycle {
+        hook = "poststart"
+        sidecar = "true"
+      }
+      driver = "docker"
+      kill_timeout = "30s"
+      resources {
+        cores = 1
+        memory = 4096
+      }
+      env {
+        CVAT_ALLOW_STATIC_CACHE = "${NOMAD_META_cvat_allow_static_cache}"
+        CVAT_LOG_IMPORT_ERRORS =  "true"
+        CVAT_POSTGRES_HOST = "${NOMAD_HOST_IP_db}"
+        CVAT_POSTGRES_PORT = "${NOMAD_HOST_PORT_db}"
+        CVAT_REDIS_INMEM_HOST = "${NOMAD_HOST_IP_redis_inmem}"
+        CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
+        CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
+        CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
+        DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
+        DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
+        NUMPROCS = "2"
+        SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
+      }
+      config {
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
+        ports = ["worker_chunks"]
+        volumes = [
+          "..${NOMAD_ALLOC_DIR}/data/data:/home/django/data",
+          "..${NOMAD_ALLOC_DIR}/data/keys:/home/django/keys",
+          "..${NOMAD_ALLOC_DIR}/data/logs:/home/django/logs",
+          "..${NOMAD_ALLOC_DIR}/data/share:/home/django/share"
+        ]
+        command = "run"
+        args = [
+          "worker.chunks"
+        ]
+      }
+    }
+
     task "opa" {
       driver = "docker"
       kill_timeout = "30s"
       config {
-        image = "${NOMAD_META_opa_image}"
+        image = "openpolicyagent/opa:0.63.0"
         ports = ["opa"]
         command = "run"
         args = [
           "--server",
-          "--log-level=info",
+          "--log-level=debug",
           "--set=services.cvat.url=http://${NOMAD_HOST_ADDR_server}",
           "--set=bundles.cvat.service=cvat",
           "--set=bundles.cvat.resource=/api/auth/rules",
@@ -1050,7 +1170,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       config {
-        image = "${NOMAD_META_ui_image}:${NOMAD_META_cvat_version}${NOMAD_META_cvat_version_custom}"
+        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-ui"
         force_pull = "${NOMAD_META_force_pull_img_cvat_ui}"
         ports = ["ui"]
       }
