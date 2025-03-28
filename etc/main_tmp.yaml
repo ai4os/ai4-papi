@@ -17,8 +17,9 @@ auth:
 
     - https://ai4life.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
-    - https://dashboard-ai4eosc-nomad.placeholder-deployments.cloud.ai4eosc.eu  # Deploy API as Nomad job
+    - https://dashboard-ai4eosc-nomad.${DOMAIN}-deployments.cloud.ai4eosc.eu  # Saúl testing deployment from Nomad
     - http://localhost:8080
+    - ${DASHBOARD_URL}
 
   OP:  # OIDC providers
 
@@ -63,17 +64,6 @@ oscar:
       endpoint:  https://inference-walton.cloud.imagine-ai.eu
       cluster_id: oscar-imagine-cluster
 
-    vo.ai4life.eu:
-      endpoint: https://inference.cloud.ai4eosc.eu
-      cluster_id: oscar-ai4eosc-cluster
-
     training.egi.eu:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
-
-mlflow:
-
-    vo.ai4eosc.eu: https://mlflow.cloud.ai4eosc.eu/
-    vo.imagine-ai.eu: https://mlflow.cloud.imagine-ai.eu/
-    vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
-    training.egi.eu: https://mlflow.cloud.ai4eosc.eu/
