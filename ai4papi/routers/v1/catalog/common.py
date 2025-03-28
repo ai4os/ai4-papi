@@ -296,6 +296,9 @@ class Catalog:
                 metadata["license"] = gh_info.get("license", "")
                 metadata["links"]["source_code"] = f"https://github.com/{owner}/{repo}"
 
+            # Map license to EU vocabularies
+            metadata["license"] = map_license(metadata["license"])
+
             # Add Jenkins CI/CD links
             metadata["links"]["cicd_url"] = (
                 f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
@@ -387,3 +390,28 @@ def retrieve_docker_tags(
         )
     tags = [i["name"] for i in r["results"]]
     return tags
+
+
+def map_license(license):
+    """
+    Map Github license to EU controlled vocabulary
+
+    References:
+    - https://op.europa.eu/en/web/eu-vocabularies/concept-scheme/-/resource?uri=http://publications.europa.eu/resource/authority/licence
+    - https://publications.europa.eu/resource/authority/licence
+    """
+    mapped = license.upper().replace("-", "_").replace(".", "_")
+
+    # Handle edge cases
+    mapped = (
+        mapped.replace("CLAUSE_CLEAR", "CLAUSECLEAR")
+        .replace("POSTGRESQL", "POSTGRE_SQL")
+        .replace("UNLICENSE", "UNLICENCE")
+        .replace("CC0_1_0", "CC0")
+    )
+
+    # Remove spaces in CC_BY licenses. eg. CC_BY_NC_SA_4 --> CC_BYNCSA_4
+    if "CC_BY" in mapped:
+        mapped = mapped.replace("_NC", "NC").replace("_ND", "ND").replace("_SA", "SA")
+
+    return mapped
