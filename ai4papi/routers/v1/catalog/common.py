@@ -271,6 +271,7 @@ class Catalog:
                     "weights": "",
                     "citation": "",
                     "base_model": "",
+                    "self": "",
                 },
                 "tags": ["invalid metadata"],
                 "tasks": [],
@@ -308,6 +309,12 @@ class Catalog:
             # (ie. ignore the value coming from the metadata)
             metadata["links"]["docker_image"] = metadata["links"]["docker_image"].strip(
                 "/ "
+            )
+
+            # Add self-link
+            item2path = {"module": "modules", "tool": "tools"}
+            metadata["links"]["self"] = (
+                f"{papiconf.MAIN_CONF['self']['domain']}/v1/catalog/{item2path[self.item_type]}/{item_name}/metadata"
             )
 
             # Add the item name
