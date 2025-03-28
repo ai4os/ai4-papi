@@ -63,7 +63,7 @@ hardware:
     value: 1000
     range: [1000, 2000]
 
-configuration:
+flower:
   rounds:
     name: Number of rounds
     value: 5
