@@ -386,6 +386,8 @@ def create_deployment(
                 ],  # limit to 1K characters
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "DOCKER_TAG": user_conf["general"]["docker_tag"],
                 "AI4LIFE_MODEL": user_conf["general"]["model_id"],
                 "CPU_NUM": user_conf["hardware"]["cpu_num"],
                 "RAM": user_conf["hardware"]["ram"],

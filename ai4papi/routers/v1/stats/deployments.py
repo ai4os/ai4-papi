@@ -288,7 +288,14 @@ def get_cluster_stats_bg():
         )
         n_stats["gpu_models"] = {}
         n_stats["namespaces"] = node["Meta"].get("namespace", "")
-        n_stats["status"] = node["Meta"].get("status", "")
+        # Sometimes nodes disconnect. And since they disconnect, their metadata cannot
+        # longer be updated. So we use the fine-grained status in the metadata *only if*
+        # the node status is ready.
+        n_stats["status"] = (
+            node["Meta"].get("status", "")
+            if node["Status"] == "ready"
+            else node["Status"]
+        )
         n_stats["tags"] = node["Meta"].get("tags", "")
 
         if n["NodeResources"]["Devices"]:
