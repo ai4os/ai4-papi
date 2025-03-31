@@ -23,14 +23,17 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
 import configparser
+import importlib
+import json
 import os
 import re
 from typing import Tuple, Union
+import warnings
 import yaml
 
-import ai4_metadata.validate
+import ai4_metadata
 from cachetools import cached, TTLCache
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPBearer
 import requests
 
@@ -41,6 +44,25 @@ import ai4papi.conf as papiconf
 security = HTTPBearer()
 
 JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
+
+# Check conversions supported in ai4-metadata
+supported_profiles = [i.value for i in ai4_metadata.mapping.SupportedOutputProfiles]
+mappers = {
+    i: importlib.import_module(f"ai4_metadata.mapping.profiles.{i}")
+    for i in supported_profiles
+}
+supported_accepts = []
+for mapper in mappers.values():
+    supported_accepts += [f.value for f in mapper.SupportedOutputFormats]
+
+# Define mapping from accept-types to ai4-metadata values
+fmt_map = {
+    "application/ld+json": "jsonld",
+    "application/x-turtle": "ttl",
+}
+for f in supported_accepts:
+    if f not in fmt_map.values():
+        warnings.warn(f"Supported format {f} has no defined mapping.")
 
 
 class Catalog:
@@ -155,11 +177,55 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
+        request: Request,
+        profile: str = Query(default="", enum=[""] + supported_profiles),
     ):
         """
         Get the item's full metadata.
+
+        Parameters
+        ==========
+        - item_name: str
+          Item to retrieve
+        - profile: str
+
+        The accept header can be use to change the output format.
         """
-        return self._get_metadata(item_name=item_name, force=False)
+        metadata = self._get_metadata(item_name=item_name, force=False)
+
+        # Return the metadata in different formats
+        accept = request.headers.get("accept", "application/json")
+        if profile and accept != "application/json":
+            fmt = fmt_map.get(accept)
+            if not fmt:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Accept-type: {accept} is not supported",
+                )
+            try:
+                # Sometimes even is the accept-type is supported in general,
+                # it might not be supported for a particular profile
+                mapped = mapper.generate_mapping(
+                    from_profile="ai4os",
+                    from_metadata=metadata,
+                    to_format=fmt,
+                )
+                if fmt == "jsonld":
+                    return json.loads(mapped)
+                else:
+                    return mapped
+            except Exception as e:
+                status = (
+                    415
+                    if isinstance(e, ai4_metadata.exceptions.InvalidMappingError)
+                    else 500
+                )
+                raise HTTPException(
+                    status_code=status,
+                    detail=str(e),
+                )
+        else:
+            return metadata
 
     @cached(
         cache=TTLCache(maxsize=1024, ttl=7 * 24 * 60 * 60),
