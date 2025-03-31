@@ -196,7 +196,11 @@ class Catalog:
         metadata = self._get_metadata(item_name=item_name, force=False)
 
         # Return the metadata in different formats
-        accept = request.headers.get("accept", "application/json") if request else "application/json"
+        accept = (
+            request.headers.get("accept", "application/json")
+            if request
+            else "application/json"
+        )
         if profile and accept != "application/json":
             fmt = fmt_map.get(accept)
             if not fmt:
