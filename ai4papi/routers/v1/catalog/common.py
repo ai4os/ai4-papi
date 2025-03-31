@@ -46,7 +46,7 @@ security = HTTPBearer()
 JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
 
 # Check conversions supported in ai4-metadata
-supported_profiles = [i.value for i in ai4_metadata.mapping.SupportedOutputProfiles]
+supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]
 mappers = {
     i: importlib.import_module(f"ai4_metadata.mapping.profiles.{i}")
     for i in supported_profiles
