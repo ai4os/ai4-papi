@@ -107,7 +107,7 @@ router.add_api_route(
     "/{item_name}/metadata",
     Tools.get_metadata,
     methods=["GET"],
-    responses={200: {"content": {i: {} for i in fmt_map.keys() }}},
+    responses={200: {"content": {i: {} for i in fmt_map.keys()}}},
 )
 router.add_api_route(
     "/{item_name}/config",
