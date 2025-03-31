@@ -18,7 +18,7 @@ immutable objects and lists are not. Only immutable objects can have a hash and
 therefore be cached by cachetools.
 ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hashable-but-not-a-list
 
-* Somes names need to be reserved to avoid clashes between URL paths.
+* Some names need to be reserved to avoid clashes between URL paths.
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
@@ -177,8 +177,8 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
-        request: Request = None,
         profile: str = Query(default="", enum=[""] + supported_profiles),
+        request: Request = None,
     ):
         """
         Get the item's full metadata.
@@ -187,9 +187,12 @@ class Catalog:
         ==========
         - item_name: str
           Item to retrieve
-        - request: Request, optional
-          FastAPI request object
         - profile: str
+          Profile used to change the output format of the metadata.
+          Has to be used jointly with the accept-type.
+          For example:
+          * profile: `mldcat`; accept-type: `application/ld+json`
+          * profile: `mldcat`; accept-type: `application/x-turtle`
 
         The accept header can be use to change the output format.
         """
@@ -201,16 +204,23 @@ class Catalog:
             if request
             else "application/json"
         )
-        if profile and accept != "application/json":
+
+        if not profile and accept != "application/json":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Please specify the profile to use to perform the mapping: {supported_profiles}",
+            )
+        elif profile and accept != "application/json":
             fmt = fmt_map.get(accept)
             if not fmt:
                 raise HTTPException(
-                    status_code=404,
+                    status_code=415,
                     detail=f"Accept-type: {accept} is not supported",
                 )
             try:
                 # Sometimes even is the accept-type is supported in general,
-                # it might not be supported for a particular profile
+                # it might not be supported for a particular profile.
+                # So we use try/except to catch possible InvalidMapping errors.
                 mapped = mapper.generate_mapping(
                     from_profile="ai4os",
                     from_metadata=metadata,
