@@ -177,7 +177,7 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
-        request: Request,
+        request: Request = None,
         profile: str = Query(default="", enum=[""] + supported_profiles),
     ):
         """
@@ -187,6 +187,8 @@ class Catalog:
         ==========
         - item_name: str
           Item to retrieve
+        - request: Request, optional
+          FastAPI request object
         - profile: str
 
         The accept header can be use to change the output format.
@@ -194,7 +196,7 @@ class Catalog:
         metadata = self._get_metadata(item_name=item_name, force=False)
 
         # Return the metadata in different formats
-        accept = request.headers.get("accept", "application/json")
+        accept = request.headers.get("accept", "application/json") if request else "application/json"
         if profile and accept != "application/json":
             fmt = fmt_map.get(accept)
             if not fmt:
