@@ -58,7 +58,7 @@ for mapper in mappers.values():
 # Define mapping from accept-types to ai4-metadata values
 fmt_map = {
     "application/ld+json": "jsonld",
-    "application/x-turtle": "ttl",
+    "text/turtle": "ttl",
 }
 for f in supported_accepts:
     if f not in fmt_map.values():
