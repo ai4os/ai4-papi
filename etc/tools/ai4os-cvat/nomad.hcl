@@ -185,6 +185,9 @@ job "tool-cvat-${JOB_UUID}" {
       port "vector" {
         to = 80
       }
+      port "nuclio" {
+        to = 8070
+      }
     }
 
     service {
@@ -223,6 +226,19 @@ job "tool-cvat-${JOB_UUID}" {
         "traefik.http.routers.${JOB_UUID}-grafana.middlewares=${JOB_UUID}-grafana-analytics-auth@consulcatalog,${JOB_UUID}-grafana-analytics-strip-prefix@consulcatalog",
         "traefik.services.${JOB_UUID}-grafana.loadbalancer.servers.url=${NOMAD_HOST_ADDR_grafana}",
         "traefik.services.${JOB_UUID}-grafana.loadbalancer.passHostHeader=false"
+      ]
+    }
+
+    service {
+      name = "${JOB_UUID}-nuclio"
+      port = "nuclio"
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.${JOB_UUID}-nuclio.tls=true",
+        "traefik.http.routers.${JOB_UUID}-nuclio.entrypoints=websecure",
+        "traefik.http.routers.${JOB_UUID}-nuclio.rule=Host(`${JOB_UUID}-nuclio.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.services.${JOB_UUID}-nuclio.loadbalancer.servers.url=${NOMAD_HOST_ADDR_nuclio}",
+        "traefik.services.${JOB_UUID}-nuclio.loadbalancer.passHostHeader=false"
       ]
     }
 
@@ -783,6 +799,11 @@ job "tool-cvat-${JOB_UUID}" {
         NUMPROCS = "2"
         ONE_RUNNING_JOB_IN_QUEUE_PER_USER = "false"
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
+        CVAT_SERVERLESS = "1"
+        # CVAT_NUCLIO envars: https://github.com/ai4os/ai4os-cvat/blob/e6fd3fd6f8f8067fbb65f5fb24078fffb2d511b0/cvat/settings/base.py#L334
+        CVAT_NUCLIO_HOST = "${NOMAD_HOST_IP_nuclio}"
+        CVAT_NUCLIO_PORT = "${NOMAD_HOST_PORT_nuclio}"
+        CVAT_NUCLIO_FUNCTION_NAMESPACE = "nuclio"
       }
       config {
         image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
@@ -798,6 +819,9 @@ job "tool-cvat-${JOB_UUID}" {
           "ensuresuperuser",
           "run",
           "server"
+        ]
+        extra_hosts = [
+          "host.docker.internal:host-gateway"
         ]
       }
     }
@@ -968,6 +992,9 @@ job "tool-cvat-${JOB_UUID}" {
         command = "run"
         args = [
           "worker.annotation"
+        ]
+        extra_hosts = [
+          "host.docker.internal:host-gateway"
         ]
       }
     }
@@ -1173,6 +1200,32 @@ job "tool-cvat-${JOB_UUID}" {
         image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-ui"
         force_pull = "${NOMAD_META_force_pull_img_cvat_ui}"
         ports = ["ui"]
+      }
+    }
+
+    task "nuclio" {
+      lifecycle {
+        hook = "poststart"
+        sidecar = "true"
+      }
+      driver = "docker"
+      kill_timeout = "30s"
+      resources {
+        cpu    = 500  # CPU in MHz
+        memory = 512  # RAM in MB
+      }
+      env {
+        NUCLIO_CHECK_FUNCTION_CONTAINERS_HEALTHINESS = "true"
+        NUCLIO_DASHBOARD_DEFAULT_FUNCTION_MOUNT_MODE = "volume"
+        CVAT_NUCLIO_FUNCTION_NAMESPACE = "nuclio"
+      }
+      config {
+        image = "quay.io/nuclio/dashboard:1.13.0-amd64"
+        ports = ["nuclio"]
+        volumes = [
+          "/var/run/docker.sock:/var/run/docker.sock",
+          "..${NOMAD_ALLOC_DIR}/data/nuclio:/etc/nuclio/store"
+        ]
       }
     }
   }
