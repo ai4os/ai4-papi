@@ -9,6 +9,7 @@ from . import (
     storage,
     try_me,
     snapshots,
+    proxies
 )
 
 
@@ -21,6 +22,7 @@ router.include_router(snapshots.router)
 router.include_router(stats.router)
 router.include_router(storage.router)
 router.include_router(try_me.router)
+router.include_router(proxies.router)
 
 
 @router.get(
