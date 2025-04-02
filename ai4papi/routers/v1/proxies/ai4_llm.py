@@ -35,7 +35,7 @@ ROBOT_API_TOKEN = os.getenv("ROBOT_API_TOKEN")
 
 client = OpenAI(
     base_url="https://llm.dev.ai4eosc.eu/api",
-    api_key="sk-5ecfe149925740cfa37fa65a60e527e1",
+    api_key=ROBOT_API_TOKEN,
 )
 
 @router.post("/chat")
