@@ -18,6 +18,7 @@ class ChatMessage(BaseModel):
     role: str
     content: str
 
+
 class ChatRequest(BaseModel):
     model: str = "ai4eoscassistant"
     messages: List[ChatMessage] = []
@@ -38,6 +39,7 @@ client = OpenAI(
     api_key="sk-5ecfe149925740cfa37fa65a60e527e1",
 )
 
+
 @router.post("/chat")
 def get_chat_response(
     request: ChatRequest,
@@ -47,20 +49,18 @@ def get_chat_response(
     """
     Handle chat response, manage errors during completion creation
     """
-    
+
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_vo_membership(vo, auth_info["vos"])
 
     try:
         completion = client.chat.completions.create(
-            model=request.model,
-            messages=request.messages
+            model=request.model, messages=request.messages
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"An unexpected error occurred: {str(e)}"
+            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
-        
+
     return completion

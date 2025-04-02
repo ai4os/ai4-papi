@@ -9,7 +9,7 @@ from . import (
     storage,
     try_me,
     snapshots,
-    proxies
+    proxies,
 )
 
 
