@@ -61,7 +61,7 @@ for tool_name in tools_list:
     # Get tool metadata in different formats
     module_meta = Tools.get_metadata(
         item_name=tool_name,
-        profile="mldcat",
+        profile="mldcatap",
         request=Request(
             scope={
                 "type": "http",

@@ -58,7 +58,7 @@ assert "title" in module_meta.keys()
 # Get module metadata in different formats
 module_meta = Modules.get_metadata(
     item_name=module_name,
-    profile="mldcat",
+    profile="mldcatap",
     request=Request(
         scope={
             "type": "http",

@@ -52,8 +52,8 @@ mappers = {
     for i in supported_profiles
 }
 supported_accepts = []
-for mapper in mappers.values():
-    supported_accepts += [f.value for f in mapper.SupportedOutputFormats]
+for m in mappers.values():
+    supported_accepts += [f.value for f in m.SupportedOutputFormats]
 
 # Define mapping from accept-types to ai4-metadata values
 fmt_map = {
@@ -215,6 +215,11 @@ class Catalog:
                 detail=f"Please specify the profile to use to perform the mapping: {supported_profiles}",
             )
         elif profile and accept != "application/json":
+            if profile not in supported_profiles:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Profile not supported: {supported_profiles}",
+                )
             fmt = fmt_map.get(accept)
             if not fmt:
                 raise HTTPException(
@@ -225,7 +230,7 @@ class Catalog:
                 # Sometimes even is the accept-type is supported in general,
                 # it might not be supported for a particular profile.
                 # So we use try/except to catch possible InvalidMapping errors.
-                mapped = mapper.generate_mapping(
+                mapped = mappers[profile].generate_mapping(
                     from_profile="ai4os",
                     from_metadata=metadata,
                     to_format=fmt,
