@@ -186,15 +186,19 @@ class Catalog:
         Parameters
         ==========
         - item_name: str
+
           Item to retrieve
+
         - profile: str
+
           Profile used to change the output format of the metadata.
           Has to be used jointly with the accept-type.
           For example:
           * profile: `mldcat`; accept-type: `application/ld+json`
           * profile: `mldcat`; accept-type: `application/x-turtle`
 
-        The accept header can be use to change the output format.
+          Using an empty profile paired with an accept-type `application/json` will
+          return the unmodified AI4OS metadata.
         """
         metadata = self._get_metadata(item_name=item_name, force=False)
 
