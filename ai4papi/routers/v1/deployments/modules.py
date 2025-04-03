@@ -236,7 +236,10 @@ def create_deployment(
     mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
 
     # Check IDE password length
-    if len(user_conf["general"]["jupyter_password"]) < 9:
+    if (
+        user_conf["general"]["service"] in ["jupyter", "vscode"]
+        and len(user_conf["general"]["jupyter_password"]) < 9
+    ):
         raise HTTPException(
             status_code=400,
             detail="Your IDE needs a password of at least 9 characters.",
