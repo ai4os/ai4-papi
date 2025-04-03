@@ -96,19 +96,19 @@ job "try-${JOB_UUID}" {
         command    = "deep-start"
         args       = ["--deepaas"]
         ports      = ["api"]
-        shm_size   = 1000000000  # 1GB
-        memory_hard_limit = 2000  # 2GB
+        shm_size   = ${SHARED_MEMORY}
+        memory_hard_limit = ${RAM}
       }
 
       # (!) Keep in mind that if a module works locally but isn't working in Nomad,
       # the reason is likely that these resources are too low and the module freezes
       resources {
-        cores      = 1
-        memory     = 2000  # 2GB
-        memory_max = 2000  # 2GB
+        cores      = ${CPU_NUM}
+        memory     = ${RAM}
+        memory_max = ${RAM}
       }
 
-      # Do not try to restart a try-me job if it failis to launch deepaas
+      # Do not try to restart a try-me job if it fails to launch deepaas
       # This is usually due to the fact that the Docker image took too long to download
       # and failed with error: `Failed to pull `ai4oshub/...`: context deadline` exceeded
       # Restarting in the same node won't fix the connectivity issues
@@ -116,6 +116,11 @@ job "try-${JOB_UUID}" {
         attempts = 0
         mode     = "fail"
       }
+
+      env {
+        BANNER = ${BANNER}
+      }
+
 
     }
 

@@ -28,6 +28,12 @@ security = HTTPBearer()
 VO = "vo.ai4eosc.eu"
 NAMESPACE = papiconf.MAIN_CONF["nomad"]["namespaces"][VO]
 
+# Set platform hardware requirements for try-me
+REQUIREMENTS = {
+    "cpu": {"default": 1, "max": 8, "min": 1},
+    "memory_MB": {"default": 2000, "max": 16000, "min": 1000},
+}
+
 
 @router.get("")
 def get_deployments(
@@ -136,6 +142,29 @@ def create_deployment(
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
+    # Try to accommodate module developer hardware requirements
+    meta_inference = meta.get("resources", {}).get("inference", {})  # user request
+    final = {}  # final deployment values
+    mismatches = {}
+    for k in ["cpu", "memory_MB"]:
+        final[k] = meta_inference.get(k, REQUIREMENTS[k]["default"])
+        final[k] = max(final[k], REQUIREMENTS[k]["min"])
+        final[k] = min(final[k], REQUIREMENTS[k]["max"])
+        if (user_k := meta_inference.get(k)) and user_k > final[k]:
+            mismatches[k] = f"* Requested: {user_k}, Max allowed: {final[k]}"
+
+    # Show warning in Gradio UI if we couldn't accommodate user requirements
+    warning = ""
+    if mismatches:
+        warning = (
+            "The developer of the module specified an optimum amount of resources "
+            "that could not be met in try-me deployments. "
+            "Therefore, you might experience some issues when using this module for "
+            "inference. \n The following resources could not be met:"
+        )
+        for k, v in mismatches:
+            warning += f"\n* {k}: {v}"
+
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
@@ -148,6 +177,10 @@ def create_deployment(
             "BASE_DOMAIN": papiconf.MAIN_CONF["lb"]["domain"][VO],
             "HOSTNAME": job_uuid,
             "DOCKER_IMAGE": docker_image,
+            "CPU_NUM": final["cpu"],
+            "RAM": final["memory_MB"],
+            "SHARED_MEMORY": final["memory_MB"] * 10**6 * 0.5,
+            "BANNER": warning,
         }
     )
 
