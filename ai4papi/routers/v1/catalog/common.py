@@ -34,6 +34,7 @@ import yaml
 import ai4_metadata
 from cachetools import cached, TTLCache
 from fastapi import Depends, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer
 import requests
 
@@ -238,7 +239,7 @@ class Catalog:
                 if fmt == "jsonld":
                     return json.loads(mapped)
                 else:
-                    return mapped
+                    return PlainTextResponse(str(mapped))
             except Exception as e:
                 status = (
                     415
