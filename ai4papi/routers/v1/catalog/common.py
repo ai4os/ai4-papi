@@ -195,8 +195,8 @@ class Catalog:
           Profile used to change the output format of the metadata.
           Has to be used jointly with the accept-type.
           For example:
-          * profile: `mldcat`; accept-type: `application/ld+json`
-          * profile: `mldcat`; accept-type: `application/x-turtle`
+          * profile: `mldcatap`; accept-type: `application/ld+json`
+          * profile: `mldcatap`; accept-type: `text/turtle`
 
           Using an empty profile paired with an accept-type `application/json` will
           return the unmodified AI4OS metadata.
