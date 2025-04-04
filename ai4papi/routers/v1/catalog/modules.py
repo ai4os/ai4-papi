@@ -69,18 +69,16 @@ def get_config(
 
     # Modify default hardware value with user preferences, as long as they are within
     # the allowed limits
-    resources = metadata.get("resources", {}).get("inference", {})
+    meta_inference = metadata.get("resources", {}).get("inference", {})  # user request
     meta2conf = {
         "cpu": "cpu_num",
-        "gpu": "gpu_num",
         "memory_MB": "ram",
-        "storage_MB": "disk",
     }
     for k, v in meta2conf.items():
-        if resources.get(k):
-            conf["hardware"]["value"] = min(
-                resources[k], conf["hardware"][v]["range"][1]
-            )
+        final = meta_inference.get(k, conf["hardware"][v]["value"])
+        final = max(final, conf["hardware"][v]["range"][0])
+        final = min(final, conf["hardware"][v]["range"][1])
+        conf["hardware"][v]["value"] = final
 
     # Fill with available GPU models in the cluster
     # Additionally filter out models that do not meet user requirements
@@ -90,9 +88,9 @@ def get_config(
         if m not in gpu_specs.keys():
             print(f"Nomad model not found in PAPI GPU specs table: {m}")
             continue
-        if (r := resources.get("gpu_memory_MB")) and r > gpu_specs[m]["memory_MB"]:
+        if (r := meta_inference.get("gpu_memory_MB")) and r > gpu_specs[m]["memory_MB"]:
             continue
-        if (r := resources.get("gpu_compute_capability")) and (
+        if (r := meta_inference.get("gpu_compute_capability")) and (
             r > gpu_specs[m]["compute_capability"]
         ):
             continue
