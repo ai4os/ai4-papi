@@ -16,6 +16,7 @@ RUN apt-get update && \
     python3-pip \
     git \
     micro \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 RUN echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
@@ -31,7 +32,7 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # Allow the ai4os-proxy (172.16.44.228) to forward requests to the API
 # Trying to restrict to internal network (172.16.0.0/16 or 172.*) didn't work
 # ENV FORWARDED_ALLOW_IPS="*"
-ENV FORWARDED_ALLOW_IPS=172.16.44.228
+# ENV FORWARDED_ALLOW_IPS=172.16.44.228
 
 # Install latest rclone (for checking backups in CVAT; "/storage" route)
 RUN curl https://rclone.org/install.sh | bash
@@ -39,10 +40,11 @@ RUN curl https://rclone.org/install.sh | bash
 # Install API
 WORKDIR /home/ai4-papi
 COPY . .
-RUN pip3 install -e .
+RUN pip3 install -e .; cp etc/main.yaml etc/main_tmp.yaml
 
 # Run the API
 EXPOSE 80
-CMD ai4papi-run \
+CMD unset NOMAD_NAMESPACE; envsubst < etc/main_tmp.yaml > etc/main.yaml; \
+    ai4papi-run \
     --host 0.0.0.0 \
     --port 80
