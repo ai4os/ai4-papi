@@ -108,8 +108,14 @@ for tool in TOOLS.keys():
         raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
 
 # OSCAR template
-with open(paths["conf"] / "oscar.yaml", "r") as f:
-    OSCAR_TMPL = Template(f.read())
+OSCAR = {}
+with open(paths["conf"] / "oscar" / "service.yaml", "r") as f:
+    OSCAR["service"] = Template(f.read())
+yml = load_yaml_conf(paths["conf"] / "oscar" / "user.yaml")
+OSCAR["user"] = {
+    "full": yml[0],
+    "values": yml[1],
+}
 
 # vLLM conf
 with open(paths["conf"] / "vllm.yaml", "r") as f:
