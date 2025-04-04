@@ -14,6 +14,7 @@ services:
             - HARBOR_ROBOT_PASSWORD=********************
             - PAPI_JENKINS_TOKEN=***********************
             - PAPI_PROVENANCE_TOKEN=********************
+            - LLM_API_KEY=******************************
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting
@@ -33,6 +34,7 @@ services:
             - HARBOR_ROBOT_PASSWORD=********************
             - PAPI_JENKINS_TOKEN=***********************
             - PAPI_PROVENANCE_TOKEN=********************
+            - LLM_API_KEY=******************************
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting
