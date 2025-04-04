@@ -429,7 +429,7 @@ def create_deployment(
             )
 
             # Configure VLLM args
-            model_id = user_conf["llm"]["model_id"]
+            model_id = user_conf["llm"]["vllm_model_id"]
             vllm_args += ["--model", model_id]
             vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
