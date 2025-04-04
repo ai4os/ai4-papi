@@ -1,7 +1,10 @@
 from copy import deepcopy
+import datetime
+import os
 import json
 import re
 import secrets
+import subprocess
 import types
 from types import SimpleNamespace
 from typing import Tuple, Union
@@ -15,6 +18,7 @@ import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
+from ai4papi.routers.v1 import deployments as ai4_deployments
 
 
 router = APIRouter(
@@ -231,6 +235,25 @@ def create_deployment(
             item_name=tool_name,
         )
 
+    # Check if requested hardware is within the user total quota (summing modules and
+    # tools)
+    tools_deps = get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    modules_deps = ai4_deployments.modules.get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    quotas.check_userwise(
+        conf=user_conf,
+        deployments=modules_deps + tools_deps,
+    )
+
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
@@ -241,6 +264,108 @@ def create_deployment(
         priority = 50
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
+
+    if tool_name == "ai4os-dev-env":
+        # Retrieve MLflow credentials
+        user_secrets = ai4secrets.get_secrets(
+            vo=vo,
+            subpath="/services",
+            authorization=types.SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
+        mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
+
+        # Check IDE password length
+        if len(user_conf["general"]["jupyter_password"]) < 9:
+            raise HTTPException(
+                status_code=400,
+                detail="Your IDE needs a password of at least 9 characters.",
+            )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "DOCKER_TAG": user_conf["general"]["docker_tag"],
+                "SERVICE": user_conf["general"]["service"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "GPU_NUM": user_conf["hardware"]["gpu_num"],
+                "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
+                "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
+                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
+                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
+                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
+                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
+                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+                "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
+                "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
+                "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
+                "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
+                "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
+                "TODAY": str(datetime.date.today()),
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        usertask = [t for t in tasks if t["Name"] == "main"][0]
+
+        # Modify the GPU section
+        if user_conf["hardware"]["gpu_num"] <= 0:
+            # Delete GPU section in CPU deployments
+            usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
+            usertask["Resources"]["Devices"] = None
+        else:
+            # If gpu_type not provided, remove constraint to GPU model
+            if not user_conf["hardware"]["gpu_type"]:
+                usertask["Resources"]["Devices"][0]["Constraints"] = None
+
+        # If storage credentials not provided, remove all storage-related tasks
+        rclone = {
+            k: v for k, v in user_conf["storage"].items() if k.startswith("rclone")
+        }
+        if not all(rclone.values()):
+            exclude_tasks = ["storage_mount", "storage_cleanup", "dataset_download"]
+        else:
+            # Obscure rclone password on behalf of user
+            obscured = subprocess.run(
+                [f"rclone obscure {user_conf['storage']['rclone_password']}"],
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
+
+            # If datasets provided, replicate 'dataset_download' task as many times as needed
+            if user_conf["storage"]["datasets"]:
+                download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]
+                for i, dataset in enumerate(user_conf["storage"]["datasets"]):
+                    t = deepcopy(download_task)
+                    t["Env"]["DOI"] = dataset["doi"]
+                    t["Env"]["FORCE_PULL"] = dataset["doi"]
+                    t["Name"] = f"dataset_download_{i}"
+                    tasks.append(t)
+            # Always exclude initial 'dataset_download' task, as it is used as template
+            exclude_tasks = ["dataset_download"]
+
+        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
     # Deploy a Federated server
     if tool_name == "ai4os-federated-server":
@@ -566,14 +691,14 @@ def delete_deployment(
     )
 
     # Remove Vault secrets belonging to that deployment
-    secrets = ai4secrets.get_secrets(
+    user_secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath=f"/deployments/{deployment_uuid}",
         authorization=SimpleNamespace(
             credentials=authorization.credentials,
         ),
     )
-    for path in secrets.keys():
+    for path in user_secrets.keys():
         _ = ai4secrets.delete_secret(
             vo=vo,
             secret_path=path,

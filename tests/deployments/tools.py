@@ -46,6 +46,12 @@ tools_config = {
             "ui_password": "papi-test",
         },
     },
+    "ai4os-dev-env": {
+        "general": {
+            "docker_tag": "u22.04",
+            "jupyter_password": "mock_password",
+        },
+    },
 }
 
 for tname, tconfig in tools_config.items():
