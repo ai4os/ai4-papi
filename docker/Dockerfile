@@ -40,9 +40,8 @@ RUN curl https://rclone.org/install.sh | bash
 # Install API
 WORKDIR /home/ai4-papi
 COPY . .
-RUN pip3 install -e .
+RUN pip3 install -e .; cp etc/main.yaml etc/main_tmp.yaml
 
-RUN cp etc/main.yaml etc/main_tmp.yaml
 # Run the API
 EXPOSE 80
 CMD unset NOMAD_NAMESPACE; envsubst < etc/main_tmp.yaml > etc/main.yaml; \
