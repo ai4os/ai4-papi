@@ -288,23 +288,21 @@ def create_deployment(
                 # Limit at 50% of RAM memory, in bytes
                 "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
                 "VAULT_TOKEN": vault_token,
-                "FEDERATED_ROUNDS": user_conf["configuration"]["rounds"],
-                "FEDERATED_METRIC": user_conf["configuration"]["metric"],
-                "FEDERATED_MIN_FIT_CLIENTS": user_conf["configuration"][
-                    "min_fit_clients"
-                ],
-                "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["configuration"][
+                "FEDERATED_ROUNDS": user_conf["flower"]["rounds"],
+                "FEDERATED_METRIC": user_conf["flower"]["metric"],
+                "FEDERATED_MIN_FIT_CLIENTS": user_conf["flower"]["min_fit_clients"],
+                "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["flower"][
                     "min_available_clients"
                 ],
-                "FEDERATED_STRATEGY": user_conf["configuration"]["strategy"],
-                "MU_FEDPROX": user_conf["configuration"]["mu"],
-                "FEDAVGM_SERVER_FL": user_conf["configuration"]["fl"],
-                "FEDAVGM_SERVER_MOMENTUM": user_conf["configuration"]["momentum"],
-                "DP": user_conf["configuration"]["dp"],
-                "METRIC_PRIVACY": user_conf["configuration"]["mp"],
-                "NOISE_MULT": user_conf["configuration"]["noise_mult"],
-                "SAMPLED_CLIENTS": user_conf["configuration"]["sampled_clients"],
-                "CLIP_NORM": user_conf["configuration"]["clip_norm"],
+                "FEDERATED_STRATEGY": user_conf["flower"]["strategy"],
+                "MU_FEDPROX": user_conf["flower"]["mu"],
+                "FEDAVGM_SERVER_FL": user_conf["flower"]["fl"],
+                "FEDAVGM_SERVER_MOMENTUM": user_conf["flower"]["momentum"],
+                "DP": user_conf["flower"]["dp"],
+                "METRIC_PRIVACY": user_conf["flower"]["mp"],
+                "NOISE_MULT": user_conf["flower"]["noise_mult"],
+                "SAMPLED_CLIENTS": user_conf["flower"]["sampled_clients"],
+                "CLIP_NORM": user_conf["flower"]["clip_norm"],
             }
         )
 
