@@ -29,6 +29,7 @@ VO = "vo.ai4eosc.eu"
 NAMESPACE = papiconf.MAIN_CONF["nomad"]["namespaces"][VO]
 
 # Set platform hardware requirements for try-me
+MAX_TRYMES = 3
 REQUIREMENTS = {
     "cpu": {"default": 1, "max": 8, "min": 1},
     "memory_MB": {"default": 2000, "max": 16000, "min": 1000},
@@ -151,19 +152,22 @@ def create_deployment(
         final[k] = max(final[k], REQUIREMENTS[k]["min"])
         final[k] = min(final[k], REQUIREMENTS[k]["max"])
         if (user_k := meta_inference.get(k)) and user_k > final[k]:
-            mismatches[k] = f"* Requested: {user_k}, Max allowed: {final[k]}"
+            mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
 
-    # Show warning in Gradio UI if we couldn't accommodate user requirements
+    if meta_inference["gpu"]:
+        mismatches["gpu"] = f"Requested: {meta_inference['gpu']}, Allowed: 0"
+
+    # Show warning if we couldn't accommodate user requirements
     warning = ""
     if mismatches:
         warning = (
             "The developer of the module specified an optimum amount of resources "
             "that could not be met in try-me deployments. "
             "Therefore, you might experience some issues when using this module for "
-            "inference. \n The following resources could not be met:"
+            "inference. <br> The following resources could not be met:"
         )
-        for k, v in mismatches:
-            warning += f"\n* {k}: {v}"
+        for k, v in mismatches.items():
+            warning += f"<br>* **{k}**: {v}"
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
@@ -219,10 +223,10 @@ def create_deployment(
         owner=auth_info["id"],
         prefix="try",
     )
-    if len(jobs) >= 3:
+    if len(jobs) >= MAX_TRYMES:
         raise HTTPException(
             status_code=503,
-            detail="Sorry, but you seem to be currently running 3 `try-me` environments already. "
+            detail=f"Sorry, but you seem to be currently running {MAX_TRYMES} `try-me` environments already. "
             "Before launching a new one, you will need to wait till one of your "
             "existing environments gets automatically deleted (ca. 10 min) or delete it manually "
             "in the Dashboard.",

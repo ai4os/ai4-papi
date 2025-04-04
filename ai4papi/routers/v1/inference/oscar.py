@@ -150,15 +150,31 @@ def get_service_conf(
     # Modify default hardware value with user preferences, as long as they are within
     # the allowed limits
     meta_inference = metadata.get("resources", {}).get("inference", {})  # user request
+    final = {}  # final deployment values
+    mismatches = {}
     meta2conf = {
         "cpu": "cpu_num",
         "memory_MB": "ram",
     }
     for k, v in meta2conf.items():
-        final = meta_inference.get(k, conf["hardware"][v]["value"])
-        final = max(final, conf["hardware"][v]["range"][0])
-        final = min(final, conf["hardware"][v]["range"][1])
-        conf["hardware"][v]["value"] = final
+        final[k] = meta_inference.get(k, conf["hardware"][v]["value"])
+        final[k] = max(final[k], conf["hardware"][v]["range"][0])
+        final[k] = min(final[k], conf["hardware"][v]["range"][1])
+        conf["hardware"][v]["value"] = final[k]
+        if (user_k := meta_inference.get(k)) and user_k > final[k]:
+            mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
+
+    # Show warning if we couldn't accommodate user requirements
+    if mismatches:
+        warning = (
+            "The developer of the module specified an optimum amount of resources "
+            "that could not be met in OSCAR deployments. "
+            "Therefore, you might experience some issues when using this module for "
+            "inference. \n The following resources could not be met:"
+        )
+        for k, v in mismatches.items():
+            warning += f"\n* **{k}**: {v}"
+        conf["hardware"]["warning"] = warning
 
     return conf
 

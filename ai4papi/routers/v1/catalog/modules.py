@@ -4,12 +4,12 @@ import types
 from fastapi import APIRouter, HTTPException
 from natsort import natsorted
 
-from ai4papi import quotas, nomad
+from ai4papi import quotas, nomad, utils
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags
 
 
-gpu_specs = {}
+gpu_specs = utils.gpu_specs()
 
 
 def get_config(
@@ -70,15 +70,19 @@ def get_config(
     # Modify default hardware value with user preferences, as long as they are within
     # the allowed limits
     meta_inference = metadata.get("resources", {}).get("inference", {})  # user request
+    final = {}  # final deployment values
+    mismatches = {}
     meta2conf = {
         "cpu": "cpu_num",
         "memory_MB": "ram",
     }
     for k, v in meta2conf.items():
-        final = meta_inference.get(k, conf["hardware"][v]["value"])
-        final = max(final, conf["hardware"][v]["range"][0])
-        final = min(final, conf["hardware"][v]["range"][1])
-        conf["hardware"][v]["value"] = final
+        final[k] = meta_inference.get(k, conf["hardware"][v]["value"])
+        final[k] = max(final[k], conf["hardware"][v]["range"][0])
+        final[k] = min(final[k], conf["hardware"][v]["range"][1])
+        conf["hardware"][v]["value"] = final[k]
+        if (user_k := meta_inference.get(k)) and user_k > final[k]:
+            mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
 
     # Fill with available GPU models in the cluster
     # Additionally filter out models that do not meet user requirements
@@ -88,16 +92,31 @@ def get_config(
         if m not in gpu_specs.keys():
             print(f"Nomad model not found in PAPI GPU specs table: {m}")
             continue
-        if (r := meta_inference.get("gpu_memory_MB")) and r > gpu_specs[m]["memory_MB"]:
-            continue
-        if (r := meta_inference.get("gpu_compute_capability")) and (
-            r > gpu_specs[m]["compute_capability"]
-        ):
-            continue
-        models.append(m)
-    conf["hardware"]["gpu_type"]["options"] += models
+        for k in ["gpu_memory_MB", "gpu_compute_capability"]:
+            if (r := meta_inference.get(k)) and r > gpu_specs[m][k]:
+                break
+        else:
+            models.append(m)
+    if not models:
+        # If no GPU models meet the requirements let the user use any model
+        conf["hardware"]["gpu_type"]["options"] += nomad_models
+        for k in ["gpu_memory_MB", "gpu_compute_capability"]:
+            if r := meta_inference.get(k):
+                mismatches[k] = f"Requested: {r}"
+    else:
+        conf["hardware"]["gpu_type"]["options"] += models
 
-    # TODO: add a warning message in case requirements could not be met by the Platform
+    # Show warning if we couldn't accommodate user requirements
+    if mismatches:
+        warning = (
+            "The developer of the module specified an optimum amount of resources "
+            "that could not be met in Nomad deployments. "
+            "Therefore, you might experience some issues when using this module for "
+            "inference. \n The following resources could not be met:"
+        )
+        for k, v in mismatches.items():
+            warning += f"\n* **{k}**: {v}"
+        conf["hardware"]["warning"] = warning
 
     return conf
 

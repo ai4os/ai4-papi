@@ -118,9 +118,8 @@ job "try-${JOB_UUID}" {
       }
 
       env {
-        BANNER = ${BANNER}
+        BANNER = "${BANNER}"
       }
-
 
     }
 

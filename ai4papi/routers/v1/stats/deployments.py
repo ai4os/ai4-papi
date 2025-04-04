@@ -156,7 +156,7 @@ def get_proper_allocation(allocs):
     return allocs[idx]["ID"]
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
+@cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
 def load_datacenters():
     # Check if datacenter info file is available
     pth = papiconf.main_path.parent / "var" / "datacenters_info.csv"
