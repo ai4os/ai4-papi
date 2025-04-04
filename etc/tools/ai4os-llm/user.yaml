@@ -33,6 +33,11 @@ llm:
     description: Large Language Model to use (retrieve from Huggingface).
     options: []
 
+  ui_username:
+    name: Open WebUI username
+    value: ''
+    description: Admin username for Open WebUI
+
   ui_password:
     name: Open WebUI password
     value: ''
