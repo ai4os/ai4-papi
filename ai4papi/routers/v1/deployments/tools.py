@@ -152,6 +152,17 @@ def get_deployment(
     if tool_id == "ai4os-ai4life-loader":
         job["main_endpoint"] = "ui"  # instead of deepaas
 
+    if tool_id == "ai4os-nvflare":
+        # Remove useless endpoints (they are not meant to be opened by the user directly)
+        ignore = ["server-admin", "server-fl"]
+        job["endpoints"] = {
+            k: v for k, v in job["endpoints"].items() if k not in ignore
+        }
+        if job["active_endpoints"]:
+            job["active_endpoints"] = [
+                k for k in job["active_endpoints"] if k not in ignore
+            ]
+
     return job
 
 
@@ -416,7 +427,6 @@ def create_deployment(
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
                 "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
                 "NVFL_END_DATE": user_conf["nvflare"]["end_date"],
-                "NVFL_FROZEN_PROJECT": user_conf["nvflare"]["frozen_project"],
                 "NVFL_PUBLIC_PROJECT": user_conf["nvflare"]["public_project"],
             }
         )
