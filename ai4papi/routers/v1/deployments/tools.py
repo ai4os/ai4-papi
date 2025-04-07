@@ -156,6 +156,17 @@ def get_deployment(
     if tool_id == "ai4os-ai4life-loader":
         job["main_endpoint"] = "ui"  # instead of deepaas
 
+    if tool_id == "ai4os-nvflare":
+        # Remove useless endpoints (they are not meant to be opened by the user directly)
+        ignore = ["server-admin", "server-fl"]
+        job["endpoints"] = {
+            k: v for k, v in job["endpoints"].items() if k not in ignore
+        }
+        if job["active_endpoints"]:
+            job["active_endpoints"] = [
+                k for k in job["active_endpoints"] if k not in ignore
+            ]
+
     return job
 
 
@@ -255,7 +266,7 @@ def create_deployment(
     )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
-    job_uuid = uuid.uuid1()
+    job_uuid = str(uuid.uuid1())
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
     if vo == "training.egi.eu":
@@ -499,6 +510,47 @@ def create_deployment(
                 "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
                 "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
                 "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+    # Deploy an NVFlare Federated server and Dashboard
+    elif tool_name == "ai4os-nvflare":
+        # Enforce having NVFLARE credentials
+        if not (user_conf["nvflare"]["username"] and user_conf["nvflare"]["password"]):
+            raise HTTPException(
+                status_code=400,
+                detail="You must provide credentials for NVFLARE.",
+            )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                "NVFL_VERSION": "2.5-Stifo",
+                "NVFL_USERNAME": user_conf["nvflare"]["username"],
+                "NVFL_PASSWORD": user_conf["nvflare"]["password"],
+                "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
+                "NVFL_SHORTNAME": job_uuid[:16],
+                "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
+                "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
+                "NVFL_END_DATE": user_conf["nvflare"]["end_date"],
+                "NVFL_PUBLIC_PROJECT": user_conf["nvflare"]["public_project"],
             }
         )
 

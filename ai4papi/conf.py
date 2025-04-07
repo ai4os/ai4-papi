@@ -100,6 +100,7 @@ for tool_path in tool_list:
 tools_nomad2id = {
     "fl": "ai4os-federated-server",
     "cvat": "ai4os-cvat",
+    "nvflare": "ai4os-nvflare",
     "llm": "ai4os-llm",
     "ai4life": "ai4os-ai4life-loader",
     "devenv": "ai4os-dev-env",
