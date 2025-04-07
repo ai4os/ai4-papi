@@ -88,9 +88,6 @@ job "tool-ai4life-${JOB_UUID}" {
       port "ui" {
         to = 80
       }
-      port "custom" {
-        to = 80
-      }
     }
 
     service {
@@ -113,21 +110,11 @@ job "tool-ai4life-${JOB_UUID}" {
       ]
     }
 
-    service {
-      name = "${JOB_UUID}-custom"
-      port = "custom"
-      tags = [
-        "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-custom.tls=true",
-        "traefik.http.routers.${JOB_UUID}-custom.rule=Host(`custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.custom-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
-      ]
-    }
-
     ephemeral_disk {
       size = ${DISK}
     }
 
-    task "main" { # Task configured by the user (deepaas, jupyter, vscode)
+    task "main" {
 
       driver = "docker"
 
@@ -136,7 +123,7 @@ job "tool-ai4life-${JOB_UUID}" {
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
         command    = "deep-start"
         args       = ["--deepaas"]
-        ports      = ["api", "custom"]
+        ports      = ["api", "ui"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
@@ -166,44 +153,6 @@ job "tool-ai4life-${JOB_UUID}" {
 
         }
       }
-    }
-
-    task "ui" { # DEEPaaS UI (Gradio)
-
-      # Run as post-start to make sure DEEPaaS up before launching the UI
-      lifecycle {
-        hook    = "poststart"
-        sidecar = true
-      }
-
-      driver = "docker"
-
-      config {
-        force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui:latest"
-        ports      = ["ui"]
-        shm_size   = 250000000   # 250MB
-        memory_hard_limit = 500  # MB
-      }
-
-      env {
-        DURATION = "10000d"  # do not kill UI (duration = 10K days)
-        UI_PORT  = 80
-        MAX_RETRIES = 1000  # some models take a lot to download --> UI will wait at least (5*1000) seconds before failing for not finding DEEPaaS
-      }
-
-      resources {
-        cpu        = 500  # MHz
-        memory     = 500  # MB
-        memory_max = 500  # MB
-      }
-
-      # Do not try to restart a try-me job if it raises error (module incompatible with Gradio UI)
-      restart {
-        attempts = 0
-        mode     = "fail"
-      }
-
     }
 
   }

@@ -5,28 +5,64 @@
 # Models are sorted in rough performance order
 
 models:
-
   Qwen/Qwen2.5-7B-Instruct-AWQ:
+    name: 'Qwen2.5-7B-Instruct-AWQ'
+    description: 'A 7B parameter instruction-tuned model from the Qwen 2.5 series, optimized for dialogue and general-purpose tasks.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '128K'
     needs_HF_token: False
     args: ['--quantization', 'awq']
 
   Qwen/Qwen2.5-Coder-7B-Instruct-AWQ:
+    name: 'Qwen2.5-Coder-7B-Instruct-AWQ'
+    description: 'A 7B parameter model specialized in code generation and understanding, instruction-tuned for programming-related tasks.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '131K'
     needs_HF_token: False
     args: ['--quantization', 'awq']
 
   Qwen/Qwen2.5-Math-1.5B-Instruct:
+    name: 'Qwen2.5-Math-1.5B-Instruct'
+    description: 'A 1.5B parameter model focused on mathematical reasoning and problem-solving, optimized for math-related queries.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
     needs_HF_token: False
     args: ['--dtype', 'float16']
 
   deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B:
+    name: 'DeepSeek-R1-Distill-Qwen-1.5B'
+    description: 'A distilled version of DeepSeek-R1, based on Qwen architecture, optimized for efficient reasoning and inference tasks.'
+    family: 'deepseek-ai'
+    license: 'Apache 2.0'
+    context: '131K'
     needs_HF_token: False
-    args: ['--dtype', 'float16']
+    args:
+      [
+        '--dtype',
+        'float16',
+        '--enable-reasoning',
+        '--reasoning-parser',
+        'deepseek_r1',
+      ]
 
   meta-llama/Llama-3.2-3B:
+    name: 'Llama-3.2-3B'
+    description: 'A 3B parameter model from Meta’s Llama 3.2 series, designed for general NLP tasks with improved efficiency.'
+    family: 'meta-llama'
+    license: 'Custom Meta AI License'
+    context: '128K'
     needs_HF_token: True
     args: ['--dtype', 'float16']
 
   meta-llama/Llama-3.2-3B-Instruct:
+    name: 'Llama-3.2-3B-Instruct'
+    description: 'An instruction-tuned variant of Llama-3.2-3B, optimized for chatbot-like interactions and structured responses.'
+    family: 'meta-llama'
+    license: 'Custom Meta AI License'
+    context: '131K'
     needs_HF_token: True
     args: ['--dtype', 'float16']
 

@@ -52,6 +52,12 @@ tools_config = {
             "password": "mock_password",
         },
     },
+    "ai4os-dev-env": {
+        "general": {
+            "docker_tag": "u22.04",
+            "jupyter_password": "mock_password",
+        },
+    },
 }
 
 for tname, tconfig in tools_config.items():

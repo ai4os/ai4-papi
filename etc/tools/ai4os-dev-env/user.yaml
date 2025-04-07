@@ -32,20 +32,20 @@ general:
 
   docker_image:
     name: Docker image
-    value: 'ai4oshub/ai4os-demo-app'
-    description: Docker image of your AI module.
+    value: 'ai4oshub/ai4os-dev-env'
+    description: Docker image to be used.
 
   docker_tag:
     name: Docker tag
-    value: 'latest'
+    value: ''
     description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
-    options: ['latest']
+    options: []
 
   service:
-    name: Service to run
-    value: 'deepaas'
-    description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`. In some container, you will also be able to deploy VS Code.
-    options: ['deepaas', 'jupyter']
+    name: Interactive Development Environment
+    value: 'vscode'
+    description: Select your favorite Interactive Development Environment
+    options: ['vscode', 'jupyter']
 
   jupyter_password:
     name: IDE password
