@@ -7,7 +7,7 @@ import natsort
 
 from ai4papi import quotas, utils, nomad
 import ai4papi.conf as papiconf
-from .common import Catalog, retrieve_docker_tags
+from .common import Catalog, retrieve_docker_tags, fmt_map
 
 
 security = HTTPBearer()
@@ -116,6 +116,7 @@ router.add_api_route(
     "/{item_name}/metadata",
     Tools.get_metadata,
     methods=["GET"],
+    responses={200: {"content": {i: {} for i in fmt_map.keys()}}},
 )
 router.add_api_route(
     "/{item_name}/config",
