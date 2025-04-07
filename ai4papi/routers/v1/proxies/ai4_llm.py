@@ -32,9 +32,11 @@ router = APIRouter(
 
 security = HTTPBearer()
 
+LLM_API_KEY = os.getenv("OPENAI_API_KEY")
+
 client = OpenAI(
     base_url="https://llm.dev.ai4eosc.eu/api",
-    api_key=os.getenv("LLM_API_KEY"),
+    api_key=LLM_API_KEY,
 )
 
 
