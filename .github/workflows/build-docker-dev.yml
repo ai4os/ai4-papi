@@ -40,7 +40,7 @@ jobs:
 
       - name: Test - Basic init (dev mode)
         run: |
-          docker run --rm test-image /bin/bash -c "unset FORWARDED_ALLOW_IPS && python3 -c 'import ai4papi'"
+          docker run -e IS_PROD=False --rm test-image /bin/bash -c "python3 -c 'import ai4papi'"
 
       - name: Build and push
         uses: docker/build-push-action@v6
