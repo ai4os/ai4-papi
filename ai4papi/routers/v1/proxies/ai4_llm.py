@@ -63,7 +63,7 @@ def get_chat_response(
         completion = client.chat.completions.create(
             model=request.model, messages=request.messages, stream=True
         )
-        
+
         def event_stream():
             for chunk in completion:
                 if not chunk.choices:
@@ -75,7 +75,7 @@ def get_chat_response(
                 yield f"{content}"
 
         return StreamingResponse(event_stream(), media_type="text/plain")
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
