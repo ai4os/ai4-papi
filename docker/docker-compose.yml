@@ -6,6 +6,7 @@ services:
         image: "registry.services.ai4os.eu/ai4os/ai4-papi:prod"
         restart: always
         environment:
+            - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy
             - NOMAD_ADDR=https://193.146.75.205:4646
             - ACCOUNTING_PTH=/home/ai4-accounting
             - ZENODO_TOKEN=*****************************
@@ -25,6 +26,7 @@ services:
         image: "registry.services.ai4os.eu/ai4os/ai4-papi:dev"
         restart: always
         environment:
+            - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy
             - NOMAD_ADDR=https://193.146.75.205:4646
             - ACCOUNTING_PTH=/home/ai4-accounting
             - ZENODO_TOKEN=*****************************

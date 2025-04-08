@@ -44,7 +44,7 @@ jobs:
 
       - name: Test - Basic init (dev mode)
         run: |
-          docker run --rm test-image /bin/bash -c "unset FORWARDED_ALLOW_IPS && python3 -c 'import ai4papi'"
+          docker run -e IS_PROD=False --rm test-image /bin/bash -c "python3 -c 'import ai4papi'"
 
       - name: Get short commit SHA
         id: vars
@@ -62,4 +62,3 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
           file: docker/Dockerfile
-
