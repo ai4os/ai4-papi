@@ -16,16 +16,6 @@ from pydantic import BaseModel
 from ai4papi import auth
 
 
-class ChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    model: str = "ai4eoscassistant"
-    messages: List[ChatMessage] = []
-
-
 router = APIRouter(
     prefix="/ai4_llm",
     tags=["AI4LLM proxy"],
@@ -34,12 +24,25 @@ router = APIRouter(
 
 security = HTTPBearer()
 
-LLM_API_KEY = os.getenv("OPENAI_API_KEY")
+#  Init the OpenAI client
+LLM_API_KEY = os.getenv("LLM_API_KEY")
+if LLM_API_KEY:
+    client = OpenAI(
+        base_url="https://llm.dev.ai4eosc.eu/api",
+        api_key=LLM_API_KEY,
+    )
+else:
+    client = None
 
-client = OpenAI(
-    base_url="https://llm.dev.ai4eosc.eu/api",
-    api_key=LLM_API_KEY,
-)
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    model: str = "ai4eoscassistant"
+    messages: List[ChatMessage] = []
 
 
 @router.post("/chat")
