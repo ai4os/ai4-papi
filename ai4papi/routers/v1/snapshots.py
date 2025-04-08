@@ -42,6 +42,10 @@ else:
 # Use the Nomad cluster inited in nomad.common
 Nomad = nomad_common.Nomad
 
+# Define limits for snapshots size
+INDIVIDUAL_LIMIT_GB = 10
+TOTAL_LIMIT_GB = 15
+
 
 @router.get("")
 def get_snapshots(
@@ -112,10 +116,13 @@ def create_snapshot(
         vo=vo,
     )
     total_size = sum([s["size"] for s in snapshots])
-    if total_size > (10 * 10**9):
+    if total_size > (TOTAL_LIMIT_GB * 10**9):
         raise HTTPException(
-            status_code=401,
-            detail="You have exceeded the 10 GB quota. Please delete some snapshots before creating a new one.",
+            status_code=400,
+            detail=(
+                f"You have exceeded the {TOTAL_LIMIT_GB} GB quota. "
+                "Please delete some snapshots before creating a new one."
+            ),
         )
 
     # Load module configuration
@@ -130,7 +137,7 @@ def create_snapshot(
     )
     if job_info["status"] != "running":
         raise HTTPException(
-            status_code=401,
+            status_code=400,
             detail='You cannot make a snapshot of a job that has a status different than "running".',
         )
 
@@ -155,6 +162,7 @@ def create_snapshot(
             "SUBMIT_TIME": now.strftime("%Y-%m-%d %X"),
             "HARBOR_ROBOT_USER": papiconf.HARBOR_USER,
             "HARBOR_ROBOT_PASSWORD": papiconf.HARBOR_PASS,
+            "SIZE_LIMIT_GB": INDIVIDUAL_LIMIT_GB,
             "VO": vo,
         }
     )
@@ -372,7 +380,8 @@ def get_nomad_snapshots(
         if size_error:
             tmp["status"] = "failed"
             tmp["error_msg"] = (
-                "The deployment is too big to make a snapshot. Please delete some data to make it lighter."
+                f"The deployment is too big to make a snapshot (maximum is {INDIVIDUAL_LIMIT_GB} GB). "
+                "Please delete some data or move it to '/storage' to make the deployment lighter."
             )
 
         elif upload_error:

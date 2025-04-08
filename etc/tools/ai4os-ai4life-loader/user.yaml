@@ -30,27 +30,23 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+
   docker_image:
     name: Docker image
-    value: 'ai4oshub/ai4os-demo-app'
-    description: Docker image of your AI module.
+    value: 'ai4oshub/ai4os-ai4life-loader'
+    description: Docker image to be used.
 
   docker_tag:
     name: Docker tag
     value: 'latest'
-    description: Docker tag to use. Tags are module dependent. You should choose the appropriate tag for your selected hardware (eg. use a `gpu`-like tag if you plan to run on GPUs).
+    description: Docker tag to use. Tags are module dependent.
     options: ['latest']
 
-  service:
-    name: Service to run
-    value: 'deepaas'
-    description: When selecting DEEPaaS you won't be able to use JupyterLab, and vice versa. If you want to have access to both services at the same time your best option is to deploy with JupyterLab, then open a terminal window and run DEEPaaS yourself typing `deep-start --deepaas`. In some container, you will also be able to deploy VS Code.
-    options: ['deepaas', 'jupyter']
-
-  jupyter_password:
-    name: IDE password
+  model_id:
+    name: AI4Life model ID
     value: ''
-    description: Select a password for your IDE (JupyterLab or VS Code). It should have at least 9 characters.
+    description: AI4Life model ID.
+    options: []
 
 hardware:
   cpu_num:
@@ -78,34 +74,3 @@ hardware:
     name: Disk memory (in MB)
     value: 10000
     range: [1000, 50000]
-
-storage:
-  rclone_conf:
-    name: RCLONE configuration
-    value: '/srv/.rclone/rclone.conf'
-    description: rclone.conf location
-
-  rclone_url:
-    name: Storage URL
-    value: ''
-    description: Remote storage link to be accessed via rclone (webdav). For example, in Nextcloud `https://share.services.ai4os.eu/remote.php/dav/files/<USER-ID>`
-
-  rclone_vendor:
-    name: RCLONE vendor
-    value: 'nextcloud'
-    options: ['nextcloud']
-    description: RCLONE vendor (webdav)
-
-  rclone_user:
-    name: RCLONE user
-    value: ''
-    description: rclone user to access a webdav remote storage
-
-  rclone_password:
-    name: RCLONE user password
-    value: ''
-
-  datasets:
-    name: Info of the datasets you want to download
-    value: []
-    description: Each element in the list should be a dict containing "doi" and "force_pull" keys. It requires the definition of all RCLONE variables.

@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "tool-fl-${JOB_UUID}" {
+job "tool-ai4life-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -82,45 +82,31 @@ job "tool-fl-${JOB_UUID}" {
 
     network {
 
-      port "fedserver" {
-        to = 5000
+      port "api" {
+        to = 5000  # -1 will assign random port
       }
-      port "monitor" {
-        to = 6006
-      }
-      port "ide" {
-        to = 8888
+      port "ui" {
+        to = 80
       }
     }
 
     service {
-      name = "${JOB_UUID}-fedserver"
-      port = "fedserver"
+      name = "${JOB_UUID}-api"
+      port = "api"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-fedserver.tls=true",
-        "traefik.http.routers.${JOB_UUID}-fedserver.rule=Host(`fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.fedserver-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
-        "traefik.http.services.${JOB_UUID}-fedserver.loadbalancer.server.scheme=h2c",  # grpc support
+        "traefik.http.routers.${JOB_UUID}-api.tls=true",
+        "traefik.http.routers.${JOB_UUID}-api.rule=Host(`api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
     service {
-      name = "${JOB_UUID}-monitor"
-      port = "monitor"
+      name = "${JOB_UUID}-ui"
+      port = "ui"
       tags = [
         "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.tls=true",
-        "traefik.http.routers.${JOB_UUID}-monitor.rule=Host(`monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.monitor-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
-      ]
-    }
-
-    service {
-      name = "${JOB_UUID}-ide"
-      port = "ide"
-      tags = [
-        "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-ide.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
+        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -129,44 +115,45 @@ job "tool-fl-${JOB_UUID}" {
     }
 
     task "main" {
+
       driver = "docker"
 
-      # Use default command defined in the Dockerfile
       config {
         force_pull = true
         image      = "${DOCKER_IMAGE}:${DOCKER_TAG}"
-        ports      = ["fedserver", "monitor", "ide"]
+        command    = "deep-start"
+        args       = ["--deepaas"]
+        ports      = ["api", "ui"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
           size = "${DISK}M"
         }
+
       }
 
       env {
-        VAULT_TOKEN                     = "${VAULT_TOKEN}"
-        jupyterPASSWORD                 = "${JUPYTER_PASSWORD}"
-        FEDERATED_ROUNDS                = "${FEDERATED_ROUNDS}"
-        FEDERATED_METRIC                = "${FEDERATED_METRIC}"
-        FEDERATED_MIN_FIT_CLIENTS       = "${FEDERATED_MIN_FIT_CLIENTS}"
-        FEDERATED_MIN_AVAILABLE_CLIENTS = "${FEDERATED_MIN_AVAILABLE_CLIENTS}"
-        FEDERATED_STRATEGY              = "${FEDERATED_STRATEGY}"
-        MU_FEDPROX                      = "${MU_FEDPROX}"
-        FEDAVGM_SERVER_FL               = "${FEDAVGM_SERVER_FL}"
-        FEDAVGM_SERVER_MOMENTUM         = "${FEDAVGM_SERVER_MOMENTUM}"
-        DP                              = "${DP}"
-        METRIC_PRIVACY                  = "${METRIC_PRIVACY}"
-        NOISE_MULT                      = "${NOISE_MULT}"
-        SAMPLED_CLIENTS                 = "${SAMPLED_CLIENTS}"
-        CLIP_NORM                       = "${CLIP_NORM}"
-        CODE_CARBON                     = "${CODE_CARBON}"
+        MODEL_NAME = "${AI4LIFE_MODEL}"
       }
 
       resources {
-        cores  = ${CPU_NUM}
-        memory = ${RAM}
+        cores      = ${CPU_NUM}
+        memory     = ${RAM}
         memory_max = ${RAM}
+
+        device "gpu" {
+          count = ${GPU_NUM}
+
+          # Add a constraint for a particular GPU model
+          constraint {
+            attribute = "${device.model}"
+            operator  = "="
+            value     = "${GPU_MODELNAME}"
+          }
+
+        }
       }
     }
+
   }
 }

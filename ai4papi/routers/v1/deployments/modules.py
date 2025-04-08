@@ -1,6 +1,7 @@
 from copy import deepcopy
 import datetime
 import os
+import subprocess
 import types
 from typing import Tuple, Union
 import uuid
@@ -12,6 +13,8 @@ from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers import v1
+from ai4papi.routers.v1 import secrets as ai4secrets
+from ai4papi.routers.v1 import deployments as ai4_deployments
 
 
 router = APIRouter(
@@ -193,8 +196,15 @@ def create_deployment(
         vo=vo,
     )
 
-    # Check if the provided configuration is within the user quotas
-    deployments = get_deployments(
+    # Check if requested hardware is within the user total quota (summing modules and
+    # tools)
+    modules_deps = get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    tools_deps = ai4_deployments.tools.get_deployments(
         vos=[vo],
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
@@ -202,7 +212,7 @@ def create_deployment(
     )
     quotas.check_userwise(
         conf=user_conf,
-        deployments=deployments,
+        deployments=modules_deps + tools_deps,
     )
 
     # Generate UUID from (MAC address+timestamp) so it's unique
@@ -215,6 +225,26 @@ def create_deployment(
         priority = 50
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
+
+    # Retrieve MLflow credentials
+    user_secrets = ai4secrets.get_secrets(
+        vo=vo,
+        subpath="/services",
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials,
+        ),
+    )
+    mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
+
+    # Check IDE password length
+    if (
+        user_conf["general"]["service"] in ["jupyter", "vscode"]
+        and len(user_conf["general"]["jupyter_password"]) < 9
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Your IDE needs a password of at least 9 characters.",
+        )
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
@@ -249,6 +279,9 @@ def create_deployment(
             "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
             "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
             "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+            "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
+            "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
+            "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
             "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
             "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
             "TODAY": str(datetime.date.today()),
@@ -269,6 +302,7 @@ def create_deployment(
     # Modify the GPU section
     if user_conf["hardware"]["gpu_num"] <= 0:
         # Delete GPU section in CPU deployments
+        usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
         usertask["Resources"]["Devices"] = None
     else:
         # If gpu_type not provided, remove constraint to GPU model
@@ -310,6 +344,15 @@ def create_deployment(
     if not all(rclone.values()):
         exclude_tasks = ["storage_mount", "storage_cleanup", "dataset_download"]
     else:
+        # Obscure rclone password on behalf of user
+        obscured = subprocess.run(
+            [f"rclone obscure {user_conf['storage']['rclone_password']}"],
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+        usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
+
         # If datasets provided, replicate 'dataset_download' task as many times as needed
         if user_conf["storage"]["datasets"]:
             download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]

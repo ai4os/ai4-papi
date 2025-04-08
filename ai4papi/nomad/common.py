@@ -115,6 +115,7 @@ def get_deployment(
     info["docker_image"] = usertask["Config"]["image"]
     command = usertask["Config"].get("command", "")
     args = usertask["Config"].get("args", [])
+    args[:] = [str(a) for a in args]
     info["docker_command"] = f"{command} {' '.join(args)}".strip()
 
     # Add endpoints
@@ -123,12 +124,20 @@ def get_deployment(
         label = s["PortLabel"]
 
         # Iterate through tags to find `Host` tag
+        url = "missing-endpoint"
         for t in s["Tags"]:
-            try:
-                url = re.search(r"Host\(`(.+?)`", t).group(1)
+            patterns = [
+                r"Host\(`(.+?)`",
+                r"HostSNI\(`(.+?)`",
+            ]
+            for pattern in patterns:
+                match = re.search(pattern, t)
+                if match:
+                    url = match.group(1)
+                    break
+
+            if url != "missing-endpoint":
                 break
-            except Exception:
-                url = "missing-endpoint"
 
         # Old deployments had network ports with names [deepaas, ide, monitor]
         # instead of [api, ide, monitor] so we have to manually replace them
@@ -136,7 +145,7 @@ def get_deployment(
         if label == "deepaas":
             label = "api"
 
-        info["endpoints"][label] = f"http://{url}"
+        info["endpoints"][label] = f"https://{url}"
 
     # Add '/ui' to deepaas endpoint
     # If in the future we support other APIs, this will have to be removed.

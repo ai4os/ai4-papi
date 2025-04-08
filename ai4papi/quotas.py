@@ -12,12 +12,18 @@ import ai4papi.conf as papiconf
 def check_jobwise(
     conf: dict,
     vo: str,
+    item_name: str = "",
 ):
     """
     Check the job configuration does not overflow the generic hardware limits.
+
+    Params:
+    ------
+    * conf: user configuration
+    * vo: user VO
+    * item_name: provide in case we look for a specific tool
     """
     # Retrieve generic quotas (vo-dependent)
-    item_name = conf["general"]["docker_image"].split("/")[-1]
     ref = limit_resources(
         item_name=item_name,
         vo=vo,
@@ -25,7 +31,7 @@ def check_jobwise(
 
     # Compare with user options
     user_conf = conf["hardware"]
-    for k in ref.keys():
+    for k in (k for k in ref.keys() if k in user_conf.keys()):
         if "range" in ref[k].keys():
             if user_conf[k] < ref[k]["range"][0]:
                 raise HTTPException(
@@ -41,7 +47,7 @@ def check_jobwise(
 
 def check_userwise(
     conf: dict,
-    deployments: dict,
+    deployments: list,
 ):
     """
     Check the job configuration does not overflow the generic hardware limits.
@@ -54,18 +60,15 @@ def check_userwise(
 
     # Check if aggregate is within the limits
     threshold = {"gpu_num": 2}
-    if (user["gpu_num"] + conf["hardware"]["gpu_num"]) > threshold["gpu_num"] and conf[
-        "hardware"
-    ]["gpu_num"]:
-        # TODO: remove this last line ("and conf['hardware']['gpu_num']"") once everyone
-        # is within the quotas. For the time being this line is enabling users that have
-        # overpassed the quotas (*) to make CPU deployments.
-        # (*) before the quotas were in place
+    if (
+        conf.get("hardware", {}).get("gpu_num")
+        and (user["gpu_num"] + conf["hardware"]["gpu_num"]) > threshold["gpu_num"]
+    ):
         raise HTTPException(
             status_code=400,
-            detail="You already have at least 2 GPUs running and/or queued. "
-            "If you want to make a new GPU deployment please delete one of your "
-            "existing ones.",
+            detail=f"You already have at least {threshold['gpu_num']} GPUs running "
+            "and/or queued. If you want to make a new GPU deployment please delete one "
+            "of your existing ones.",
         )
 
 

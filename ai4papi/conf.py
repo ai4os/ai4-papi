@@ -100,6 +100,10 @@ for tool_path in tool_list:
 tools_nomad2id = {
     "fl": "ai4os-federated-server",
     "cvat": "ai4os-cvat",
+    "nvflare": "ai4os-nvflare",
+    "llm": "ai4os-llm",
+    "ai4life": "ai4os-ai4life-loader",
+    "devenv": "ai4os-dev-env",
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():
@@ -108,6 +112,10 @@ for tool in TOOLS.keys():
 # OSCAR template
 with open(paths["conf"] / "oscar.yaml", "r") as f:
     OSCAR_TMPL = Template(f.read())
+
+# vLLM conf
+with open(paths["conf"] / "vllm.yaml", "r") as f:
+    VLLM = yaml.safe_load(f)
 
 # Try-me endpoints
 nmd = load_nomad_job(paths["conf"] / "try_me" / "nomad.hcl")
