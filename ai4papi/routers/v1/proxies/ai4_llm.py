@@ -9,6 +9,8 @@ from openai import OpenAI
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
+from fastapi.responses import StreamingResponse
+
 from pydantic import BaseModel
 
 from ai4papi import auth
@@ -56,11 +58,22 @@ def get_chat_response(
 
     try:
         completion = client.chat.completions.create(
-            model=request.model, messages=request.messages
+            model=request.model, messages=request.messages, stream=True
         )
+        
+        def event_stream():
+            for chunk in completion:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if not delta or not hasattr(delta, "content"):
+                    continue
+                content = delta.content or ""
+                yield f"{content}"
+
+        return StreamingResponse(event_stream(), media_type="text/plain")
+        
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"An unexpected error occurred: {str(e)}"
         )
-
-    return completion
