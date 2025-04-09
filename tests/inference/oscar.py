@@ -15,16 +15,10 @@ If running from VScode make sure to launch `code` from that terminal so it can a
 that ENV variable.'
     )
 
-# Test service
-service = oscar.Service(
-    image="deephdc/deep-oc-image-classification-tf",
-    cpu=2,
-)
-
 # Create service
 sname = oscar.create_service(
     vo="vo.ai4eosc.eu",
-    svc_conf=service,
+    conf={},
     authorization=SimpleNamespace(credentials=token),
 )
 
@@ -37,11 +31,10 @@ names = [s["name"] for s in slist]
 assert sname in names, "Service does not exist"
 
 # Update service
-service.cpu = 1
 oscar.update_service(
     vo="vo.ai4eosc.eu",
     service_name=sname,
-    svc_conf=service,
+    conf={},
     authorization=SimpleNamespace(credentials=token),
 )
 
