@@ -164,10 +164,11 @@ def create_deployment(
             "The developer of the module specified an optimum amount of resources "
             "that could not be met in try-me deployments. "
             "Therefore, you might experience some issues when using this module for "
-            "inference. <br> The following resources could not be met:"
+            "inference. <br> The following resources could not be met: <ul>"
         )
         for k, v in mismatches.items():
-            warning += f"<br>* **{k}**: {v}"
+            warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
+        warning = warning + '</ul>'
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(

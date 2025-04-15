@@ -170,11 +170,11 @@ def get_service_conf(
             "The developer of the module specified an optimum amount of resources "
             "that could not be met in OSCAR deployments. "
             "Therefore, you might experience some issues when using this module for "
-            "inference. \n The following resources could not be met:"
+            "inference. \n The following resources could not be met: <ul>"
         )
         for k, v in mismatches.items():
-            warning += f"\n* **{k}**: {v}"
-        conf["hardware"]["warning"] = warning
+            warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
+        conf["hardware"]["warning"] = warning + '</ul>'
 
     return conf
 
