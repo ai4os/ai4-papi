@@ -214,15 +214,11 @@ def get_services_list(
         services.append(s)
 
     # Sort services by creation time, recent to old
-    # todo: comment because OSCAR is returning empty Variables, uncomment when ready
+    dates = [s["environment"]["variables"]["PAPI_CREATED"] for s in services]
+    idxs = sorted(range(len(dates)), key=dates.__getitem__)  # argsort
+    sorted_services = [services[i] for i in idxs[::-1]]
 
-    # dates = [s["environment"]["Variables"]["PAPI_CREATED"] for s in services]
-    # idxs = sorted(range(len(dates)), key=dates.__getitem__)  # argsort
-    # sorted_services = [services[i] for i in idxs[::-1]]
-
-    # return sorted_services
-
-    return services
+    return sorted_services
 
 
 @router.get("/services/{service_name}")
