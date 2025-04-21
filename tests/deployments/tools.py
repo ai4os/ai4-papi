@@ -46,6 +46,18 @@ tools_config = {
             "ui_password": "papi-test",
         },
     },
+    "ai4os-nvflare": {
+        "nvflare": {
+            "username": "mock_user",
+            "password": "mock_password",
+        },
+    },
+    "ai4os-dev-env": {
+        "general": {
+            "docker_tag": "u22.04",
+            "jupyter_password": "mock_password",
+        },
+    },
 }
 
 for tname, tconfig in tools_config.items():
@@ -73,6 +85,7 @@ for tname, tconfig in tools_config.items():
     assert "job_ID" in rdep.keys()
     assert rdep["job_ID"] == rcreate["job_ID"]
     assert rdep["status"] != "error"
+    assert rdep["tool_name"]
 
     # Retrieve all tools
     rdeps = tools.get_deployments(

@@ -231,7 +231,7 @@ def get_services_list(
         services.append(s)
 
     # Sort services by creation time, recent to old
-    dates = [s["environment"]["Variables"]["PAPI_CREATED"] for s in services]
+    dates = [s["environment"]["variables"]["PAPI_CREATED"] for s in services]
     idxs = sorted(range(len(dates)), key=dates.__getitem__)  # argsort
     sorted_services = [services[i] for i in idxs[::-1]]
 

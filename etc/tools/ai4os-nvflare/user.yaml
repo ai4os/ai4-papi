@@ -1,0 +1,69 @@
+---
+# User customizable configuration to make a deployment in Nomad.
+# Additional non-customizable values (eg. ports) are hardcoded in `job.nomad`.
+
+# All conf parameters follow the same structure:
+# varname:
+#  name: name of the parameter to be displayed to end user (mandatory)
+#  value: (default) value of the parameter (mandatory)
+#  options: restricted set of values that the parameter can take (optional)
+#  description: some comments on the parameter to be displayed to the end user (optional)
+
+general:
+  title:
+    name: Deployment title
+    value: ''
+    description: Provide short title for this deployment (less than 45 characters). Useful when you have lots of different active deployments.
+
+  desc:
+    name: Deployment description
+    value: ''
+    description: Provide some additional extended information about this deployment.
+
+nvflare:
+  username:
+    name: NVFlare Dashboard username
+    value: ''
+    description: Select a username / email for admin in your NVFlare Dashboard instance.
+
+  password:
+    name: NVFlare password
+    value: ''
+    description: Admin password for both the Dashboard and the Jupyter server instance.
+
+  app_location:
+    name: NVFlare project docker image download link
+    value: 'registry.services.ai4os.eu/ai4os/ai4os-nvflare-client:2.5-Stifo'
+    description: NVFlare project docker image download link
+
+  public_project:
+    name: Make NVFlare project public
+    value: False
+    options: [False, True]
+    description: If the project is public, user sign-up is enabled. Otherwise the admin enables the users.
+
+  starting_date:
+    name: NVFlare project start date
+    value: ''
+    description: NVFlare project start date (DD/MM/YY)
+
+  end_date:
+    name: NVFlare project end date
+    value: ''
+    description: NVFlare project end date (DD/MM/YY)
+
+hardware:
+  cpu_num:
+    name: Number of CPUs
+    value: 1
+    range: [1, 2]
+
+  ram:
+    name: RAM memory (in MB)
+    value: 2000
+    range: [2000, 4000]
+
+  disk:
+    name: Disk memory (in MB)
+    value: 1000
+    range: [1000, 2000]

@@ -2,6 +2,7 @@
 Manage configurations of the API.
 """
 
+from distutils.util import strtobool
 import os
 from pathlib import Path
 from string import Template
@@ -10,11 +11,10 @@ import subprocess
 import yaml
 
 
-# Check if we are developing from local, to disable parts of the code that are compute
-# intensive (eg. disables calls to Github API)
-# The variables 'FORWARDED_ALLOW_IPS' serves as proxy for this, as it is only defined
-# when running from the Docker container
-IS_DEV = False if os.getenv("FORWARDED_ALLOW_IPS") else True
+# Check if we are developing in dev mode or production mode, to disable parts of the
+# code that are compute intensive (eg. disables calls to Github API)
+IS_PROD = bool(strtobool(i)) if (i := os.getenv("IS_PROD")) else False
+IS_DEV = not IS_PROD
 
 # Harbor token is kind of mandatory in production, otherwise snapshots won't work.
 HARBOR_USER = "robot$user-snapshots+snapshot-api"
@@ -100,8 +100,10 @@ for tool_path in tool_list:
 tools_nomad2id = {
     "fl": "ai4os-federated-server",
     "cvat": "ai4os-cvat",
+    "nvflare": "ai4os-nvflare",
     "llm": "ai4os-llm",
     "ai4life": "ai4os-ai4life-loader",
+    "devenv": "ai4os-dev-env",
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():

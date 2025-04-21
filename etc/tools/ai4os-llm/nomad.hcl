@@ -116,6 +116,11 @@ job "tool-llm-${JOB_UUID}" {
 
     task "vllm" {
 
+      lifecycle {
+        hook    = "prestart"
+        sidecar = true
+      }
+
       driver = "docker"
 
       config {
@@ -131,7 +136,7 @@ job "tool-llm-${JOB_UUID}" {
       }
 
       resources {
-        cores  = 8
+        cores  = 4
         memory = 16000
 
         device "gpu" {
@@ -147,6 +152,68 @@ job "tool-llm-${JOB_UUID}" {
         }
       }
 
+    }
+
+    task "check_vllm_startup" {
+
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+
+      driver = "docker"
+
+      config {
+        force_pull = true
+        image      = "python:slim-bullseye"
+        command    = "bash"
+        args       = ["local/get_models.sh"]
+      }
+
+      env {
+        VLLM_ENDPOINT = "https://vllm-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}/v1/models"
+        TOKEN = "${API_TOKEN}"
+      }
+
+      template {
+        data = <<-EOF
+        #!/bin/bash
+
+        pip install requests
+
+        python -c '
+        import requests
+        import os
+        import time
+
+        VLLM_ENDPOINT = os.environ["VLLM_ENDPOINT"]
+        TOKEN = os.environ["TOKEN"]
+
+        headers = {
+            "Authorization": f"Bearer {TOKEN}",
+            "Content-Type": "application/json"
+        }
+
+        attempts = 0
+        delay = 2
+
+        with requests.Session() as session:
+            session.headers.update(headers)
+
+            while True:
+                response = session.get(VLLM_ENDPOINT)
+                if response.ok:
+                    print(f"Success | Status code: {response.status_code}")
+                    print(f"{response.text}")
+                    exit(0)
+                else:
+                    attempts += 1
+                    print(f"Attempt nº {attempts} | Status code: {response.status_code}")
+                    time.sleep(delay)
+        '
+        EOF
+        destination = "local/get_models.sh"
+      }
     }
 
     task "open-webui" {
@@ -167,7 +234,7 @@ job "tool-llm-${JOB_UUID}" {
 
       resources {  # UI needs a fair amount of resources because it's also doing RAG
         cores  = 4
-        memory = 8000
+        memory = 16000
      }
    }
 
@@ -193,7 +260,7 @@ job "tool-llm-${JOB_UUID}" {
       env {
         OPEN_WEBUI_URL = "https://ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}"
         NAME           = "${OWNER_NAME}"
-        EMAIL          = "${OWNER_EMAIL}"
+        EMAIL          = "${OPEN_WEBUI_USERNAME}"
         PASSWORD       = "${OPEN_WEBUI_PASSWORD}"
       }
 
