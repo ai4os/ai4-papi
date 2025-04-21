@@ -99,7 +99,7 @@ def get_config(
         )
         for k, v in mismatches.items():
             warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
-        conf["hardware"]["warning"] = warning + '</ul>'
+        conf["hardware"]["warning"] = warning + "</ul>"
 
     return conf
 

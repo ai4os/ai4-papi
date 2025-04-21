@@ -168,7 +168,7 @@ def create_deployment(
         )
         for k, v in mismatches.items():
             warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
-        warning = warning + '</ul>'
+        warning = warning + "</ul>"
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
