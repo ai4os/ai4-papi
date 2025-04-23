@@ -161,7 +161,7 @@ def create_deployment(
     warning = ""
     if mismatches:
         warning = (
-            "The developer of the module specified an optimum amount of resources "
+            "The developer of the module specified an minimum amount of resources "
             "that could not be met in try-me deployments. "
             "Therefore, you might experience some issues when using this module for "
             "inference. <br> The following resources could not be met: <ul>"

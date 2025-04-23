@@ -92,7 +92,7 @@ def get_config(
     # Show warning if we couldn't accommodate user requirements
     if mismatches:
         warning = (
-            "The developer of the module specified an optimum amount of resources "
+            "The developer of the module specified an minimum amount of resources "
             "that could not be met in Nomad deployments. "
             "Therefore, you might experience some issues when using this module for "
             "inference. \n The following resources could not be met: <ul>"
