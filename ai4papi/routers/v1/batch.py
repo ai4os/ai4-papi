@@ -1,12 +1,13 @@
 from copy import deepcopy
 import datetime
+import json
 import os
 import subprocess
 import types
 from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, utils
@@ -142,7 +143,7 @@ def get_deployment(
 def create_deployment(
     vo: str,
     user_cmd: UploadFile,
-    conf: Union[dict, None] = None,
+    conf: Union[str, None] = Form(None),
     authorization=Depends(security),
 ):
     """
@@ -179,8 +180,20 @@ def create_deployment(
     nomad_conf = deepcopy(papiconf.MODULES["nomad"])
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
-    # Update values conf in case we received a submitted conf
     if conf is not None:
+        # Configuration has to be received as a str then converted to dict.
+        # Because otherwise we cannot have both content-type "application/json" and
+        # content-type "multipart/form-data"
+        # ref: https://fastapi.tiangolo.com/tutorial/request-forms-and-files/
+        try:
+            conf = json.loads(conf)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="conf parameter must be a valid JSON string",
+            )
+
+        # Update values conf in case we received a submitted conf
         user_conf = utils.update_values_conf(submitted=conf, reference=user_conf)
 
     # Validate conf
