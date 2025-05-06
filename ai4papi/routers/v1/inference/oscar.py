@@ -164,16 +164,19 @@ def get_service_conf(
         if (user_k := meta_inference.get(k)) and user_k > final[k]:
             mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
 
+    if user_k := meta_inference.get("gpu"):
+        mismatches["gpu"] = f"Requested: {user_k}, Max allowed: 0"
+
     # Show warning if we couldn't accommodate user requirements
     if mismatches:
         warning = (
             "The developer of the module specified a recommended amount of resources "
             "that could not be met in OSCAR deployments. "
             "Therefore, you might experience some issues when using this module for "
-            "inference. \n The following resources could not be met: <ul>"
+            "inference. The following resources could not be met: <ul>"
         )
         for k, v in mismatches.items():
-            warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
+            warning += f"<li> <strong>{k}</strong>: {v} </li>"
         conf["hardware"]["warning"] = warning + "</ul>"
 
     return conf
