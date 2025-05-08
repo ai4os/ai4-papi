@@ -42,8 +42,9 @@ tools_config = {
     },
     "ai4os-llm": {
         "llm": {
-            "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
-            "ui_password": "papi-test",
+            "vllm_model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+            "ui_username": "mock_user",
+            "ui_password": "mock_password",
         },
     },
     "ai4os-nvflare": {
