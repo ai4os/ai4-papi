@@ -120,7 +120,8 @@ def get_deployment(
 
     # Add endpoints
     info["endpoints"] = {}
-    for s in j["TaskGroups"][0]["Services"]:
+    services = j["TaskGroups"][0].get("Services", []) or []
+    for s in services:
         label = s["PortLabel"]
 
         # Iterate through tags to find `Host` tag
@@ -167,7 +168,15 @@ def get_deployment(
         info["main_endpoint"] = service2endpoint[service]
 
     except Exception:  # return first endpoint
-        info["main_endpoint"] = list(info["endpoints"].keys())[0]
+        endpoints = list(info["endpoints"].keys())
+        info["main_endpoint"] = endpoints[0] if endpoints else None
+
+    # Add user script for batch jobs
+    if full_info:
+        templates = usertask.get("Templates", []) or []
+        info["templates"] = {}
+        for t in templates:
+            info["templates"][t["DestPath"]] = t["EmbeddedTmpl"]
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(

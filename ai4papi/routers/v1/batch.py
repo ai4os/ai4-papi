@@ -61,7 +61,7 @@ def get_deployments(
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
             owner=auth_info["id"],
-            prefix="module",
+            prefix="batch",
         )
 
         # Retrieve info for jobs in namespace
@@ -123,7 +123,6 @@ def get_deployment(
         owner=auth_info["id"],
         full_info=full_info,
     )
-    # TODO: adapt this function now that we have no service in the command
 
     # Check the deployment is indeed a batch
     if not job["name"].startswith("batch"):
@@ -131,10 +130,6 @@ def get_deployment(
             status_code=400,
             detail="This deployment is not a batch job.",
         )
-
-    if full_info:
-        pass
-        # TODO: add the user bash script to the deployment info
 
     return job
 
@@ -364,14 +359,15 @@ def create_deployment(
             "target": "/srv/user-batch-commands.sh",
         }
     ]
-    usertask["Templates"] = [
-        {"DestPath": "local/batch.sh", "EmbeddedTmpl": user_cmd.file}
-    ]
+    content = user_cmd.file.readlines()
+    content = " ".join([line.decode("utf-8") for line in content])  # bytes to utf-8
+    usertask["Templates"] = [{"DestPath": "local/batch.sh", "EmbeddedTmpl": content}]
 
     # TODO: check if we have to change the nomad job type (ie. "service") or the
     # lifecycle ("sidecar")
 
-    # Change the job prefix
+    # Change the job type to batch mode
+    nomad_conf["Type"] = "batch"
     nomad_conf["Name"] = nomad_conf["Name"].replace("module-", "batch-")
 
     # Submit job
