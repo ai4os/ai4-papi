@@ -20,7 +20,7 @@ If running from VScode make sure to launch `code` from that terminal so it can a
 that ENV variable.'
     )
 
-# Create a module
+# Create a job
 batch_file = tempfile.SpooledTemporaryFile()
 batch_file.write(b"""
 echo "Test started"
@@ -52,7 +52,7 @@ assert "job_ID" in rcreate.keys()
 
 time.sleep(0.2)  # Nomad takes some time to allocate deployment
 
-# Retrieve that module
+# Retrieve that job
 rdep = batch.get_deployment(
     vo="vo.ai4eosc.eu",
     deployment_uuid=rcreate["job_ID"],
@@ -65,7 +65,7 @@ assert rdep["job_ID"] == rcreate["job_ID"]
 assert rdep["status"] != "error"
 assert "templates" in rdep  # user batch script
 
-# Retrieve all modules
+# Retrieve all jobs
 rdeps = batch.get_deployments(
     vos=["vo.ai4eosc.eu"],
     authorization=SimpleNamespace(credentials=token),
@@ -74,7 +74,7 @@ assert isinstance(rdeps, list)
 assert any([d["job_ID"] == rcreate["job_ID"] for d in rdeps])
 assert all([d["job_ID"] != "error" for d in rdeps])
 
-# Delete module
+# Delete job
 rdel = batch.delete_deployment(
     vo="vo.ai4eosc.eu",
     deployment_uuid=rcreate["job_ID"],
@@ -85,7 +85,7 @@ assert "status" in rdel.keys()
 
 time.sleep(3)  # Nomad takes some time to delete
 
-# Check module no longer exists
+# Check job no longer exists
 rdeps3 = batch.get_deployments(
     vos=["vo.ai4eosc.eu"],
     authorization=SimpleNamespace(credentials=token),

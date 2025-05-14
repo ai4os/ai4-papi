@@ -303,6 +303,10 @@ def get_deployment(
         if info["status"] == "down" and info["active_endpoints"]:
             info["active_endpoints"] = []
 
+        # Replace dead status with either "complete" of "failed"
+        if info["status"] == "dead":
+            info["status"] = a["ClientStatus"]
+
     elif evals:
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
@@ -384,10 +388,19 @@ def delete_deployment(
         full_info=False,
     )
 
-    # If job is in stuck status, allow deleting with purge.
+    # If job is in stuck status, allow deleting with purge. Basically we allow purging
+    # any job that is not running.
     # Most of the time, when a job is in this status, it is due to a platform error.
     # It gets stuck and cannot be deleted without purge
-    if info["status"] in ["queued", "complete", "failed", "error", "down", "dead"]:
+    if info["status"] in [
+        "starting",
+        "queued",
+        "complete",
+        "failed",
+        "error",
+        "down",
+        "dead",
+    ]:
         purge = True
     else:
         purge = False

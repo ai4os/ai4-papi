@@ -57,11 +57,15 @@ def get_deployments(
 
     user_jobs = []
     for vo in vos:
-        # Retrieve all jobs in namespace
-        jobs = nomad.get_deployments(
+        # Retrieve all jobs in namespace (including dead jobs)
+        job_filter = (
+            'Name matches "^batch" and '
+            + "Meta is not empty and "
+            + f'Meta.owner == "{auth_info["id"]}"'
+        )
+        jobs = nomad.Nomad.jobs.get_jobs(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-            owner=auth_info["id"],
-            prefix="batch",
+            filter_=job_filter,
         )
 
         # Retrieve info for jobs in namespace
@@ -363,8 +367,8 @@ def create_deployment(
     content = " ".join([line.decode("utf-8") for line in content])  # bytes to utf-8
     usertask["Templates"] = [{"DestPath": "local/batch.sh", "EmbeddedTmpl": content}]
 
-    # TODO: check if we have to change the nomad job type (ie. "service") or the
-    # lifecycle ("sidecar")
+    # Do not restart if user commands if fail
+    usertask["RestartPolicy"] = {"Attempts": 0, "Mode": "fail"}
 
     # Change the job type to batch mode
     nomad_conf["Type"] = "batch"
