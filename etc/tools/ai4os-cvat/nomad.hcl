@@ -50,6 +50,7 @@ job "tool-cvat-${JOB_UUID}" {
     # CVAT-specific metadata
     force_pull_img_cvat_server         = true
     force_pull_img_cvat_ui             = true
+    force_pull_img_cvat_backups        = true
     restore_from                       = "${RESTORE_FROM}"
     backup_name                        = "${BACKUP_NAME}"
     cvat_allow_static_cache            = "no"
@@ -478,6 +479,33 @@ job "tool-cvat-${JOB_UUID}" {
         rclone sync $LOCAL_PATH/$$BACKUP_NAME $REMOTE_PATH/$$BACKUP_NAME --progress
         EOF
         destination = "local/sync_remote.sh"
+      }
+    }
+
+    task "backups" {
+      driver = "docker"
+      kill_timeout = "30s"
+      resources {
+        cpu = 300
+        memory = 4096
+      }
+      env {
+        LOG_LEVEL = "INFO"
+        CVAT_URL = "http://${NOMAD_HOST_ADDR_server}"
+        CVAT_USERNAME = "${NOMAD_META_CVAT_SU_USERNAME}"
+        CVAT_PASSWORD = "${NOMAD_META_CVAT_SU_PASSWORD}"
+        CVAT_BACKUP_DIR = "/cvat-backups"
+        CVAT_BACKUP_TTL_HOURS = 24
+        CVAT_MIN_NUM_BACKUPS = 3
+        CVAT_BACKUP_SAVE_IMAGES = false
+        CVAT_BACKUP_REQUEST_TIMEOUT_HOURS = 1
+      }
+      config {
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-backups:0.1"
+        force_pull = "${NOMAD_META_force_pull_img_cvat_backups}"
+        volumes = [
+          "..${NOMAD_ALLOC_DIR}/data/share/:/cvat-backups"
+        ]
       }
     }
 
