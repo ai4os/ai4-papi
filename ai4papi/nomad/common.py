@@ -176,7 +176,7 @@ def get_deployment(
         templates = usertask.get("Templates", []) or []
         info["templates"] = {}
         for t in templates:
-            info["templates"][t["DestPath"]] = t["EmbeddedTmpl"]
+            info["templates"][t["DestPath"]] = t["EmbeddedTmpl"].replace("\n ", "\n")
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
