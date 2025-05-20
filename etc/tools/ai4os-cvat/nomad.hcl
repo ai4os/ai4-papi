@@ -290,14 +290,15 @@ job "tool-cvat-${JOB_UUID}" {
         #!/usr/bin/env bash
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         function mount_remote() {
-          dir_name=$1
-          rm -rf $LOCAL_PATH/$dir_name
-          mkdir -p $LOCAL_PATH/$dir_name
-          rclone mkdir $REMOTE_PATH/$dir_name
-          chown 1000:1000 $LOCAL_PATH/$dir_name
-          chmod 750 $LOCAL_PATH/$dir_name
-          echo "mounting $dir_name"
-          rclone --log-level INFO mount $REMOTE_PATH/$dir_name $LOCAL_PATH/$dir_name \
+          remote_dir_name=$1
+          local_dir_name=$2
+          rm -rf $LOCAL_PATH/$local_dir_name
+          mkdir -p $LOCAL_PATH/$local_dir_name
+          rclone mkdir $REMOTE_PATH/$remote_dir_name
+          chown 1000:1000 $LOCAL_PATH/$local_dir_name
+          chmod 750 $LOCAL_PATH/$local_name
+          echo "mounting remote $remote_dir_name --to-local-> $local_dir_name"
+          rclone --log-level INFO mount $REMOTE_PATH/$remote_dir_name $LOCAL_PATH/$local_dir_name \
             --uid 1000 \
             --gid 1000 \
             --dir-perms 0750 \
@@ -306,8 +307,8 @@ job "tool-cvat-${JOB_UUID}" {
             --vfs-cache-mode full \
             --daemon
         }
-        mount_remote share &&
-        mount_remote backups-periodic &&
+        mount_remote share share &&
+        mount_remote backups-periodic/$BACKUP_NAME backups-periodic &&
         tail -f /dev/null
         EOF
         destination = "local/entrypoint.sh"
