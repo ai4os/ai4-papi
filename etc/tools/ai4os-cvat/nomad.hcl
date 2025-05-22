@@ -50,6 +50,7 @@ job "tool-cvat-${JOB_UUID}" {
     # CVAT-specific metadata
     force_pull_img_cvat_server         = true
     force_pull_img_cvat_ui             = true
+    force_pull_img_cvat_backups        = true
     restore_from                       = "${RESTORE_FROM}"
     backup_name                        = "${BACKUP_NAME}"
     cvat_allow_static_cache            = "no"
@@ -252,7 +253,8 @@ job "tool-cvat-${JOB_UUID}" {
         image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
         privileged = true
         volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/share:/mnt/share:rshared"
+          "..${NOMAD_ALLOC_DIR}/data/share:/mnt/share:rshared",
+          "..${NOMAD_ALLOC_DIR}/data/backups-periodic:/mnt/backups-periodic:rshared"
         ]
         mount {
           type = "bind"
@@ -287,18 +289,27 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         #!/usr/bin/env bash
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
-        rm -rf $LOCAL_PATH/share
-        mkdir -p $LOCAL_PATH/share
-        rclone mkdir $REMOTE_PATH/share
-        chown 1000:1000 $LOCAL_PATH/share
-        chmod 750 $LOCAL_PATH/share
-        rclone --log-level INFO mount $REMOTE_PATH/share $LOCAL_PATH/share \
-          --uid 1000 \
-          --gid 1000 \
-          --dir-perms 0750 \
-          --allow-non-empty \
-          --allow-other \
-          --vfs-cache-mode full
+        function mount_remote() {
+          remote_dir_name=$1
+          local_dir_name=$2
+          rm -rf $LOCAL_PATH/$local_dir_name
+          mkdir -p $LOCAL_PATH/$local_dir_name
+          rclone mkdir $REMOTE_PATH/$remote_dir_name
+          chown 1000:1000 $LOCAL_PATH/$local_dir_name
+          chmod 750 $LOCAL_PATH/$local_name
+          echo "mounting remote $remote_dir_name --to-local-> $local_dir_name"
+          rclone --log-level INFO mount $REMOTE_PATH/$remote_dir_name $LOCAL_PATH/$local_dir_name \
+            --uid 1000 \
+            --gid 1000 \
+            --dir-perms 0750 \
+            --allow-non-empty \
+            --allow-other \
+            --vfs-cache-mode full \
+            --daemon
+        }
+        mount_remote share share &&
+        mount_remote backups-periodic/$BACKUP_NAME backups-periodic &&
+        tail -f /dev/null
         EOF
         destination = "local/entrypoint.sh"
       }
@@ -478,6 +489,33 @@ job "tool-cvat-${JOB_UUID}" {
         rclone sync $LOCAL_PATH/$$BACKUP_NAME $REMOTE_PATH/$$BACKUP_NAME --progress
         EOF
         destination = "local/sync_remote.sh"
+      }
+    }
+
+    task "backups" {
+      driver = "docker"
+      kill_timeout = "30s"
+      resources {
+        cpu = 300
+        memory = 4096
+      }
+      env {
+        LOG_LEVEL = "INFO"
+        CVAT_URL = "http://${NOMAD_HOST_ADDR_server}"
+        CVAT_USERNAME = "${NOMAD_META_CVAT_SU_USERNAME}"
+        CVAT_PASSWORD = "${NOMAD_META_CVAT_SU_PASSWORD}"
+        CVAT_BACKUP_DIR = "/cvat-backups"
+        CVAT_BACKUP_TTL_HOURS = 24
+        CVAT_MIN_NUM_BACKUPS = 3
+        CVAT_BACKUP_SAVE_IMAGES = false
+        CVAT_BACKUP_REQUEST_TIMEOUT_HOURS = 1
+      }
+      config {
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-backups:0.1"
+        force_pull = "${NOMAD_META_force_pull_img_cvat_backups}"
+        volumes = [
+          "..${NOMAD_ALLOC_DIR}/data/backups-periodic:/cvat-backups"
+        ]
       }
     }
 
