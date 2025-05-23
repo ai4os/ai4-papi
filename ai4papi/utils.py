@@ -204,7 +204,7 @@ def gpu_specs():
     # Load datacenter info
     models = {}
     with open(pth, "r") as f:
-        reader = csv.DictReader(f, delimiter=";")
+        reader = csv.DictReader(f, delimiter=",")
         dc_keys = reader.fieldnames.copy()
         dc_keys.remove("name")
         for row in reader:

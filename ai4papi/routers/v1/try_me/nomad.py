@@ -154,21 +154,15 @@ def create_deployment(
         if (user_k := meta_inference.get(k)) and user_k > final[k]:
             mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
 
-    if meta_inference["gpu"]:
-        mismatches["gpu"] = f"Requested: {meta_inference['gpu']}, Allowed: 0"
+    if user_k := meta_inference.get("gpu"):
+        mismatches["gpu"] = f"Requested: {user_k}, Max allowed: 0"
 
     # Show warning if we couldn't accommodate user requirements
     warning = ""
     if mismatches:
-        warning = (
-            "The developer of the module specified a recommended amount of resources "
-            "that could not be met in try-me deployments. "
-            "Therefore, you might experience some issues when using this module for "
-            "inference. <br> The following resources could not be met: <ul>"
-        )
         for k, v in mismatches.items():
-            warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
-        warning = warning + "</ul>"
+            warning += f"<li> <strong>{k}</strong>: {v} </li>"
+        warning = "<ul>" + warning + "</ul>"
 
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
@@ -185,7 +179,7 @@ def create_deployment(
             "CPU_NUM": final["cpu"],
             "RAM": final["memory_MB"],
             "SHARED_MEMORY": final["memory_MB"] * 10**6 * 0.5,
-            "BANNER": warning,
+            "INFERENCE_WARNING": warning,
         }
     )
 

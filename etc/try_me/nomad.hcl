@@ -117,10 +117,6 @@ job "try-${JOB_UUID}" {
         mode     = "fail"
       }
 
-      env {
-        BANNER = "${BANNER}"
-      }
-
     }
 
     task "ui" { # DEEPaaS UI (Gradio)
@@ -138,6 +134,7 @@ job "try-${JOB_UUID}" {
       env {
         DURATION = "10m"  # kill job after 10 mins
         UI_PORT  = 80
+        INFERENCE_WARNING = "${INFERENCE_WARNING}"
       }
 
       resources {

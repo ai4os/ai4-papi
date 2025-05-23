@@ -83,9 +83,18 @@ def get_config(
     if not models:
         # If no GPU models meet the requirements let the user use any model
         conf["hardware"]["gpu_type"]["options"] += nomad_models
+        gpu_mismatch = []
         for k in ["gpu_memory_MB", "gpu_compute_capability"]:
             if r := meta_inference.get(k):
-                mismatches[k] = f"Requested: {r}"
+                gpu_mismatch.append(f"<li><strong>{k}</strong>: {r}</li>")
+        gpu_mismatch = f"<ul>{' '.join(gpu_mismatch)}</ul>"
+        mismatches["gpu"] = (
+            "No GPU model could fullfil all requirements at once."
+            "<ul>"
+            f"<li> Requested: {gpu_mismatch} </li> "
+            f'<li> <a href="https://github.com/ai4os/ai4-papi/blob/master/var/gpu_models.csv"> Available models</a>: {", ".join(nomad_models)} </li> '
+            "</ul>"
+        )
     else:
         conf["hardware"]["gpu_type"]["options"] += models
 
@@ -95,10 +104,10 @@ def get_config(
             "The developer of the module specified a recommended amount of resources "
             "that could not be met in Nomad deployments. "
             "Therefore, you might experience some issues when using this module for "
-            "inference. \n The following resources could not be met: <ul>"
+            "inference. The following resources could not be met: <ul>"
         )
         for k, v in mismatches.items():
-            warning += f"\n<li> <strong>{k}</strong>: {v} </li>"
+            warning += f"<li> <strong>{k}</strong>: {v} </li>"
         conf["hardware"]["warning"] = warning + "</ul>"
 
     return conf
