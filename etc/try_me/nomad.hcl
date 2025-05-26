@@ -24,7 +24,7 @@ job "try-${JOB_UUID}" {
     description = ""
   }
 
-  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  # Only use nodes that have successfully passed the ai4-nomad_tests (ie. meta.status=ready)
   constraint {
     attribute = "${meta.status}"
     operator  = "regexp"

@@ -25,7 +25,7 @@ job "tool-nvflare-${JOB_UUID}" {
     meta_domain = "${meta.domain}"  # needed in the template (NOMAD_META_meta_domain)
   }
 
-  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  # Only use nodes that have successfully passed the ai4-nomad_tests (ie. meta.status=ready)
   constraint {
     attribute = "${meta.status}"
     operator  = "regexp"
@@ -37,6 +37,13 @@ job "tool-nvflare-${JOB_UUID}" {
     attribute = "${meta.compute}"
     operator  = "="
     value     = "true"
+  }
+
+  # Avoid deploying in nodes that are reserved to batch
+  constraint {
+    attribute = "${meta.type}"
+    operator  = "!="
+    value     = "batch"
   }
 
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools

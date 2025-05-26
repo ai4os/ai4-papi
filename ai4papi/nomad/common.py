@@ -120,7 +120,8 @@ def get_deployment(
 
     # Add endpoints
     info["endpoints"] = {}
-    for s in j["TaskGroups"][0]["Services"]:
+    services = j["TaskGroups"][0].get("Services", []) or []
+    for s in services:
         label = s["PortLabel"]
 
         # Iterate through tags to find `Host` tag
@@ -167,7 +168,15 @@ def get_deployment(
         info["main_endpoint"] = service2endpoint[service]
 
     except Exception:  # return first endpoint
-        info["main_endpoint"] = list(info["endpoints"].keys())[0]
+        endpoints = list(info["endpoints"].keys())
+        info["main_endpoint"] = endpoints[0] if endpoints else None
+
+    # Add user script for batch jobs
+    if full_info:
+        templates = usertask.get("Templates", []) or []
+        info["templates"] = {}
+        for t in templates:
+            info["templates"][t["DestPath"]] = t["EmbeddedTmpl"].replace("\n ", "\n")
 
     # Only fill resources if the job is allocated
     allocs = Nomad.job.get_allocations(
@@ -294,6 +303,10 @@ def get_deployment(
         if info["status"] == "down" and info["active_endpoints"]:
             info["active_endpoints"] = []
 
+        # Replace dead status with either "complete" of "failed"
+        if info["status"] == "dead":
+            info["status"] = a["ClientStatus"]
+
     elif evals:
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
@@ -375,10 +388,19 @@ def delete_deployment(
         full_info=False,
     )
 
-    # If job is in stuck status, allow deleting with purge.
+    # If job is in stuck status, allow deleting with purge. Basically we allow purging
+    # any job that is not running.
     # Most of the time, when a job is in this status, it is due to a platform error.
     # It gets stuck and cannot be deleted without purge
-    if info["status"] in ["queued", "complete", "failed", "error", "down", "dead"]:
+    if info["status"] in [
+        "starting",
+        "queued",
+        "complete",
+        "failed",
+        "error",
+        "down",
+        "dead",
+    ]:
         purge = True
     else:
         purge = False
