@@ -221,7 +221,7 @@ def get_cluster_stats(
         for n_stats in dc_stats["nodes"].values():
             for k, v in n_stats.items():
                 # Ignore keys
-                if k in ["name", "namespaces", "eligibility", "status", "tags"]:
+                if k in ["name", "namespaces", "eligibility", "status", "tags", "type"]:
                     continue
 
                 # Aggregate nested gpu_models dict
@@ -288,6 +288,7 @@ def get_cluster_stats_bg():
         )
         n_stats["gpu_models"] = {}
         n_stats["namespaces"] = node["Meta"].get("namespace", "")
+        n_stats["type"] = node["Meta"].get("type", "")
         # Sometimes nodes disconnect. And since they disconnect, their metadata cannot
         # longer be updated. So we use the fine-grained status in the metadata *only if*
         # the node status is ready.
