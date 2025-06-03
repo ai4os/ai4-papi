@@ -20,7 +20,7 @@ import ai4papi.nomad.patches as npatches
 
 
 router = APIRouter(
-    prefix="/stats",
+    prefix="/deployments",
     tags=["Deployments stats"],
     responses={404: {"description": "Not found"}},
 )

@@ -13,6 +13,7 @@ from fastapi_utils.tasks import repeat_every
 from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
+from ai4papi.routers.v1.stats.modules import get_modules_stats_bg
 
 
 description = (
@@ -47,6 +48,7 @@ description = (
 async def lifespan(app: fastapi.FastAPI):
     # on startup
     await get_cluster_stats_thread()
+    await get_modules_stats_thread()
     yield
     # on shutdown
     # (nothing to do)
@@ -137,6 +139,16 @@ def get_cluster_stats_thread():
     get_cluster_stats_bg.cache_clear()
     get_cluster_stats_bg()
 
+# Compute modules stats in background task each 24h
+@repeat_every(seconds=86400)
+def get_modules_stats_thread():
+    """
+    Recompute modules stats
+    Do *not* run as async to avoid blocking the main event.
+    ref: https://stackoverflow.com/questions/67599119/fastapi-asynchronous-background-tasks-blocks-other-requests
+    """
+    get_modules_stats_bg.cache_clear()
+    get_modules_stats_bg()
 
 if __name__ == "__main__":
     run()
