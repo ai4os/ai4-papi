@@ -266,8 +266,8 @@ def get_harbor_snapshots(
     * **vo**: Virtual Organization the snapshot belongs to
     """
     # Check if the user exists in Harbor (ie. Docker image exists)
-    projects = client.get_repositories(project_name="user-snapshots")
-    users = [p.name.split("/")[1] for p in projects]
+    repos = client.get_repositories(project_name="user-snapshots")
+    users = [r.name.split("/")[1] for r in repos]
     user_str = owner.replace("@", "_at_")
     if user_str not in users:
         return []
