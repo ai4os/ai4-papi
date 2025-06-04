@@ -3,6 +3,7 @@ Return stats of the modules
 """
 
 import copy
+import os
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter
@@ -36,25 +37,24 @@ def get_modules_stats():
         * Dockerhub downloads
         * Number of nomad deployments (TODO)
         * Number of oscar services, number of oscar calls (TODO)
+        * Overall popularity (TODO)
     """
 
-    # global modules_stats
-    # if not modules_stats:
-    #     # If PAPI is used as a package, cluster_stats will be None, as the background
-    #     # computation of `get_modules_stats_bg()` is only started when PAPI is launched
-    #     # with uvicorn.
-    #     # So if None, we need to initialize it
-    #     modules_stats = get_modules_stats_bg()
-    # stats = copy.deepcopy(modules_stats)
+    global modules_stats
+    
+    if not modules_stats:
+        # If PAPI is used as a package, cluster_stats will be None, as the background
+        # computation of `get_modules_stats_bg()` is only started when PAPI is launched
+        # with uvicorn.
+        # So if None, we need to initialize it
+        modules_stats = get_modules_stats_bg()
 
-
-    modules_stats = get_modules_stats_bg()
     stats = copy.deepcopy(modules_stats)
 
     return stats
 
 
-#@cached(cache=TTLCache(maxsize=1024, ttl=86400))
+@cached(cache=TTLCache(maxsize=1024, ttl=86400))
 def get_modules_stats_bg():
     """
     Background task that computes the stats of the modules.
@@ -84,18 +84,17 @@ def get_modules_stats_bg():
     # TODO: Numer of OSCAR services/calls
 
     # Group all the metrics 
-    stats = []
+    stats = {}
     for module_id in module_ids:
         detail = modules._get_metadata(module_id)
 
-        stats_obj = {
-            "module_id": module_id,
+        stats[module_id] = {
             "number_of_trymes": tryme_stats.get(module_id, 0),
             "number_of_module_views": detail_stats.get(module_id, 0),
             "github_stars": get_github_stars(detail['links']['source_code']),      
-            "dockerhub_downloads": get_dockerhub_downloads(detail['links']['docker_image'])
+            "dockerhub_downloads": get_dockerhub_downloads(detail['links']['docker_image']),
+            "overall": 0 # TODO: compute overall popularity based on the stats
         }
-        stats.append(stats_obj)
 
     # Set the new shared variable
     global modules_stats
@@ -106,7 +105,7 @@ def get_modules_stats_bg():
 ######################################
 ########### Plausible stats ##########
 ######################################
-API_KEY = ''  # TODO: add this as an env variable
+API_KEY = os.getenv("PLAUSIBLE_API_KEY")
 SITE_IDS = [
     'dashboard.cloud.ai4eosc.eu',
     'dashboard.cloud.imagine-ai.eu',

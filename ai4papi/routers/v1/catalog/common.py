@@ -159,7 +159,12 @@ class Catalog:
         """
         Get the item's full metadata.
         """
-        return self._get_metadata(item_name=item_name, force=False)
+        # Move import here to avoid circular imports
+        from ai4papi.routers.v1.stats.modules import get_modules_stats
+        
+        metadata = self._get_metadata(item_name=item_name, force=False)
+        metadata['popularity'] = get_modules_stats().get(item_name, {});
+        return metadata
 
     @cached(
         cache=TTLCache(maxsize=1024, ttl=7 * 24 * 60 * 60),
