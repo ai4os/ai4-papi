@@ -24,7 +24,7 @@ job "tool-fl-${JOB_UUID}" {
     description = "${DESCRIPTION}"
   }
 
-  # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
+  # Only use nodes that have successfully passed the ai4-nomad_tests (ie. meta.status=ready)
   constraint {
     attribute = "${meta.status}"
     operator  = "regexp"
@@ -36,6 +36,13 @@ job "tool-fl-${JOB_UUID}" {
     attribute = "${meta.compute}"
     operator  = "="
     value     = "true"
+  }
+
+  # Avoid deploying in nodes that are reserved to batch
+  constraint {
+    attribute = "${meta.type}"
+    operator  = "!="
+    value     = "batch"
   }
 
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
@@ -155,9 +162,11 @@ job "tool-fl-${JOB_UUID}" {
         FEDAVGM_SERVER_FL               = "${FEDAVGM_SERVER_FL}"
         FEDAVGM_SERVER_MOMENTUM         = "${FEDAVGM_SERVER_MOMENTUM}"
         DP                              = "${DP}"
+        METRIC_PRIVACY                  = "${METRIC_PRIVACY}"
         NOISE_MULT                      = "${NOISE_MULT}"
         SAMPLED_CLIENTS                 = "${SAMPLED_CLIENTS}"
         CLIP_NORM                       = "${CLIP_NORM}"
+        CODE_CARBON                     = "${CODE_CARBON}"
       }
 
       resources {

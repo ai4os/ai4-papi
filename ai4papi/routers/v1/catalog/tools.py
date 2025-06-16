@@ -3,6 +3,7 @@ import types
 
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
+import natsort
 
 from ai4papi import quotas, utils, nomad
 import ai4papi.conf as papiconf
@@ -36,23 +37,31 @@ def get_config(
     metadata = self.get_metadata(item_name)
 
     # Modify the resources limits for a given user or VO
-    if conf.get("hardware", None):
+    if "hardware" in conf.keys():
         conf["hardware"] = quotas.limit_resources(
             item_name=item_name,
             vo=vo,
         )
 
-    # Parse docker registry
-    registry = metadata["links"]["docker_image"]
-    repo, image = registry.split("/")[-2:]
-    if repo not in ["deephdc", "ai4oshub"]:
-        repo = "ai4oshub"
-
     # Fill with correct Docker image and tags
-    if item_name in ["ai4os-federated-server", "ai4os-ai4life-loader"]:
+    if item_name in ["ai4os-federated-server", "ai4os-ai4life-loader", "ai4os-dev-env"]:
+        # Parse docker registry
+        registry = metadata["links"]["docker_image"]
+        repo, image = registry.split("/")[-2:]
+        if repo not in ["deephdc", "ai4oshub"]:
+            repo = "ai4oshub"
         conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
+        # Retrieve Docker tags
         tags = retrieve_docker_tags(image=image, repo=repo)
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
+
+    if item_name == "ai4os-dev-env":
+        # For dev-env, order the tags in "Z-A" order instead of "newest"
+        # This is done because builds are done in parallel, so "newest" is meaningless
+        # (Z-A + natsort) allows to show more recent semver first
+        tags = natsort.natsorted(tags)[::-1]
         conf["general"]["docker_tag"]["options"] = tags
         conf["general"]["docker_tag"]["value"] = tags[0]
 
@@ -66,6 +75,11 @@ def get_config(
         models = nomad.common.get_gpu_models(vo)
         if models:
             conf["hardware"]["gpu_type"]["options"] += models
+
+    if item_name == "ai4os-llm":
+        models = list(papiconf.VLLM["models"].keys())
+        conf["llm"]["vllm_model_id"]["options"] = models
+        conf["llm"]["vllm_model_id"]["value"] = models[0]
 
     return conf
 

@@ -2,6 +2,7 @@
 Miscellaneous utils
 """
 
+import csv
 from datetime import datetime
 import json
 from pathlib import Path
@@ -191,3 +192,27 @@ def ai4life_catalog():
     url = "https://raw.githubusercontent.com/ai4os/ai4os-ai4life-loader/refs/heads/main/models/filtered_models.json"
     response = requests.get(url)
     return response.json()
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
+def gpu_specs():
+    # Check if datacenter info file is available
+    pth = papiconf.main_path.parent / "var" / "gpu_models.csv"
+    if not pth.is_file():
+        return {}
+
+    # Load datacenter info
+    models = {}
+    with open(pth, "r") as f:
+        reader = csv.DictReader(f, delimiter=",")
+        dc_keys = reader.fieldnames.copy()
+        dc_keys.remove("name")
+        for row in reader:
+            for k, v in row.items():
+                if k == "name":
+                    name = v
+                    models[name] = {k: 0 for k in dc_keys}
+                else:
+                    models[name][k] = float(v)
+
+    return models

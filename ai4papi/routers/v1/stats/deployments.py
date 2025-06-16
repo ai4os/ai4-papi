@@ -156,7 +156,7 @@ def get_proper_allocation(allocs):
     return allocs[idx]["ID"]
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
+@cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
 def load_datacenters():
     # Check if datacenter info file is available
     pth = papiconf.main_path.parent / "var" / "datacenters_info.csv"
@@ -221,7 +221,7 @@ def get_cluster_stats(
         for n_stats in dc_stats["nodes"].values():
             for k, v in n_stats.items():
                 # Ignore keys
-                if k in ["name", "namespaces", "eligibility", "status", "tags"]:
+                if k in ["name", "namespaces", "eligibility", "status", "tags", "type"]:
                     continue
 
                 # Aggregate nested gpu_models dict
@@ -288,7 +288,15 @@ def get_cluster_stats_bg():
         )
         n_stats["gpu_models"] = {}
         n_stats["namespaces"] = node["Meta"].get("namespace", "")
-        n_stats["status"] = node["Meta"].get("status", "")
+        n_stats["type"] = node["Meta"].get("type", "")
+        # Sometimes nodes disconnect. And since they disconnect, their metadata cannot
+        # longer be updated. So we use the fine-grained status in the metadata *only if*
+        # the node status is ready.
+        n_stats["status"] = (
+            node["Meta"].get("status", "")
+            if node["Status"] == "ready"
+            else node["Status"]
+        )
         n_stats["tags"] = node["Meta"].get("tags", "")
 
         if n["NodeResources"]["Devices"]:

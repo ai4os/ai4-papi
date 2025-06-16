@@ -1,12 +1,13 @@
 from copy import deepcopy
 import datetime
+import json
 import os
 import subprocess
 import types
 from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, utils
@@ -14,21 +15,14 @@ import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
-from ai4papi.routers.v1 import deployments as ai4_deployments
 
 
 router = APIRouter(
-    prefix="/modules",
-    tags=["Modules deployments"],
+    prefix="/batch",
+    tags=["Modules batch deployments"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
-
-
-# When deploying in production, force the definition of a provenance token
-provenance_token = os.environ.get("PAPI_PROVENANCE_TOKEN", None)
-if not papiconf.IS_DEV and not provenance_token:
-    raise Exception('You need to define the variable "PAPI_PROVENANCE_TOKEN".')
 
 
 @router.get("")
@@ -63,11 +57,15 @@ def get_deployments(
 
     user_jobs = []
     for vo in vos:
-        # Retrieve all jobs in namespace
-        jobs = nomad.get_deployments(
+        # Retrieve all jobs in namespace (including dead jobs)
+        job_filter = (
+            'Name matches "^batch" and '
+            + "Meta is not empty and "
+            + f'Meta.owner == "{auth_info["id"]}"'
+        )
+        jobs = nomad.Nomad.jobs.get_jobs(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-            owner=auth_info["id"],
-            prefix="module",
+            filter_=job_filter,
         )
 
         # Retrieve info for jobs in namespace
@@ -115,13 +113,10 @@ def get_deployment(
 
     Returns a dict with info
     """
-    # Check if the query comes from the provenance-workflow, if so search in snapshots
-    if authorization.credentials == provenance_token:
-        return utils.retrieve_from_snapshots(deployment_uuid)
 
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, vo)
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -133,11 +128,11 @@ def get_deployment(
         full_info=full_info,
     )
 
-    # Check the deployment is indeed a module
-    if not job["name"].startswith("module"):
+    # Check the deployment is indeed a batch
+    if not job["name"].startswith("batch"):
         raise HTTPException(
             status_code=400,
-            detail="This deployment is not a module.",
+            detail="This deployment is not a batch job.",
         )
 
     return job
@@ -146,7 +141,8 @@ def get_deployment(
 @router.post("")
 def create_deployment(
     vo: str,
-    conf: Union[dict, None] = None,
+    user_cmd: UploadFile,
+    conf: Union[str, None] = Form(None),
     authorization=Depends(security),
 ):
     """
@@ -154,6 +150,7 @@ def create_deployment(
 
     Parameters:
     * **vo**: Virtual Organization where you want to create your deployment
+    * **user_cmd**: batch command to execute in the batch deployment
     * **conf**: configuration dict of the deployment to be submitted.
     For example:
     ```
@@ -174,57 +171,51 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, vo)
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Load module configuration
+    # To avoid duplicating too much code, we use the standard job deployment
+    # and then remove/replace the parts we don't need
     nomad_conf = deepcopy(papiconf.MODULES["nomad"])
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
-    # Update values conf in case we received a submitted conf
     if conf is not None:
-        user_conf = utils.update_values_conf(
-            submitted=conf,
-            reference=user_conf,
-        )
+        # Configuration has to be received as a str then converted to dict.
+        # Because otherwise we cannot have both content-type "application/json" and
+        # content-type "multipart/form-data"
+        # ref: https://fastapi.tiangolo.com/tutorial/request-forms-and-files/
+        try:
+            conf = json.loads(conf)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="conf parameter must be a valid JSON string",
+            )
 
-    # Utils validate conf
+        # Update values conf in case we received a submitted conf
+        user_conf = utils.update_values_conf(submitted=conf, reference=user_conf)
+
+    # Validate conf
     user_conf = utils.validate_conf(user_conf)
 
     # Check if the provided configuration is within the job quotas
-    quotas.check_jobwise(
-        conf=user_conf,
-        vo=vo,
-    )
+    quotas.check_jobwise(conf=user_conf, vo=vo)
 
-    # Check if requested hardware is within the user total quota (summing modules and
-    # tools)
-    modules_deps = get_deployments(
+    # Check if requested hardware is within the user total quota (only summing batch
+    # jobs)
+    batch_deps = get_deployments(
         vos=[vo],
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
         ),
     )
-    tools_deps = ai4_deployments.tools.get_deployments(
-        vos=[vo],
-        authorization=types.SimpleNamespace(
-            credentials=authorization.credentials  # token
-        ),
-    )
-    quotas.check_userwise(
-        conf=user_conf,
-        deployments=modules_deps + tools_deps,
-    )
+    quotas.check_userwise(conf=user_conf, deployments=batch_deps)
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    if vo == "training.egi.eu":
-        priority = 25
-    else:
-        priority = 50
-
-    base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
+    priority = 25 if vo == "training.egi.eu" else 50
 
     # Retrieve MLflow credentials
     user_secrets = ai4secrets.get_secrets(
@@ -236,16 +227,6 @@ def create_deployment(
     )
     mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
 
-    # Check IDE password length
-    if (
-        user_conf["general"]["service"] in ["jupyter", "vscode"]
-        and len(user_conf["general"]["jupyter_password"]) < 9
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="Your IDE needs a password of at least 9 characters.",
-        )
-
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
@@ -255,17 +236,10 @@ def create_deployment(
             "OWNER": auth_info["id"],
             "OWNER_NAME": auth_info["name"],
             "OWNER_EMAIL": auth_info["email"],
-            "TITLE": user_conf["general"]["title"][
-                :45
-            ],  # keep only 45 first characters
-            "DESCRIPTION": user_conf["general"]["desc"][
-                :1000
-            ],  # limit to 1K characters
-            "BASE_DOMAIN": base_domain,
-            "HOSTNAME": job_uuid,
+            "TITLE": user_conf["general"]["title"][:45],
+            "DESCRIPTION": user_conf["general"]["desc"][:1000],
             "DOCKER_IMAGE": user_conf["general"]["docker_image"],
             "DOCKER_TAG": user_conf["general"]["docker_tag"],
-            "SERVICE": user_conf["general"]["service"],
             "CPU_NUM": user_conf["hardware"]["cpu_num"],
             "RAM": user_conf["hardware"]["ram"],
             "DISK": user_conf["hardware"]["disk"],
@@ -273,7 +247,6 @@ def create_deployment(
             # Limit at 50% of RAM memory, in bytes
             "GPU_NUM": user_conf["hardware"]["gpu_num"],
             "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
-            "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
             "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
             "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
             "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
@@ -339,45 +312,92 @@ def create_deployment(
             }
         ]
 
-    # If storage credentials not provided, remove all storage-related tasks
+    # Enforce storage credentials, otherwise batch jobs cannot save their outputs
     rclone = {k: v for k, v in user_conf["storage"].items() if k.startswith("rclone")}
     if not all(rclone.values()):
-        exclude_tasks = ["storage_mount", "storage_cleanup", "dataset_download"]
-    else:
-        # Obscure rclone password on behalf of user
-        obscured = subprocess.run(
-            [f"rclone obscure {user_conf['storage']['rclone_password']}"],
-            shell=True,
-            capture_output=True,
-            text=True,
+        raise HTTPException(
+            status_code=401,
+            detail="You must provide a storage when running batch jobs.",
         )
-        usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
 
-        # If datasets provided, replicate 'dataset_download' task as many times as needed
-        if user_conf["storage"]["datasets"]:
-            download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]
-            for i, dataset in enumerate(user_conf["storage"]["datasets"]):
-                t = deepcopy(download_task)
-                t["Env"]["DOI"] = dataset["doi"]
-                t["Env"]["FORCE_PULL"] = dataset["doi"]
-                t["Name"] = f"dataset_download_{i}"
-                tasks.append(t)
-        # Always exclude initial 'dataset_download' task, as it is used as template
-        exclude_tasks = ["dataset_download"]
+    # Obscure rclone password on behalf of user
+    obscured = subprocess.run(
+        [f"rclone obscure {user_conf['storage']['rclone_password']}"],
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
 
-    # If DEEPaaS was not launched, do not launch UI because it will fail
-    if user_conf["general"]["service"] != "deepaas":
-        exclude_tasks.append("ui")
+    # If datasets provided, replicate 'dataset_download' task as many times as needed
+    if user_conf["storage"]["datasets"]:
+        download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]
+        for i, dataset in enumerate(user_conf["storage"]["datasets"]):
+            t = deepcopy(download_task)
+            t["Env"]["DOI"] = dataset["doi"]
+            t["Env"]["FORCE_PULL"] = dataset["doi"]
+            t["Name"] = f"dataset_download_{i}"
+            tasks.append(t)
+    # Always exclude initial 'dataset_download' task, as it is used as template
+    exclude_tasks = ["dataset_download"]
+
+    # Batch jobs do not need UI
+    exclude_tasks.append("ui")
 
     tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
-    # Remove appropriate Traefik domains in each case (no need to remove the ports)
-    services = nomad_conf["TaskGroups"][0]["Services"]
-    if user_conf["general"]["service"] == "deepaas":
-        exclude_services = ["ide"]
-    else:
-        exclude_services = ["ui"]
-    services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+    # Remove all endpoints
+    del nomad_conf["TaskGroups"][0]["Services"]
+    del nomad_conf["TaskGroups"][0]["Networks"][0]["DynamicPorts"]
+    del usertask["Config"]["ports"]
+
+    # Replace the standard job service (eg. deepaas) with the commands provided
+    # by the user
+    usertask["Config"]["command"] = "/bin/bash"
+    usertask["Config"]["args"] = ["/srv/user-batch-commands.sh"]
+    usertask["Config"]["mount"] = [
+        {
+            "source": "local/batch.sh",
+            "readonly": False,
+            "type": "bind",
+            "target": "/srv/user-batch-commands.sh",
+        }
+    ]
+    content = user_cmd.file.readlines()
+    content = " ".join([line.decode("utf-8") for line in content])  # bytes to utf-8
+    usertask["Templates"] = [{"DestPath": "local/batch.sh", "EmbeddedTmpl": content}]
+
+    # Batch jobs should no longer avoid batch nodes (ie. module's old constraint)
+    nomad_conf["Constraints"][:] = [
+        c
+        for c in nomad_conf["Constraints"]
+        if not c == {"LTarget": "${meta.type}", "Operand": "!=", "RTarget": "batch"}
+    ]
+    # Batch jobs should not prefer cpu nodes because batch is meant for GPU training
+    # (also messes with next affinity)
+    nomad_conf["Affinities"][:] = [
+        c
+        for c in nomad_conf["Affinities"]
+        if not c
+        == {
+            "LTarget": "${meta.tags}",
+            "Operand": "regexp",
+            "RTarget": "cpu",
+            "Weight": 100,
+        }
+    ]
+    # Batch jobs should have affinity for batch nodes (but can be deployed also in
+    # standard compute nodes)
+    nomad_conf["Affinities"].append(
+        {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "batch", "Weight": 100}
+    )
+
+    # Do not restart if user commands if fail
+    usertask["RestartPolicy"] = {"Attempts": 0, "Mode": "fail"}
+
+    # Change the job type to batch mode
+    nomad_conf["Type"] = "batch"
+    nomad_conf["Name"] = nomad_conf["Name"].replace("module-", "batch-")
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)
@@ -402,7 +422,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, vo)
+    auth.check_vo_membership(vo, auth_info["vos"])
 
     # Delete deployment
     r = nomad.delete_deployment(

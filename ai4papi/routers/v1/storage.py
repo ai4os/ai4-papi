@@ -28,14 +28,14 @@ def run_clone(command, storage_name, vo, token):
     secrets stored in Vault.
     """
     # Retrieve the rclone credentials
-    secrets = ai4secrets.get_secrets(
+    user_secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath="/services/storage/",
         authorization=types.SimpleNamespace(
             credentials=token,
         ),
     )
-    storage = secrets[f"/services/storage/{storage_name}"]
+    storage = user_secrets[f"/services/storage/{storage_name}"]
     if not storage:
         raise HTTPException(
             status_code=401,
@@ -62,7 +62,12 @@ def run_clone(command, storage_name, vo, token):
     )
 
     # Check for possible errors
-    if result.returncode != 0:
+    if result.returncode == 3:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Directory not found. \n\n {result.stderr}",
+        )
+    elif result.returncode != 0:
         raise HTTPException(
             status_code=500,
             detail=f"Error running the RCLONE command. \n\n {result.stderr}",

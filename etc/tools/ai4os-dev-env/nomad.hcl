@@ -9,7 +9,7 @@ When replacing user values we use safe_substitute() so that ge don't get an erro
 replacing Nomad values
 */
 
-job "module-${JOB_UUID}" {
+job "tool-devenv-${JOB_UUID}" {
   namespace = "${NAMESPACE}"
   type      = "service"
   region    = "global"
@@ -98,9 +98,6 @@ job "module-${JOB_UUID}" {
       port "ide" {
         to = 8888
       }
-      port "ui" {
-        to = 80
-      }
       port "custom" {
         to = 80
       }
@@ -133,16 +130,6 @@ job "module-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-ide.tls=true",
         "traefik.http.routers.${JOB_UUID}-ide.rule=Host(`ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ide-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
-      ]
-    }
-
-    service {
-      name = "${JOB_UUID}-ui"
-      port = "ui"
-      tags = [
-        "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-ui.tls=true",
-        "traefik.http.routers.${JOB_UUID}-ui.rule=Host(`ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`, `www.ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -277,13 +264,6 @@ job "module-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
-
-        # # This will be added later on, if the job is meant to be deployed in Harbor
-        # auth {
-        #   username = "harbor_user"
-        #   password = "harbor_password"
-        # }
-
       }
 
       env {
@@ -316,43 +296,6 @@ job "module-${JOB_UUID}" {
 
         }
       }
-    }
-
-    task "ui" { # DEEPaaS UI (Gradio)
-
-      # Run as post-start to make sure DEEPaaS up before launching the UI
-      lifecycle {
-        hook    = "poststart"
-        sidecar = true
-      }
-
-      driver = "docker"
-
-      config {
-        force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/deepaas_ui:latest"
-        ports      = ["ui"]
-        shm_size   = 250000000   # 250MB
-        memory_hard_limit = 500  # MB
-      }
-
-      env {
-        DURATION = "10000d"  # do not kill UI (duration = 10K days)
-        UI_PORT  = 80
-      }
-
-      resources {
-        cpu        = 500  # MHz
-        memory     = 500  # MB
-        memory_max = 500  # MB
-      }
-
-      # Do not try to restart a try-me job if it raises error (module incompatible with Gradio UI)
-      restart {
-        attempts = 0
-        mode     = "fail"
-      }
-
     }
 
     task "storage_cleanup" {

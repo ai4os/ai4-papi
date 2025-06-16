@@ -21,8 +21,8 @@ jobs:
       - name: Login to Harbor
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.HARBOR_URL  }}
-          username: ${{ secrets.HARBOR_USERNAME  }}
+          registry: ${{ vars.HARBOR_URL  }}
+          username: ${{ vars.HARBOR_USERNAME  }}
           password: ${{ secrets.HARBOR_TOKEN }}
 
       - name: Login to Docker Hub
@@ -44,7 +44,7 @@ jobs:
 
       - name: Test - Basic init (dev mode)
         run: |
-          docker run --rm test-image /bin/bash -c "unset FORWARDED_ALLOW_IPS && python3 -c 'import ai4papi'"
+          docker run -e IS_PROD=False --rm test-image /bin/bash -c "python3 -c 'import ai4papi'"
 
       - name: Get short commit SHA
         id: vars
@@ -56,10 +56,9 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:latest
-            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod
-            ${{ secrets.HARBOR_URL }}/ai4os/ai4-papi:prod-${{ env.GIT_COMMIT_SHORT }}
+            ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:latest
+            ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod
+            ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod-${{ env.GIT_COMMIT_SHORT }}
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
           file: docker/Dockerfile
-
