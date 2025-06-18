@@ -114,7 +114,7 @@ def get_deployment(
 
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -169,7 +169,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Load module configuration
     # To avoid duplicating too much code, we use the standard job deployment
@@ -420,7 +420,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Delete deployment
     r = nomad.delete_deployment(
