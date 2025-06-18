@@ -46,13 +46,11 @@ def get_deployments(
 
     # If no VOs, then retrieve jobs from all user VOs
     # Always remove VOs that do not belong to the project
-    if not vos:
-        vos = auth_info["vos"]
     vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
     if not vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}.",
+            detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
