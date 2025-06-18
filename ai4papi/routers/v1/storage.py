@@ -96,7 +96,7 @@ def storage_ls(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     if storage_name:
         # Sanitize user path (avoid security risk)
@@ -142,7 +142,7 @@ def storage_rm(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Do not allow to delete root folder to prevent accidents
     if not subpath.strip("/"):

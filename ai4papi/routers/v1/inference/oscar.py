@@ -102,7 +102,7 @@ def get_cluster_info(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Get cluster info
     client = get_client_from_auth(authorization.credentials, vo)
@@ -199,7 +199,7 @@ def get_services_list(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Get services list
     client = get_client_from_auth(authorization.credentials, vo)
@@ -253,7 +253,7 @@ def get_service(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Get service
     client = get_client_from_auth(authorization.credentials, vo)
@@ -309,7 +309,7 @@ def create_service(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Load service configuration
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
@@ -351,7 +351,7 @@ def update_service(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Load service configuration
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
@@ -389,7 +389,7 @@ def delete_service(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Delete service
     client = get_client_from_auth(authorization.credentials, vo)

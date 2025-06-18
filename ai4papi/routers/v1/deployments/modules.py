@@ -52,13 +52,11 @@ def get_deployments(
 
     # If no VOs, then retrieve jobs from all user VOs
     # Always remove VOs that do not belong to the project
-    if not vos:
-        vos = auth_info["vos"]
     vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
     if not vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}.",
+            detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
@@ -121,7 +119,7 @@ def get_deployment(
 
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -174,7 +172,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Load module configuration
     nomad_conf = deepcopy(papiconf.MODULES["nomad"])
@@ -402,7 +400,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Delete deployment
     r = nomad.delete_deployment(

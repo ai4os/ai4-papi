@@ -21,8 +21,6 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
  button where you can copy paste your token. So you will be able to access authenticated methods from the interface.
 """
 
-import re
-
 from fastapi import HTTPException
 from flaat.fastapi import Flaat
 
@@ -50,16 +48,18 @@ def get_user_info(token):
             detail="Invalid token",
         )
 
-    # Retrieve VOs the user belongs to
-    # VOs can be empty if the user does not belong to any VO, or the
-    # 'eduperson_entitlement wasn't correctly retrieved from the token
-    vos = []
-    for i in user_infos.get("eduperson_entitlement", []):
-        # Parse Virtual Organizations manually from URNs
-        # If more complexity is need in the future, check https://github.com/oarepo/urnparse
-        ent_i = re.search(r"group:(.+?):", i)
-        if ent_i:  # your entitlement has indeed a group `tag`
-            vos.append(ent_i.group(1))
+    # Create a group dictionary where keys are the access levels and values are the
+    # projects that enabled the user into that access level.
+    # eg. {"platform-access": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
+    groups = {}
+    for i in user_infos.get("realm_access", {}).get("roles", []):
+        i = i.split(":")
+        access = i[0]  # eg. "platform-access"
+        project = i[1] if len(i) > 1 else None  # eg. "vo.ai4eosc.eu"
+        v = groups.get(access, [])
+        if project:
+            v.append(project)
+        groups[access] = v
 
     # Generate user info dict
     for k in ["sub", "iss", "name", "email"]:
@@ -68,25 +68,42 @@ def get_user_info(token):
                 status_code=401,
                 detail=f"You token should have scopes for {k}.",
             )
+
+    # Check audiences (needed for Vault)
+    if "account" not in user_infos.get("aud"):
+        raise HTTPException(
+            status_code=401,
+            detail="You token should have 'account' in audiences.",
+        )
+
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
         "issuer": user_infos.get("iss"),  # URL of the access token issuer
         "name": user_infos.get("name"),
         "email": user_infos.get("email"),
-        "vos": vos,
+        "groups": groups,
     }
 
     return out
 
 
-def check_vo_membership(
-    requested_vo,
-    user_vos,
+def check_authorization(
+    auth_info: dict,
+    requested_vo: str = None,
+    access_level: str = "platform-access",
 ):
     """
-    Check that the user has access to the VO he is asking for.
+    Check that the user has permissions to use the resource (usually "platform-access")
+    and check he indeed belongs to the requested VO if one is specified.
     """
-    if requested_vo not in user_vos:
+    if access_level not in auth_info["groups"].keys():
+        raise HTTPException(
+            status_code=401,
+            detail=f"Your user has not the required access level to use this resource: {access_level}.",
+        )
+
+    user_vos = auth_info["groups"][access_level]
+    if requested_vo and (requested_vo not in user_vos):
         raise HTTPException(
             status_code=401,
             detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}.",
