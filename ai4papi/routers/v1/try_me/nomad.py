@@ -28,6 +28,13 @@ security = HTTPBearer()
 VO = "vo.ai4eosc.eu"
 NAMESPACE = papiconf.MAIN_CONF["nomad"]["namespaces"][VO]
 
+# Set platform hardware requirements for try-me
+MAX_TRYMES = 3
+REQUIREMENTS = {
+    "cpu": {"default": 1, "max": 8, "min": 1},
+    "memory_MB": {"default": 2000, "max": 16000, "min": 1000},
+}
+
 
 @router.get("")
 def get_deployments(
@@ -136,6 +143,27 @@ def create_deployment(
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
 
+    # Try to accommodate module developer hardware requirements
+    meta_inference = meta.get("resources", {}).get("inference", {})  # user request
+    final = {}  # final deployment values
+    mismatches = {}
+    for k in ["cpu", "memory_MB"]:
+        final[k] = meta_inference.get(k, REQUIREMENTS[k]["default"])
+        final[k] = max(final[k], REQUIREMENTS[k]["min"])
+        final[k] = min(final[k], REQUIREMENTS[k]["max"])
+        if (user_k := meta_inference.get(k)) and user_k > final[k]:
+            mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
+
+    if user_k := meta_inference.get("gpu"):
+        mismatches["gpu"] = f"Requested: {user_k}, Max allowed: 0"
+
+    # Show warning if we couldn't accommodate user requirements
+    warning = ""
+    if mismatches:
+        for k, v in mismatches.items():
+            warning += f"<li> <strong>{k}</strong>: {v} </li>"
+        warning = "<ul>" + warning + "</ul>"
+
     # Replace the Nomad job template
     nomad_conf = nomad_conf.safe_substitute(
         {
@@ -148,6 +176,10 @@ def create_deployment(
             "BASE_DOMAIN": papiconf.MAIN_CONF["lb"]["domain"][VO],
             "HOSTNAME": job_uuid,
             "DOCKER_IMAGE": docker_image,
+            "CPU_NUM": final["cpu"],
+            "RAM": final["memory_MB"],
+            "SHARED_MEMORY": final["memory_MB"] * 10**6 * 0.5,
+            "INFERENCE_WARNING": warning,
         }
     )
 
@@ -186,10 +218,10 @@ def create_deployment(
         owner=auth_info["id"],
         prefix="try",
     )
-    if len(jobs) >= 3:
+    if len(jobs) >= MAX_TRYMES:
         raise HTTPException(
             status_code=503,
-            detail="Sorry, but you seem to be currently running 3 `try-me` environments already. "
+            detail=f"Sorry, but you seem to be currently running {MAX_TRYMES} `try-me` environments already. "
             "Before launching a new one, you will need to wait till one of your "
             "existing environments gets automatically deleted (ca. 10 min) or delete it manually "
             "in the Dashboard.",

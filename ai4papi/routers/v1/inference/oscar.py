@@ -6,18 +6,19 @@ from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 import json
-from typing import List
+from typing import Union
 import uuid
 import yaml
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
-from pydantic import BaseModel, NonNegativeInt
 import requests
 
-from ai4papi import auth
-from ai4papi.conf import MAIN_CONF, OSCAR_TMPL
+from ai4papi import auth, utils
+from ai4papi.routers.v1.catalog.modules import Modules
+from ai4papi.routers.v1.catalog.common import retrieve_docker_tags
+import ai4papi.conf as papiconf
 
 
 router = APIRouter(
@@ -25,32 +26,6 @@ router = APIRouter(
     tags=["OSCAR inference"],
     responses={404: {"description": "Inference not found"}},
 )
-
-
-class Service(BaseModel):
-    image: str
-    cpu: NonNegativeInt = 2
-    memory: NonNegativeInt = 3000
-    allowed_users: List[str] = []  # no additional users by default
-    title: str = ""
-
-    # Not configurable
-    _name: str = ""  # filled by PAPI with UUID
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "title": "Demo image classification service",
-                    "image": "deephdc/deep-oc-image-classification-tf",
-                    "cpu": 2,
-                    "memory": 3000,
-                    "allowed_users": [],
-                }
-            ]
-        }
-    }
-
 
 security = HTTPBearer()
 
@@ -94,8 +69,8 @@ def get_client_from_auth(token, vo):
     Retrieve authenticated user info and init OSCAR client.
     """
     client_options = {
-        "cluster_id": MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
-        "endpoint": MAIN_CONF["oscar"]["clusters"][vo]["endpoint"],
+        "cluster_id": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
+        "endpoint": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"],
         "oidc_token": token,
         "ssl": "true",
     }
@@ -112,34 +87,8 @@ def get_client_from_auth(token, vo):
     client.create_service = raise_for_status(client.create_service)
     client.update_service = raise_for_status(client.update_service)
     client.remove_service = raise_for_status(client.remove_service)
-    # client.run_service = raise_for_status(client.run_service)  #TODO: reenable when ready?
 
     return client
-
-
-def make_service_definition(svc_conf, vo):
-    # Create service definition
-    service = deepcopy(OSCAR_TMPL)  # init from template
-    service = service.safe_substitute(
-        {
-            "CLUSTER_ID": MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
-            "NAME": svc_conf._name,
-            "IMAGE": svc_conf.image,
-            "CPU": svc_conf.cpu,
-            "MEMORY": svc_conf.memory,
-            "ALLOWED_USERS": svc_conf.allowed_users,
-            "VO": vo,
-            "ENV_VARS": {
-                "Variables": {
-                    "PAPI_TITLE": svc_conf.title,
-                    "PAPI_CREATED": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                },
-            },
-        }
-    )
-    service = yaml.safe_load(service)
-
-    return service
 
 
 @router.get("/cluster")
@@ -160,6 +109,77 @@ def get_cluster_info(
     r = client.get_cluster_info()
 
     return json.loads(r.text)
+
+
+@router.get("/conf")
+def get_service_conf(
+    item_name: str,
+    vo: str,
+):
+    """
+    Returns the configuration needed to make an OSCAR service deployment.
+    """
+    # Check if module exists
+    modules = Modules.get_items()
+    if item_name not in modules.keys():
+        raise HTTPException(
+            status_code=400,
+            detail=f"{item_name} is not an available module.",
+        )
+
+    # Retrieve module configuration
+    conf = deepcopy(papiconf.OSCAR["user"]["full"])
+
+    # Retrieve module metadata
+    metadata = Modules.get_metadata(item_name)
+
+    # Parse docker registry
+    registry = metadata["links"]["docker_image"]
+    repo, image = registry.split("/")[-2:]
+    if repo not in ["deephdc", "ai4oshub"]:
+        repo = "ai4oshub"
+
+    # Fill with correct Docker image
+    conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+
+    # Add available Docker tags
+    tags = retrieve_docker_tags(image=image, repo=repo)
+    conf["general"]["docker_tag"]["options"] = tags
+    conf["general"]["docker_tag"]["value"] = tags[0]
+
+    # Modify default hardware value with user preferences, as long as they are within
+    # the allowed limits
+    meta_inference = metadata.get("resources", {}).get("inference", {})  # user request
+    final = {}  # final deployment values
+    mismatches = {}
+    meta2conf = {
+        "cpu": "cpu_num",
+        "memory_MB": "ram",
+    }
+    for k, v in meta2conf.items():
+        final[k] = meta_inference.get(k, conf["hardware"][v]["value"])
+        final[k] = max(final[k], conf["hardware"][v]["range"][0])
+        final[k] = min(final[k], conf["hardware"][v]["range"][1])
+        conf["hardware"][v]["value"] = final[k]
+        if (user_k := meta_inference.get(k)) and user_k > final[k]:
+            mismatches[k] = f"Requested: {user_k}, Max allowed: {final[k]}"
+
+    if user_k := meta_inference.get("gpu"):
+        mismatches["gpu"] = f"Requested: {user_k}, Max allowed: 0"
+
+    # Show warning if we couldn't accommodate user requirements
+    if mismatches:
+        warning = (
+            "The developer of the module specified a recommended amount of resources "
+            "that could not be met in OSCAR deployments. "
+            "Therefore, you might experience some issues when using this module for "
+            "inference. The following resources could not be met: <ul>"
+        )
+        for k, v in mismatches.items():
+            warning += f"<li> <strong>{k}</strong>: {v} </li>"
+        conf["hardware"]["warning"] = warning + "</ul>"
+
+    return conf
 
 
 @router.get("/services")
@@ -204,7 +224,7 @@ def get_services_list(
             continue
 
         # Add service endpoint for sync calls
-        cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+        cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
         s["endpoint"] = f"{cluster_endpoint}/run/{s['name']}"
 
         # Info for async calls
@@ -214,7 +234,7 @@ def get_services_list(
         services.append(s)
 
     # Sort services by creation time, recent to old
-    dates = [s["environment"]["Variables"]["PAPI_CREATED"] for s in services]
+    dates = [s["environment"]["variables"]["PAPI_CREATED"] for s in services]
     idxs = sorted(range(len(dates)), key=dates.__getitem__)  # argsort
     sorted_services = [services[i] for i in idxs[::-1]]
 
@@ -241,8 +261,39 @@ def get_service(
     service = json.loads(r.text)
 
     # Add service endpoint
-    cluster_endpoint = MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+    cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
     service["endpoint"] = f"{cluster_endpoint}/run/{service_name}"
+
+    return service
+
+
+def make_service_definition(conf, vo):
+    """
+    Generate an OSCAR service definition. It is used both to create and to update a
+    service.
+    """
+
+    # Create service definition
+    service = deepcopy(papiconf.OSCAR["service"])  # init from template
+    service = service.safe_substitute(
+        {
+            "CLUSTER_ID": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
+            "NAME": conf["name"],
+            "IMAGE": conf["general"]["docker_image"],
+            "CPU": conf["hardware"]["cpu_num"],
+            "MEMORY": conf["hardware"]["ram"],
+            "ALLOWED_USERS": conf["allowed_users"],
+            "VO": vo,
+            "ENV_VARS": {
+                "Variables": {
+                    "PAPI_TITLE": conf["general"]["title"],
+                    "PAPI_DESCRIPTION": conf["general"]["desc"],
+                    "PAPI_CREATED": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            },
+        }
+    )
+    service = yaml.safe_load(service)
 
     return service
 
@@ -250,7 +301,7 @@ def get_service(
 @router.post("/services")
 def create_service(
     vo: str,
-    svc_conf: Service,
+    conf: Union[dict, None] = None,
     authorization=Depends(security),
 ):
     """
@@ -260,26 +311,38 @@ def create_service(
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info["vos"])
 
+    # Load service configuration
+    user_conf = deepcopy(papiconf.MODULES["user"]["values"])
+
+    # Update values conf in case we received a submitted conf
+    if conf is not None:
+        user_conf = utils.update_values_conf(
+            submitted=conf,
+            reference=user_conf,
+        )
+
     # Assign random UUID to service to avoid clashes
     # We clip it because OSCAR only seems to support names smaller than 39 characters
-    svc_conf._name = f"ai4papi-{uuid.uuid1()}"[:39]
+    user_conf["name"] = f"ai4papi-{uuid.uuid1()}"[:39]
+
+    # Add service owner
+    user_conf["allowed_users"] = [auth_info["id"]]
 
     # Create service definition
-    service_definition = make_service_definition(svc_conf, vo)
-    service_definition["allowed_users"] += [auth_info["id"]]  # add service owner
+    service_definition = make_service_definition(user_conf, vo)
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
     _ = client.create_service(service_definition)
 
-    return svc_conf._name
+    return user_conf["name"]
 
 
 @router.put("/services/{service_name}")
 def update_service(
     vo: str,
     service_name: str,
-    svc_conf: Service,
+    conf: Union[dict, None] = None,
     authorization=Depends(security),
 ):
     """
@@ -290,19 +353,31 @@ def update_service(
     auth_info = auth.get_user_info(authorization.credentials)
     auth.check_vo_membership(vo, auth_info["vos"])
 
+    # Load service configuration
+    user_conf = deepcopy(papiconf.MODULES["user"]["values"])
+
+    # Update values conf in case we received a submitted conf
+    if conf is not None:
+        user_conf = utils.update_values_conf(
+            submitted=conf,
+            reference=user_conf,
+        )
+
+    # Update conf values
+    user_conf["name"] = service_name
+    user_conf["allowed_users"] = [auth_info["id"]]
+
     # Create service definition
-    svc_conf._name = service_name
-    service_definition = make_service_definition(svc_conf, vo)
-    service_definition["allowed_users"] += [auth_info["id"]]  # add service owner
+    service_definition = make_service_definition(user_conf, vo)
 
     # Update service
     client = get_client_from_auth(authorization.credentials, vo)
-    _ = client.update_service(svc_conf._name, service_definition)
+    _ = client.update_service(service_name, service_definition)
 
-    return service_name
+    return user_conf["name"]
 
 
-@router.delete("/services/{service_name}")
+@router.delete("/services/{service_uuid}")
 def delete_service(
     vo: str,
     service_name: str,

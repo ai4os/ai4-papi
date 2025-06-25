@@ -1,7 +1,10 @@
 from copy import deepcopy
+import datetime
+import os
 import json
 import re
 import secrets
+import subprocess
 import types
 from types import SimpleNamespace
 from typing import Tuple, Union
@@ -15,6 +18,7 @@ import ai4papi.conf as papiconf
 import ai4papi.nomad.common as nomad
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
+from ai4papi.routers.v1 import deployments as ai4_deployments
 
 
 router = APIRouter(
@@ -152,6 +156,17 @@ def get_deployment(
     if tool_id == "ai4os-ai4life-loader":
         job["main_endpoint"] = "ui"  # instead of deepaas
 
+    if tool_id == "ai4os-nvflare":
+        # Remove useless endpoints (they are not meant to be opened by the user directly)
+        ignore = ["server-admin", "server-fl"]
+        job["endpoints"] = {
+            k: v for k, v in job["endpoints"].items() if k not in ignore
+        }
+        if job["active_endpoints"]:
+            job["active_endpoints"] = [
+                k for k in job["active_endpoints"] if k not in ignore
+            ]
+
     return job
 
 
@@ -231,8 +246,27 @@ def create_deployment(
             item_name=tool_name,
         )
 
+    # Check if requested hardware is within the user total quota (summing modules and
+    # tools)
+    tools_deps = get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    modules_deps = ai4_deployments.modules.get_deployments(
+        vos=[vo],
+        authorization=types.SimpleNamespace(
+            credentials=authorization.credentials  # token
+        ),
+    )
+    quotas.check_userwise(
+        conf=user_conf,
+        deployments=modules_deps + tools_deps,
+    )
+
     # Generate UUID from (MAC address+timestamp) so it's unique
-    job_uuid = uuid.uuid1()
+    job_uuid = str(uuid.uuid1())
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
     if vo == "training.egi.eu":
@@ -241,6 +275,108 @@ def create_deployment(
         priority = 50
 
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
+
+    if tool_name == "ai4os-dev-env":
+        # Retrieve MLflow credentials
+        user_secrets = ai4secrets.get_secrets(
+            vo=vo,
+            subpath="/services",
+            authorization=types.SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
+        mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
+
+        # Check IDE password length
+        if len(user_conf["general"]["jupyter_password"]) < 9:
+            raise HTTPException(
+                status_code=400,
+                detail="Your IDE needs a password of at least 9 characters.",
+            )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "DOCKER_TAG": user_conf["general"]["docker_tag"],
+                "SERVICE": user_conf["general"]["service"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                "GPU_NUM": user_conf["hardware"]["gpu_num"],
+                "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
+                "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
+                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
+                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
+                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
+                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
+                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+                "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
+                "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
+                "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
+                "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
+                "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
+                "TODAY": str(datetime.date.today()),
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks = nomad_conf["TaskGroups"][0]["Tasks"]
+        usertask = [t for t in tasks if t["Name"] == "main"][0]
+
+        # Modify the GPU section
+        if user_conf["hardware"]["gpu_num"] <= 0:
+            # Delete GPU section in CPU deployments
+            usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
+            usertask["Resources"]["Devices"] = None
+        else:
+            # If gpu_type not provided, remove constraint to GPU model
+            if not user_conf["hardware"]["gpu_type"]:
+                usertask["Resources"]["Devices"][0]["Constraints"] = None
+
+        # If storage credentials not provided, remove all storage-related tasks
+        rclone = {
+            k: v for k, v in user_conf["storage"].items() if k.startswith("rclone")
+        }
+        if not all(rclone.values()):
+            exclude_tasks = ["storage_mount", "storage_cleanup", "dataset_download"]
+        else:
+            # Obscure rclone password on behalf of user
+            obscured = subprocess.run(
+                [f"rclone obscure {user_conf['storage']['rclone_password']}"],
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            usertask["Env"]["RCLONE_CONFIG_RSHARE_PASS"] = obscured.stdout.strip()
+
+            # If datasets provided, replicate 'dataset_download' task as many times as needed
+            if user_conf["storage"]["datasets"]:
+                download_task = [t for t in tasks if t["Name"] == "dataset_download"][0]
+                for i, dataset in enumerate(user_conf["storage"]["datasets"]):
+                    t = deepcopy(download_task)
+                    t["Env"]["DOI"] = dataset["doi"]
+                    t["Env"]["FORCE_PULL"] = dataset["doi"]
+                    t["Name"] = f"dataset_download_{i}"
+                    tasks.append(t)
+            # Always exclude initial 'dataset_download' task, as it is used as template
+            exclude_tasks = ["dataset_download"]
+
+        tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
     # Deploy a Federated server
     if tool_name == "ai4os-federated-server":
@@ -288,23 +424,21 @@ def create_deployment(
                 # Limit at 50% of RAM memory, in bytes
                 "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
                 "VAULT_TOKEN": vault_token,
-                "FEDERATED_ROUNDS": user_conf["configuration"]["rounds"],
-                "FEDERATED_METRIC": user_conf["configuration"]["metric"],
-                "FEDERATED_MIN_FIT_CLIENTS": user_conf["configuration"][
-                    "min_fit_clients"
-                ],
-                "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["configuration"][
+                "FEDERATED_ROUNDS": user_conf["flower"]["rounds"],
+                "FEDERATED_METRIC": user_conf["flower"]["metric"],
+                "FEDERATED_MIN_FIT_CLIENTS": user_conf["flower"]["min_fit_clients"],
+                "FEDERATED_MIN_AVAILABLE_CLIENTS": user_conf["flower"][
                     "min_available_clients"
                 ],
-                "FEDERATED_STRATEGY": user_conf["configuration"]["strategy"],
-                "MU_FEDPROX": user_conf["configuration"]["mu"],
-                "FEDAVGM_SERVER_FL": user_conf["configuration"]["fl"],
-                "FEDAVGM_SERVER_MOMENTUM": user_conf["configuration"]["momentum"],
-                "DP": user_conf["configuration"]["dp"],
-                "METRIC_PRIVACY": user_conf["configuration"]["mp"],
-                "NOISE_MULT": user_conf["configuration"]["noise_mult"],
-                "SAMPLED_CLIENTS": user_conf["configuration"]["sampled_clients"],
-                "CLIP_NORM": user_conf["configuration"]["clip_norm"],
+                "FEDERATED_STRATEGY": user_conf["flower"]["strategy"],
+                "MU_FEDPROX": user_conf["flower"]["mu"],
+                "FEDAVGM_SERVER_FL": user_conf["flower"]["fl"],
+                "FEDAVGM_SERVER_MOMENTUM": user_conf["flower"]["momentum"],
+                "DP": user_conf["flower"]["dp"],
+                "METRIC_PRIVACY": user_conf["flower"]["mp"],
+                "NOISE_MULT": user_conf["flower"]["noise_mult"],
+                "SAMPLED_CLIENTS": user_conf["flower"]["sampled_clients"],
+                "CLIP_NORM": user_conf["flower"]["clip_norm"],
             }
         )
 
@@ -382,6 +516,47 @@ def create_deployment(
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
 
+    # Deploy an NVFlare Federated server and Dashboard
+    elif tool_name == "ai4os-nvflare":
+        # Enforce having NVFLARE credentials
+        if not (user_conf["nvflare"]["username"] and user_conf["nvflare"]["password"]):
+            raise HTTPException(
+                status_code=400,
+                detail="You must provide credentials for NVFLARE.",
+            )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                "NVFL_VERSION": "2.5-Stifo",
+                "NVFL_USERNAME": user_conf["nvflare"]["username"],
+                "NVFL_PASSWORD": user_conf["nvflare"]["password"],
+                "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
+                "NVFL_SHORTNAME": job_uuid[:16],
+                "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
+                "NVFL_STARTING_DATE": user_conf["nvflare"]["starting_date"],
+                "NVFL_END_DATE": user_conf["nvflare"]["end_date"],
+                "NVFL_PUBLIC_PROJECT": user_conf["nvflare"]["public_project"],
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
         vllm_args = []
@@ -400,6 +575,12 @@ def create_deployment(
             api_endpoint = user_conf["llm"]["openai_api_url"]
 
         if user_conf["llm"]["type"] in ["openwebui", "both"]:
+            # Check if user has provided a username
+            if not user_conf["llm"]["ui_username"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="A username is required to deploy this tool.",
+                )
             # Check if user has provided a password
             if not user_conf["llm"]["ui_password"]:
                 raise HTTPException(
@@ -423,7 +604,7 @@ def create_deployment(
             )
 
             # Configure VLLM args
-            model_id = user_conf["llm"]["model_id"]
+            model_id = user_conf["llm"]["vllm_model_id"]
             vllm_args += ["--model", model_id]
             vllm_args += papiconf.VLLM["models"][model_id]["args"]
 
@@ -454,6 +635,7 @@ def create_deployment(
                 "API_TOKEN": api_token,
                 "API_ENDPOINT": api_endpoint,
                 "HUGGINGFACE_TOKEN": user_conf["llm"]["HF_token"],
+                "OPEN_WEBUI_USERNAME": user_conf["llm"]["ui_username"],
                 "OPEN_WEBUI_PASSWORD": user_conf["llm"]["ui_password"],
             }
         )
@@ -561,14 +743,14 @@ def delete_deployment(
     )
 
     # Remove Vault secrets belonging to that deployment
-    secrets = ai4secrets.get_secrets(
+    user_secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath=f"/deployments/{deployment_uuid}",
         authorization=SimpleNamespace(
             credentials=authorization.credentials,
         ),
     )
-    for path in secrets.keys():
+    for path in user_secrets.keys():
         _ = ai4secrets.delete_secret(
             vo=vo,
             secret_path=path,

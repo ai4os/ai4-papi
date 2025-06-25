@@ -38,6 +38,13 @@ job "tool-llm-${JOB_UUID}" {
     value     = "true"
   }
 
+  # Avoid deploying in nodes that are reserved to batch
+  constraint {
+    attribute = "${meta.type}"
+    operator  = "!="
+    value     = "batch"
+  }
+
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
   # because Nomad does not allow a node to belong to several node pools)
   constraint {
@@ -260,7 +267,7 @@ job "tool-llm-${JOB_UUID}" {
       env {
         OPEN_WEBUI_URL = "https://ui-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}"
         NAME           = "${OWNER_NAME}"
-        EMAIL          = "${OWNER_EMAIL}"
+        EMAIL          = "${OPEN_WEBUI_USERNAME}"
         PASSWORD       = "${OPEN_WEBUI_PASSWORD}"
       }
 

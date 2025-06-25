@@ -1,6 +1,7 @@
 import fastapi
 
 from . import (
+    batch,
     catalog,
     deployments,
     inference,
@@ -9,10 +10,12 @@ from . import (
     storage,
     try_me,
     snapshots,
+    proxies,
 )
 
 
 router = fastapi.APIRouter()
+router.include_router(batch.router)
 router.include_router(catalog.router)
 router.include_router(deployments.router)
 router.include_router(inference.router)
@@ -21,6 +24,7 @@ router.include_router(snapshots.router)
 router.include_router(stats.router)
 router.include_router(storage.router)
 router.include_router(try_me.router)
+router.include_router(proxies.router)
 
 
 @router.get(
