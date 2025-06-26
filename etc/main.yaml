@@ -23,9 +23,10 @@ auth:
 
   OP:  # OIDC providers
 
-    - https://aai-demo.egi.eu/auth/realms/egi
-    - https://aai-dev.egi.eu/auth/realms/egi
-    - https://aai.egi.eu/auth/realms/egi
+    # - https://aai-demo.egi.eu/auth/realms/egi
+    # - https://aai-dev.egi.eu/auth/realms/egi
+    # - https://aai.egi.eu/auth/realms/egi
+    - https://login.cloud.ai4eosc.eu/realms/ai4eosc
 
   VO:  # Virtual Organizations
 
