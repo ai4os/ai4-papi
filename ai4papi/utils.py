@@ -101,10 +101,14 @@ def get_github_info(owner, repo):
     _get_metadata() each time the metadata needs to be recomputed.
     """
     # Avoid running this function if were are doing local development, because
-    # repeatedly calling the Github API will otherwise get you blocked
+    # repeatedly calling the Github API will otherwise get you blocked. Return mock data
     if papiconf.IS_DEV:
         print("[info] Skipping Github API info fetching (development).")
-        return {}
+        return {
+            "created": "1970-01-01",
+            "updated": "1970-01-01",
+            "license": "MIT",
+        }
 
     # Retrieve information from Github API
     url = f"https://api.github.com/repos/{owner}/{repo}"

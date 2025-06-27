@@ -1,6 +1,10 @@
 ---
 # Main configuration file of the API
 
+self:  # info about the API endpoint
+
+  domain: https://api.cloud.ai4eosc.eu
+
 auth:
 
   CORS_origins:  # allows requests to the API from these domains
