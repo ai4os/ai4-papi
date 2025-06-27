@@ -57,4 +57,4 @@ rdeps3 = nomad.get_deployments(
 )
 assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
 
-print("Try-me (nomad) tests passed!")
+print("🟢 Try-me (nomad) tests passed!")

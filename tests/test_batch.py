@@ -92,4 +92,4 @@ rdeps3 = batch.get_deployments(
 )
 assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
 
-print("Batch jobs (Nomad) tests passed!")
+print("🟢 Batch jobs (Nomad) tests passed!")

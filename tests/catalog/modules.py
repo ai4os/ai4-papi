@@ -65,4 +65,4 @@ assert isinstance(module_meta, dict)
 
 # TODO: we should not be able to get config or metadata for a tool_name
 
-print("Catalog (modules) tests passed!")
+print("🟢 Catalog (modules) tests passed!")

@@ -23,4 +23,4 @@ r = storage.storage_ls(
     authorization=SimpleNamespace(credentials=token),
 )
 
-print("Storage tests passed!")
+print("🟢 Storage tests passed!")

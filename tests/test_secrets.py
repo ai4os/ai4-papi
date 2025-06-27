@@ -49,4 +49,4 @@ r = secrets.get_secrets(
 )
 assert SECRET_PATH not in r.keys()
 
-print("Secrets tests passed!")
+print("🟢 Secrets tests passed!")

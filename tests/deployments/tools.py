@@ -133,4 +133,4 @@ for tname, tconfig in tools_config.items():
     )
     assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
 
-print("Deployments (tools) tests passed!")
+print("🟢 Deployments (tools) tests passed!")

@@ -24,8 +24,9 @@ import deployments.modules
 import deployments.tools
 import try_me.test_nomad
 import test_batch
-import routes
 import test_secrets
+import test_snapshots
 import test_stats
 import test_storage
 import test_launch
+import routes

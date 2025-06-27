@@ -25,4 +25,4 @@ except requests.exceptions.ConnectionError:
 finally:
     server_process.kill()
 
-print("PAPI launch tests successful!")
+print("🟢 PAPI launch tests successful!")

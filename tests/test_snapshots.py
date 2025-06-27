@@ -77,4 +77,4 @@ assert isinstance(ndel, dict)
 assert "status" in ndel.keys()
 
 
-print("Snapshot tests passed!")
+print("🟢 Snapshot tests passed!")

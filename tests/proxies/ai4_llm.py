@@ -27,4 +27,4 @@ r = ai4_llm.get_chat_response(
 )
 assert isinstance(r, openai.types.chat.chat_completion.ChatCompletion)
 
-print("Proxies (ai4_llm) tests passed!")
+print("🟢 Proxies (ai4_llm) tests passed!")

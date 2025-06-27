@@ -93,4 +93,4 @@ r_prov = modules.get_deployment(
     authorization=SimpleNamespace(credentials="1234"),
 )
 
-print("Deployments (modules) tests passed!")
+print("🟢 Deployments (modules) tests passed!")

@@ -33,4 +33,4 @@ r = stats.deployments.get_cluster_stats(
 )
 assert r, "Cluster stats dict is empty"
 
-print("Stats tests passed!")
+print("🟢 Stats tests passed!")
