@@ -199,7 +199,7 @@ def create_deployment(
 
     for _, datacenter in stats["datacenters"].items():
         for _, node in datacenter["nodes"].items():
-            if "tryme" in node["tags"] and node["status"] == "ready":
+            if node["type"] == "tryme" and node["status"] == "ready":
                 for k in keys:
                     status[k] += node[k]
     for r in resources:
