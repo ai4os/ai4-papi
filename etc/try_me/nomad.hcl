@@ -42,8 +42,8 @@ job "try-${JOB_UUID}" {
   # Force that try-me jobs land in "tryme" nodes (that are the ones that have the docker
   # images pre-fetched for fast deployment)
   constraint {
-    attribute = "${meta.tags}"
-    operator  = "regexp"
+    attribute = "${meta.type}"
+    operator  = "="
     value     = "tryme"
   }
 

@@ -33,16 +33,9 @@ job "module-${JOB_UUID}" {
 
   # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
   constraint {
-    attribute = "${meta.compute}"
-    operator  = "="
-    value     = "true"
-  }
-
-  # Avoid deploying in nodes that are reserved to batch
-  constraint {
     attribute = "${meta.type}"
-    operator  = "!="
-    value     = "batch"
+    operator  = "="
+    value     = "compute"
   }
 
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools

@@ -83,9 +83,9 @@ job "tool-cvat-${JOB_UUID}" {
 
   # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
   constraint {
-    attribute = "${meta.compute}"
+    attribute = "${meta.type}"
     operator  = "="
-    value     = "true"
+    value     = "compute"
   }
 
   # Avoid deploying in nodes that are reserved to batch

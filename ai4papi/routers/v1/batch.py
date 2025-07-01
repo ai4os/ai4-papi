@@ -365,12 +365,20 @@ def create_deployment(
     content = " ".join([line.decode("utf-8") for line in content])  # bytes to utf-8
     usertask["Templates"] = [{"DestPath": "local/batch.sh", "EmbeddedTmpl": content}]
 
-    # Batch jobs should no longer avoid batch nodes (ie. module's old constraint)
+    # Batch jobs should no longer have "type=compute" constraint (ie. module's old constraint)
     nomad_conf["Constraints"][:] = [
         c
         for c in nomad_conf["Constraints"]
-        if not c == {"LTarget": "${meta.type}", "Operand": "!=", "RTarget": "batch"}
+        if not c == {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "compute"}
     ]
+    # Batch jobs should be able to deploy both in "type=batch" OR "type=compute"
+    nomad_conf["Constraints"].append(
+        {
+            "LTarget": "${meta.type}",
+            "Operand": "set_contains_any",
+            "RTarget": "compute,batch",
+        }
+    )
     # Batch jobs should not prefer cpu nodes because batch is meant for GPU training
     # (also messes with next affinity)
     nomad_conf["Affinities"][:] = [
@@ -384,8 +392,8 @@ def create_deployment(
             "Weight": 100,
         }
     ]
-    # Batch jobs should have affinity for batch nodes (but can be deployed also in
-    # standard compute nodes)
+    # Batch jobs should have affinity for batch nodes (even if they can also be deployed
+    # in compute nodes)
     nomad_conf["Affinities"].append(
         {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "batch", "Weight": 100}
     )
