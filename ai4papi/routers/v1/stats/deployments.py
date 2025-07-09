@@ -220,7 +220,7 @@ def get_cluster_stats(
     for dc_stats in stats["datacenters"].values():
         for n_stats in dc_stats["nodes"].values():
             for k, v in n_stats.items():
-                # Ignore keys
+                # Ignore keys that are not meant to be aggregated
                 if k in ["name", "namespaces", "eligibility", "status", "tags", "type"]:
                     continue
 
@@ -255,6 +255,7 @@ def get_cluster_stats_bg():
 
     resources = [
         "jobs_num",
+        "reallocations",
         "cpu_total",
         "cpu_used",
         "gpu_total",
@@ -353,8 +354,10 @@ def get_cluster_stats_bg():
             n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
 
             # TODO: we are ignoring resources consumed by other jobs
-            if job["Name"].startswith("module") or job["Name"].startswith("tool"):
-                n_stats["jobs_num"] += 1
+            if not (job["Name"].startswith("module") or job["Name"].startswith("tool")):
+                continue
+
+            n_stats["jobs_num"] += 1
 
             # TODO: we are ignoring resources consumed by other tasks
             if "main" in a["AllocatedResources"]["Tasks"]:
@@ -385,6 +388,16 @@ def get_cluster_stats_bg():
                     if n_stats["gpu_models"]:
                         n_stats["gpu_used"] += gpu_num
                         n_stats["gpu_models"][gpu["Name"]]["gpu_used"] += gpu_num
+
+            # We also want to keep track of how many allocations in a node were reallocated
+            # (frequent reallocation is a sign of node malfunctioning)
+            if len(allocs) > 1:  # the job has been reallocated
+                for a in allocs:
+                    if a["NextAllocation"]:  # this alloc has been reallocated
+                        datacenter = nodes_dc[a["NodeID"]]
+                        n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
+                        n_stats["reallocations"] += 1
+
             else:
                 continue
 
