@@ -85,8 +85,14 @@ job "tool-ai4life-${JOB_UUID}" {
     # * if the node is lost for good, you would need to manually redeploy,
     # * if the node is unavailable due to a network cut, you will recover the job (and
     #   your saved data) once the network comes back.
-    prevent_reschedule_on_lost = true
+    #prevent_reschedule_on_lost = true
 
+    disconnect {
+      lost_after = "6h"
+      replace = false
+      reconcile = "keep_original"
+    }
+    
     network {
 
       port "api" {
