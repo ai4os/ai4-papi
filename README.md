@@ -115,7 +115,7 @@ Then, you will a token via the terminal. For this you need:
    eval `oidc-agent-service start`
    oidc-gen \
     --configuration-endpoint https://login.cloud.ai4eosc.eu/realms/ai4eosc/.well-known/openid-configuration \
-    --client-id "ai4papi" \
+    --client-id "ai4-papi" \
     --client-secret <client-secret> \
     ai4os-keycloak
    ```
