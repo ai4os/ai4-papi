@@ -63,6 +63,9 @@ job "tool-cvat-${JOB_UUID}" {
     clickhouse_user                    = "user"
     clickhouse_password                = "user"
 
+    oscar_url                          = "${OSCAR_URL}"
+    oscar_refresh_token                = "${OSCAR_REFRESH_TOKEN}"
+
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
     RCLONE_CONFIG_RSHARE_TYPE          = "webdav"
     RCLONE_CONFIG_RSHARE_URL           = "${RCLONE_CONFIG_RSHARE_URL}"
@@ -815,6 +818,7 @@ job "tool-cvat-${JOB_UUID}" {
         CVAT_REDIS_INMEM_PORT = "${NOMAD_HOST_PORT_redis_inmem}"
         CVAT_REDIS_ONDISK_HOST = "${NOMAD_HOST_IP_redis_ondisk}"
         CVAT_REDIS_ONDISK_PORT = "${NOMAD_HOST_PORT_redis_ondisk}"
+        CVAT_SERVERLESS = 1
         DJANGO_LOG_LEVEL = "INFO"
         DJANGO_LOG_SERVER_HOST = "${NOMAD_HOST_IP_vector}"
         DJANGO_LOG_SERVER_PORT = "${NOMAD_HOST_PORT_vector}"
@@ -827,10 +831,12 @@ job "tool-cvat-${JOB_UUID}" {
         IAM_OPA_BUNDLE = "1"
         NUMPROCS = "2"
         ONE_RUNNING_JOB_IN_QUEUE_PER_USER = "false"
+        OSCAR_URL = "${NOMAD_META_oscar_url}"
+        OSCAR_REFRESH_TOKEN = "${NOMAD_META_oscar_refresh_token}"
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["server"]
         volumes = [
@@ -874,7 +880,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["utils"]
         volumes = [
@@ -915,7 +921,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_import"]
         volumes = [
@@ -961,7 +967,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_export"]
         volumes = [
@@ -1002,7 +1008,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_annotation"]
         volumes = [
@@ -1043,7 +1049,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_webhooks"]
         volumes = [
@@ -1084,7 +1090,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_quality_reports"]
         volumes = [
@@ -1130,7 +1136,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_analytics_reports"]
         volumes = [
@@ -1172,7 +1178,7 @@ job "tool-cvat-${JOB_UUID}" {
         SMOKESCREEN_OPTS = "${NOMAD_META_smokescreen_opts}"
       }
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-server"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-server:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_server}"
         ports = ["worker_chunks"]
         volumes = [
@@ -1215,7 +1221,7 @@ job "tool-cvat-${JOB_UUID}" {
       driver = "docker"
       kill_timeout = "30s"
       config {
-        image = "ai4oshub/ai4os-cvat:v2.28.0-ai4os-ui"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-ui:v2.28.0-AI4OS-OSCAR"
         force_pull = "${NOMAD_META_force_pull_img_cvat_ui}"
         ports = ["ui"]
       }
