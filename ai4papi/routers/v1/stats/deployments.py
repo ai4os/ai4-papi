@@ -7,16 +7,14 @@ import csv
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
-import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
-import nomad
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
-import ai4papi.nomad.patches as npatches
+from ai4papi.nomad.common import Nomad
 
 
 router = APIRouter(
@@ -27,9 +25,6 @@ router = APIRouter(
 security = HTTPBearer()
 
 main_dir = Path(__file__).resolve().parent
-
-Nomad = nomad.Nomad()
-Nomad.job.get_allocations = types.MethodType(npatches.get_allocations, Nomad.job)
 
 cluster_stats = None
 
