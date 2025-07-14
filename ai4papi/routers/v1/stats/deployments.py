@@ -154,14 +154,12 @@ def get_proper_allocation(allocs):
 @cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
 def load_datacenters():
     # Check if datacenter info file is available
-    pth = papiconf.main_path.parent / "var" / "datacenters_info.csv"
-    if not pth.is_file():
-        return {}
+    pth = papiconf.main_path.parent / "var" / "datacenters.csv"
 
     # Load datacenter info
     datacenters = {}
     with open(pth, "r") as f:
-        reader = csv.DictReader(f, delimiter=";")
+        reader = csv.DictReader(f, delimiter=",")
         dc_keys = reader.fieldnames.copy()
         dc_keys.remove("name")
         for row in reader:
@@ -320,6 +318,9 @@ def get_cluster_stats_bg():
                 "energy_quality": 0,
                 "nodes": {},
             }
+            print(
+                f"Warning: Datacenter {n['Datacenter']} not found in datacenters.csv file"
+            )
 
         stats["datacenters"][n["Datacenter"]]["nodes"][n["ID"]] = n_stats
         nodes_dc[n["ID"]] = n["Datacenter"]
