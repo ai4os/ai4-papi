@@ -78,12 +78,13 @@ job "module-${JOB_UUID}" {
     # * if the node is lost for good, you would need to manually redeploy,
     # * if the node is unavailable due to a network cut, you will recover the job (and
     #   your saved data) once the network comes back.
-    #prevent_reschedule_on_lost = true
+    # We don't want to increase the "lost_after" too much because otherwise we will fail
+    # to identify clients that are failing due to network from clients that are truly down
 
     disconnect {
-      lost_after = "6h"
+      lost_after = "48h"
       replace = false
-      reconcile = "keep_original"
+      reconcile = "keep_original"  # in our case, this is redundant
     }
 
     network {
