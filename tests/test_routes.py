@@ -12,6 +12,7 @@ for collection in ["modules", "tools"]:
     assert (f"/v1/catalog/{collection}", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/detail", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/tags", {"GET"}) in routes
+    assert (f"/v1/catalog/{collection}/refresh", {"PUT"}) in routes
     assert (f"/v1/catalog/{collection}/" + "{item_name}/config", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/" + "{item_name}/metadata", {"GET"}) in routes
 

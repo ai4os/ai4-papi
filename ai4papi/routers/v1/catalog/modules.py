@@ -153,7 +153,7 @@ router.add_api_route(
 )
 
 router.add_api_route(
-    "/{item_name}/refresh",
+    "/refresh",
     Modules.refresh_catalog,
     methods=["PUT"],
 )
