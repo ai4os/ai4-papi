@@ -123,7 +123,7 @@ router.add_api_route(
     methods=["GET"],
 )
 router.add_api_route(
-    "/{item_name}/refresh",
-    Tools.refresh_metadata_cache_entry,
+    "/refresh",
+    Tools.refresh_catalog,
     methods=["PUT"],
 )

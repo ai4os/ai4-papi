@@ -154,6 +154,6 @@ router.add_api_route(
 
 router.add_api_route(
     "/{item_name}/refresh",
-    Modules.refresh_metadata_cache_entry,
+    Modules.refresh_catalog,
     methods=["PUT"],
 )

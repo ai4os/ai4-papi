@@ -40,7 +40,13 @@ import ai4papi.conf as papiconf
 
 security = HTTPBearer()
 
+# Jenkins token is mandatory in production
 JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
+if not JENKINS_TOKEN:
+    if papiconf.IS_DEV:  # Not enforced for developers
+        print('"JENKINS_TOKEN" envar is not defined')
+    else:
+        raise Exception('You need to define the variable "JENKINS_TOKEN".')
 
 
 class Catalog:
@@ -315,13 +321,15 @@ class Catalog:
 
         return metadata
 
-    def refresh_metadata_cache_entry(
+    def refresh_catalog(
         self,
-        item_name: str,
+        item_name: str = None,
         authorization=Depends(security),
     ):
         """
-        Expire the metadata cache of a given item and recompute new cache value.
+        Refresh PAPI catalog.
+        If a particular item is provided, expire the metadata cache of a given item
+        and recompute new cache value.
         """
         # Check if token is valid
         if authorization.credentials != JENKINS_TOKEN:
@@ -333,6 +341,11 @@ class Catalog:
         # First refresh the items in the catalog, because this item might be a
         # new addition to the catalog (ie. not present since last parsing the catalog)
         self.get_items.cache_clear()
+        self.get_items()
+
+        # If no item name, then we refresh only the catalog index
+        if not item_name:
+            return {"message": "Catalog refreshed successfully"}
 
         # Check if the item is indeed valid
         if item_name not in self.get_items().keys():
