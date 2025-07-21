@@ -38,6 +38,8 @@ from ai4papi import utils
 import ai4papi.conf as papiconf
 
 
+session = requests.Session()
+
 security = HTTPBearer()
 
 # Jenkins token is mandatory in production
@@ -79,7 +81,7 @@ class Catalog:
         gitmodules_url = (
             f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
         )
-        r = requests.get(gitmodules_url)
+        r = session.get(gitmodules_url)
 
         cfg = configparser.ConfigParser()
         cfg.read_string(r.text)
@@ -205,7 +207,7 @@ class Catalog:
 
         error = None
         # Try to retrieve the metadata from Github
-        r = requests.get(metadata_url)
+        r = session.get(metadata_url)
         if not r.ok:
             error = (
                 "The metadata of this module could not be retrieved because the "
@@ -385,7 +387,7 @@ def retrieve_docker_tags(
     """
     url = f"https://registry.hub.docker.com/v2/repositories/{repo}/{image}/tags?page_size=100"
     try:
-        r = requests.get(url)
+        r = session.get(url)
         r.raise_for_status()
         r = r.json()
     except Exception:
