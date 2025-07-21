@@ -133,7 +133,7 @@ class Catalog:
         Tag-related fields are kept to avoid breaking backward-compatibility but
         aren't actually serving any purpose.
         """
-        modules = self.get_filtered_list()
+        modules = self.get_items()
         summary = []
         ignore = ["description", "links"]  # don't send this info to decrease latency
         for m in modules:
@@ -342,6 +342,8 @@ class Catalog:
         # new addition to the catalog (ie. not present since last parsing the catalog)
         self.get_items.cache_clear()
         self.get_items()
+        self.get_summary.cache_clear()
+        self.get_summary()
 
         # If no item name, then we refresh only the catalog index
         if not item_name:
