@@ -33,16 +33,9 @@ job "module-${JOB_UUID}" {
 
   # Only launch in compute nodes (to avoid clashing with system jobs, eg. Traefik)
   constraint {
-    attribute = "${meta.compute}"
-    operator  = "="
-    value     = "true"
-  }
-
-  # Avoid deploying in nodes that are reserved to batch
-  constraint {
     attribute = "${meta.type}"
-    operator  = "!="
-    value     = "batch"
+    operator  = "="
+    value     = "compute"
   }
 
   # Only deploy in nodes serving that namespace (we use metadata instead of node-pools
@@ -85,7 +78,14 @@ job "module-${JOB_UUID}" {
     # * if the node is lost for good, you would need to manually redeploy,
     # * if the node is unavailable due to a network cut, you will recover the job (and
     #   your saved data) once the network comes back.
-    prevent_reschedule_on_lost = true
+    # We don't want to increase the "lost_after" too much because otherwise we will fail
+    # to identify clients that are failing due to network from clients that are truly down
+
+    disconnect {
+      lost_after = "48h"
+      replace = false
+      reconcile = "keep_original"  # in our case, this is redundant
+    }
 
     network {
 

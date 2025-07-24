@@ -12,6 +12,7 @@ for collection in ["modules", "tools"]:
     assert (f"/v1/catalog/{collection}", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/detail", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/tags", {"GET"}) in routes
+    assert (f"/v1/catalog/{collection}/refresh", {"PUT"}) in routes
     assert (f"/v1/catalog/{collection}/" + "{item_name}/config", {"GET"}) in routes
     assert (f"/v1/catalog/{collection}/" + "{item_name}/metadata", {"GET"}) in routes
 
@@ -27,11 +28,12 @@ for collection in ["modules", "tools"]:
 assert ("/v1/datasets/zenodo", {"POST"}) in routes
 
 assert ("/v1/inference/oscar/cluster", {"GET"}) in routes
+assert ("/v1/inference/oscar/conf", {"GET"}) in routes
 assert ("/v1/inference/oscar/services", {"GET"}) in routes
 assert ("/v1/inference/oscar/services", {"POST"}) in routes
 assert ("/v1/inference/oscar/services/{service_name}", {"GET"}) in routes
 assert ("/v1/inference/oscar/services/{service_name}", {"PUT"}) in routes
-assert ("/v1/inference/oscar/services/{service_name}", {"DELETE"}) in routes
+assert ("/v1/inference/oscar/services/{service_uuid}", {"DELETE"}) in routes
 
 assert ("/v1/secrets", {"GET"}) in routes
 assert ("/v1/secrets", {"POST"}) in routes
@@ -45,6 +47,13 @@ assert ("/v1/try_me/nomad", {"GET"}) in routes
 assert ("/v1/try_me/nomad/{deployment_uuid}", {"GET"}) in routes
 assert ("/v1/try_me/nomad/{deployment_uuid}", {"DELETE"}) in routes
 
+assert ("/v1/batch", {"POST"}) in routes
+assert ("/v1/batch", {"GET"}) in routes
+assert ("/v1/batch/{deployment_uuid}", {"GET"}) in routes
+assert ("/v1/batch/{deployment_uuid}", {"DELETE"}) in routes
+
 assert ("/v1/storage/{storage_name}/ls", {"GET"}) in routes
 
-print("Checks for API routes passed!")
+assert ("/v1/proxies/ai4_llm/chat", {"POST"}) in routes
+
+print("🟢 Checks for API routes passed!")

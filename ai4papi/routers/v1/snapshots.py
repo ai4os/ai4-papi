@@ -64,13 +64,11 @@ def get_snapshots(
 
     # If no VOs, then retrieve jobs from all user VOs
     # Always remove VOs that do not belong to the project
-    if not vos:
-        vos = auth_info["vos"]
     vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
     if not vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}.",
+            detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     snapshots = []
@@ -105,7 +103,7 @@ def create_snapshot(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -194,7 +192,7 @@ def delete_snapshot(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Check is the snapshot is in the "completed" list (Harbor)
     snapshots = get_harbor_snapshots(

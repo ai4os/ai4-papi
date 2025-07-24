@@ -53,6 +53,7 @@ def get_deployments(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Retrieve all jobs in namespace
     jobs = nomad.get_deployments(
@@ -103,6 +104,7 @@ def get_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
@@ -131,6 +133,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
@@ -196,7 +199,7 @@ def create_deployment(
 
     for _, datacenter in stats["datacenters"].items():
         for _, node in datacenter["nodes"].items():
-            if "tryme" in node["tags"] and node["status"] == "ready":
+            if node["type"] == "tryme" and node["status"] == "ready":
                 for k in keys:
                     status[k] += node[k]
     for r in resources:
@@ -249,6 +252,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     # Delete deployment
     r = nomad.delete_deployment(

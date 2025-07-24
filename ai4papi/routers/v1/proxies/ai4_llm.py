@@ -56,8 +56,9 @@ def get_chat_response(
     """
 
     # Retrieve authenticated user info
+    # We allow anyone with an account, for the time being (group: demo)
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, requested_vo="demo")
 
     try:
         completion = client.chat.completions.create(

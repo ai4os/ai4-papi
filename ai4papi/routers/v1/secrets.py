@@ -3,7 +3,7 @@ Manage user secrets with Vault
 """
 
 import hvac
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
@@ -16,26 +16,16 @@ router = APIRouter(
 )
 security = HTTPBearer()
 
-# For now, we use for everyone the official EGI Vault server.
-# We can reconsider this is we start using the IAM in auth.
-VAULT_ADDR = "https://vault.services.fedcloud.eu:8200"
-VAULT_AUTH_PATH = "jwt"
+VAULT_ADDR = "https://secrets.services.ai4os.eu:8200/"
+VAULT_AUTH_PATH = "jwt-keycloak"
 VAULT_ROLE = ""
 VAULT_MOUNT_POINT = "/secrets/"
 
 
-def vault_client(jwt, issuer):
+def vault_client(jwt):
     """
     Common init steps of Vault client
     """
-    # Check we are using EGI Check-In prod
-    if issuer != "https://aai.egi.eu/auth/realms/egi":
-        raise HTTPException(
-            status_code=400,
-            detail="Secrets are only compatible with EGI Check-In Production OIDC "
-            "provider.",
-        )
-
     # Init the Vault client
     client = hvac.Client(
         url=VAULT_ADDR,
@@ -51,7 +41,6 @@ def vault_client(jwt, issuer):
 
 def create_vault_token(
     jwt,
-    issuer,
     ttl="1h",
 ):
     """
@@ -59,10 +48,9 @@ def create_vault_token(
 
     Parameters:
     * jwt: JSON web token
-    * issuer: JWT issuer
     * ttl: duration of the token
     """
-    client = vault_client(jwt, issuer)
+    client = vault_client(jwt)
 
     # When creating the client (`jwt_login`) we are already creating a login token with
     # default TTL (1h). So any newly created child token (independently of their TTL)
@@ -122,13 +110,10 @@ def get_secrets(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Init the Vault client
-    client = vault_client(
-        jwt=authorization.credentials,
-        issuer=auth_info["issuer"],
-    )
+    client = vault_client(jwt=authorization.credentials)
 
     # Check subpath syntax
     if not subpath.startswith("/"):
@@ -189,13 +174,10 @@ def create_secret(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Init the Vault client
-    client = vault_client(
-        jwt=authorization.credentials,
-        issuer=auth_info["issuer"],
-    )
+    client = vault_client(jwt=authorization.credentials)
 
     # Create secret
     client.secrets.kv.v1.create_or_update_secret(
@@ -225,13 +207,10 @@ def delete_secret(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Init the Vault client
-    client = vault_client(
-        jwt=authorization.credentials,
-        issuer=auth_info["issuer"],
-    )
+    client = vault_client(jwt=authorization.credentials)
 
     # Delete secret
     client.secrets.kv.v1.delete_secret(

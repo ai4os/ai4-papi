@@ -1,21 +1,9 @@
-import os
 import time
 from types import SimpleNamespace
 
 from ai4papi.routers.v1.try_me import nomad
+from conf import token
 
-
-# Retrieve EGI token (not generated on the fly in case the are rate limiting issues
-# if too many queries)
-token = os.getenv("TMP_EGI_TOKEN")
-if not token:
-    raise Exception(
-        'Please remember to set a token as ENV variable before executing \
-the tests! \n\n \
-   export TMP_EGI_TOKEN="$(oidc-token egi-checkin)" \n\n \
-If running from VScode make sure to launch `code` from that terminal so it can access \
-that ENV variable.'
-    )
 
 # Create deployment
 rcreate = nomad.create_deployment(
@@ -57,4 +45,4 @@ rdeps3 = nomad.get_deployments(
 )
 assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
 
-print("Try-me (nomad) tests passed!")
+print("🟢 Try-me (nomad) tests passed!")

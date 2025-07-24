@@ -5,11 +5,6 @@ Miscellaneous Nomad patches
 
 from typing import Union
 
-import nomad
-
-
-Nomad = nomad.Nomad()
-
 
 def deregister_job(
     self,

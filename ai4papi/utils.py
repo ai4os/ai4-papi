@@ -194,7 +194,7 @@ def ai4life_catalog():
     Load the AI4Life catalog, after filtering the models that AI4EOSC can support.
     """
     url = "https://raw.githubusercontent.com/ai4os/ai4os-ai4life-loader/refs/heads/main/models/filtered_models.json"
-    response = requests.get(url)
+    response = session.get(url)
     return response.json()
 
 

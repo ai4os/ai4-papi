@@ -69,16 +69,24 @@ module_meta = Modules.get_metadata(
 assert isinstance(module_meta, dict)
 assert "@context" in module_meta.keys()
 
-# Refresh metadata cache
+# Refresh PAPI catalog
 common.JENKINS_TOKEN = "1234"
-module_meta = Modules.refresh_metadata_cache_entry(
+r = Modules.refresh_catalog(
+    authorization=SimpleNamespace(
+        credentials="1234",
+    ),
+)
+assert isinstance(r, dict)
+
+# Refresh metadata of a particular item
+r = Modules.refresh_catalog(
     item_name=module_name,
     authorization=SimpleNamespace(
         credentials="1234",
     ),
 )
-assert isinstance(module_meta, dict)
+assert isinstance(r, dict)
 
 # TODO: we should not be able to get config or metadata for a tool_name
 
-print("Catalog (modules) tests passed!")
+print("🟢 Catalog (modules) tests passed!")

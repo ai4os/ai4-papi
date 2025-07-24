@@ -8,8 +8,10 @@ Nomad (ie. after launching)
 """
 
 # TODO: move to proper testing package
-# TODO: rename test script: modules --> test_modules
 # TODO: add spinners
+
+import glob
+import os
 
 import ai4papi.conf as papiconf
 
@@ -18,14 +20,9 @@ import ai4papi.conf as papiconf
 papiconf.IS_DEV = False
 
 
-import catalog.modules
-import catalog.tools
-import deployments.modules
-import deployments.tools
-import try_me.test_nomad
-import test_batch
-import routes
-import test_secrets
-import test_stats
-import test_storage
-import test_launch
+# Import all test files dynamically
+test_files = glob.glob(os.path.join(os.path.dirname(__file__), "test_*.py"))
+test_files.sort()
+for test_file in test_files:
+    module_name = os.path.basename(test_file)[:-3]  # Remove .py extension
+    __import__(module_name)

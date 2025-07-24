@@ -42,9 +42,17 @@ from ai4papi import utils
 import ai4papi.conf as papiconf
 
 
+session = requests.Session()
+
 security = HTTPBearer()
 
+# Jenkins token is mandatory in production
 JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
+if not JENKINS_TOKEN:
+    if papiconf.IS_DEV:  # Not enforced for developers
+        print('"JENKINS_TOKEN" envar is not defined')
+    else:
+        raise Exception('You need to define the variable "JENKINS_TOKEN".')
 
 # Check conversions supported in ai4-metadata
 supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]
@@ -96,7 +104,7 @@ class Catalog:
         gitmodules_url = (
             f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
         )
-        r = requests.get(gitmodules_url)
+        r = session.get(gitmodules_url)
 
         cfg = configparser.ConfigParser()
         cfg.read_string(r.text)
@@ -150,7 +158,7 @@ class Catalog:
         Tag-related fields are kept to avoid breaking backward-compatibility but
         aren't actually serving any purpose.
         """
-        modules = self.get_filtered_list()
+        modules = self.get_items()
         summary = []
         ignore = ["description", "links"]  # don't send this info to decrease latency
         for m in modules:
@@ -291,7 +299,7 @@ class Catalog:
 
         error = None
         # Try to retrieve the metadata from Github
-        r = requests.get(metadata_url)
+        r = session.get(metadata_url)
         if not r.ok:
             error = (
                 "The metadata of this module could not be retrieved because the "
@@ -417,13 +425,15 @@ class Catalog:
 
         return metadata
 
-    def refresh_metadata_cache_entry(
+    def refresh_catalog(
         self,
-        item_name: str,
+        item_name: str = None,
         authorization=Depends(security),
     ):
         """
-        Expire the metadata cache of a given item and recompute new cache value.
+        Refresh PAPI catalog.
+        If a particular item is provided, expire the metadata cache of a given item
+        and recompute new cache value.
         """
         # Check if token is valid
         if authorization.credentials != JENKINS_TOKEN:
@@ -435,6 +445,13 @@ class Catalog:
         # First refresh the items in the catalog, because this item might be a
         # new addition to the catalog (ie. not present since last parsing the catalog)
         self.get_items.cache_clear()
+        self.get_items()
+        self.get_summary.cache_clear()
+        self.get_summary()
+
+        # If no item name, then we refresh only the catalog index
+        if not item_name:
+            return {"message": "Catalog refreshed successfully"}
 
         # Check if the item is indeed valid
         if item_name not in self.get_items().keys():
@@ -472,7 +489,7 @@ def retrieve_docker_tags(
     """
     url = f"https://registry.hub.docker.com/v2/repositories/{repo}/{image}/tags?page_size=100"
     try:
-        r = requests.get(url)
+        r = session.get(url)
         r.raise_for_status()
         r = r.json()
     except Exception:

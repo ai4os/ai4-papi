@@ -46,13 +46,11 @@ def get_deployments(
 
     # If no VOs, then retrieve jobs from all user VOs
     # Always remove VOs that do not belong to the project
-    if not vos:
-        vos = auth_info["vos"]
     vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
     if not vos:
         raise HTTPException(
             status_code=401,
-            detail=f"The provided Virtual Organizations do not match with any of your available VOs: {auth_info['vos']}.",
+            detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
@@ -116,7 +114,7 @@ def get_deployment(
 
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -171,7 +169,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Load module configuration
     # To avoid duplicating too much code, we use the standard job deployment
@@ -367,12 +365,20 @@ def create_deployment(
     content = " ".join([line.decode("utf-8") for line in content])  # bytes to utf-8
     usertask["Templates"] = [{"DestPath": "local/batch.sh", "EmbeddedTmpl": content}]
 
-    # Batch jobs should no longer avoid batch nodes (ie. module's old constraint)
+    # Batch jobs should no longer have "type=compute" constraint (ie. module's old constraint)
     nomad_conf["Constraints"][:] = [
         c
         for c in nomad_conf["Constraints"]
-        if not c == {"LTarget": "${meta.type}", "Operand": "!=", "RTarget": "batch"}
+        if not c == {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "compute"}
     ]
+    # Batch jobs should be able to deploy both in "type=batch" OR "type=compute"
+    nomad_conf["Constraints"].append(
+        {
+            "LTarget": "${meta.type}",
+            "Operand": "set_contains_any",
+            "RTarget": "compute,batch",
+        }
+    )
     # Batch jobs should not prefer cpu nodes because batch is meant for GPU training
     # (also messes with next affinity)
     nomad_conf["Affinities"][:] = [
@@ -386,8 +392,8 @@ def create_deployment(
             "Weight": 100,
         }
     ]
-    # Batch jobs should have affinity for batch nodes (but can be deployed also in
-    # standard compute nodes)
+    # Batch jobs should have affinity for batch nodes (even if they can also be deployed
+    # in compute nodes)
     nomad_conf["Affinities"].append(
         {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "batch", "Weight": 100}
     )
@@ -422,7 +428,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_vo_membership(vo, auth_info["vos"])
+    auth.check_authorization(auth_info, vo)
 
     # Delete deployment
     r = nomad.delete_deployment(
