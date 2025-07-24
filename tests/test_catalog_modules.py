@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+from fastapi import Request
+
 from ai4papi.routers.v1.catalog import common
 from ai4papi.routers.v1.catalog.modules import Modules
 
@@ -53,14 +55,31 @@ module_meta = Modules.get_metadata(
 assert isinstance(module_meta, dict)
 assert "title" in module_meta.keys()
 
+# Get module metadata in different formats
+module_meta = Modules.get_metadata(
+    item_name=module_name,
+    profile="mldcatap",
+    request=Request(
+        scope={
+            "type": "http",
+            "headers": [(b"accept", b"application/ld+json")],
+        }
+    ),
+)
+assert isinstance(module_meta, dict)
+assert "@context" in module_meta.keys()
+
 # Refresh PAPI catalog
 common.JENKINS_TOKEN = "1234"
-r = Modules.refresh_catalog(  # refresh just the catalog index
+r = Modules.refresh_catalog(
     authorization=SimpleNamespace(
         credentials="1234",
     ),
 )
-r = Modules.refresh_catalog(  # refresh a particular modules metadata
+assert isinstance(r, dict)
+
+# Refresh metadata of a particular item
+r = Modules.refresh_catalog(
     item_name=module_name,
     authorization=SimpleNamespace(
         credentials="1234",

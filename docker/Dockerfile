@@ -1,6 +1,6 @@
 # docker build -t ai4-papi -f docker/Dockerfile .
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # Install Nomad
 # Updated commands: https://developer.hashicorp.com/nomad/tutorials/get-started/gs-install
@@ -13,7 +13,7 @@ RUN apt-get update && \
     gpg \
     coreutils \
     lsb-release \
-    python3-pip \
+    pipx \
     git \
     micro \
     gettext-base \
@@ -23,6 +23,20 @@ RUN echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] http
 RUN apt-get update && \
     apt-get install -y nomad && \
     rm -rf /var/lib/apt/lists/*
+
+# Install latest rclone (for checking backups in CVAT; "/storage" route)
+RUN curl https://rclone.org/install.sh | bash
+
+# Install API
+# Starting in Ubuntu 24.04, virtual environments are mandatory so we use pipx
+# * venv will be created at /root/.local/share/pipx/venvs/ai4papi
+# * entrypoint will be located at /root/.local/bin/ai4papi-run
+WORKDIR /home/ai4-papi
+COPY . .
+RUN pipx install -e .
+
+# Add pipx-installed packages to path
+RUN echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
 
 # Add an envvar to notify PAPI that it should behave as in production
 ENV IS_PROD=True
@@ -36,14 +50,6 @@ ENV NOMAD_CLIENT_KEY=/home/nomad-certs/cli-key.pem
 # Allow the ai4os-proxy (172.16.44.228) to forward requests to the API
 # Trying to restrict to internal network (172.16.0.0/16 or 172.*) didn't work
 # ENV FORWARDED_ALLOW_IPS=172.16.44.228
-
-# Install latest rclone (for checking backups in CVAT; "/storage" route)
-RUN curl https://rclone.org/install.sh | bash
-
-# Install API
-WORKDIR /home/ai4-papi
-COPY . .
-RUN pip3 install -e .
 
 # We create a copy of the configuration so that we can run envsubst at launch time
 # to add the ${DASHBOARD_URL} provided by TOSCA to the CORS section
@@ -61,6 +67,6 @@ CMD \
     # Replace ${DASHBOARD_URL} provided by TOSCA to the CORS section
     envsubst < etc/main_tmp.yaml > etc/main.yaml; \
     # Run PAPI
-    ai4papi-run \
+    /root/.local/bin/ai4papi-run \
     --host 0.0.0.0 \
     --port 80
