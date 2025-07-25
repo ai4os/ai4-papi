@@ -275,7 +275,7 @@ job "tool-nvflare-${JOB_UUID}" {
           --ServerApp.password=`python3 -c "from jupyter_server.auth import passwd; print(passwd('${NVFL_PASSWORD}'))"` \
           --port=8888 \
           --ip=0.0.0.0 \
-          --notebook-dir=/tf \
+          --notebook-dir=/workspace \
           --no-browser \
           --allow-root
         EOF
