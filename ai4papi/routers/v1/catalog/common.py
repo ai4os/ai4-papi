@@ -401,10 +401,10 @@ class Catalog:
 
             # Add Jenkins CI/CD links
             metadata["links"]["cicd_url"] = (
-                f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
+                f"https://jenkins.cloud.ai4eosc.eu/job/{github_org}/job/{item_name}/job/{branch}/"
             )
             metadata["links"]["cicd_badge"] = (
-                f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+                f"https://jenkins.cloud.ai4eosc.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
             )
 
             # Add DockerHub
