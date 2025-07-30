@@ -264,6 +264,11 @@ def get_service(
     cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
     service["endpoint"] = f"{cluster_endpoint}/run/{service_name}"
 
+    # Retrieve cluster config for MinIO info
+    info = client.get_cluster_config()
+    info_json = json.loads(info.content)
+    service["storage_providers"]["minio"]["default"] = info_json["minio_provider"]
+
     return service
 
 
