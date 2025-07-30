@@ -7,16 +7,14 @@ import csv
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
-import types
 
 from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
-import nomad
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
-import ai4papi.nomad.patches as npatches
+from ai4papi.nomad.common import Nomad
 
 
 router = APIRouter(
@@ -27,9 +25,6 @@ router = APIRouter(
 security = HTTPBearer()
 
 main_dir = Path(__file__).resolve().parent
-
-Nomad = nomad.Nomad()
-Nomad.job.get_allocations = types.MethodType(npatches.get_allocations, Nomad.job)
 
 cluster_stats = None
 
@@ -159,14 +154,12 @@ def get_proper_allocation(allocs):
 @cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
 def load_datacenters():
     # Check if datacenter info file is available
-    pth = papiconf.main_path.parent / "var" / "datacenters_info.csv"
-    if not pth.is_file():
-        return {}
+    pth = papiconf.main_path.parent / "var" / "datacenters.csv"
 
     # Load datacenter info
     datacenters = {}
     with open(pth, "r") as f:
-        reader = csv.DictReader(f, delimiter=";")
+        reader = csv.DictReader(f, delimiter=",")
         dc_keys = reader.fieldnames.copy()
         dc_keys.remove("name")
         for row in reader:
@@ -220,7 +213,7 @@ def get_cluster_stats(
     for dc_stats in stats["datacenters"].values():
         for n_stats in dc_stats["nodes"].values():
             for k, v in n_stats.items():
-                # Ignore keys
+                # Ignore keys that are not meant to be aggregated
                 if k in ["name", "namespaces", "eligibility", "status", "tags", "type"]:
                     continue
 
@@ -255,6 +248,7 @@ def get_cluster_stats_bg():
 
     resources = [
         "jobs_num",
+        "reallocations",
         "cpu_total",
         "cpu_used",
         "gpu_total",
@@ -324,6 +318,9 @@ def get_cluster_stats_bg():
                 "energy_quality": 0,
                 "nodes": {},
             }
+            print(
+                f"Warning: Datacenter {n['Datacenter']} not found in datacenters.csv file"
+            )
 
         stats["datacenters"][n["Datacenter"]]["nodes"][n["ID"]] = n_stats
         nodes_dc[n["ID"]] = n["Datacenter"]
@@ -353,8 +350,10 @@ def get_cluster_stats_bg():
             n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
 
             # TODO: we are ignoring resources consumed by other jobs
-            if job["Name"].startswith("module") or job["Name"].startswith("tool"):
-                n_stats["jobs_num"] += 1
+            if not (job["Name"].startswith("module") or job["Name"].startswith("tool")):
+                continue
+
+            n_stats["jobs_num"] += 1
 
             # TODO: we are ignoring resources consumed by other tasks
             if "main" in a["AllocatedResources"]["Tasks"]:
@@ -385,6 +384,16 @@ def get_cluster_stats_bg():
                     if n_stats["gpu_models"]:
                         n_stats["gpu_used"] += gpu_num
                         n_stats["gpu_models"][gpu["Name"]]["gpu_used"] += gpu_num
+
+            # We also want to keep track of how many allocations in a node were reallocated
+            # (frequent reallocation is a sign of node malfunctioning)
+            if len(allocs) > 1:  # the job has been reallocated
+                for a in allocs:
+                    if a["NextAllocation"]:  # this alloc has been reallocated
+                        datacenter = nodes_dc[a["NodeID"]]
+                        n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
+                        n_stats["reallocations"] += 1
+
             else:
                 continue
 

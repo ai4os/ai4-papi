@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from ai4papi import quotas, nomad, utils
 import ai4papi.conf as papiconf
-from .common import Catalog, retrieve_docker_tags
+from .common import Catalog, retrieve_docker_tags, fmt_map
 
 
 gpu_specs = utils.gpu_specs()
@@ -145,6 +145,7 @@ router.add_api_route(
     "/{item_name}/metadata",
     Modules.get_metadata,
     methods=["GET"],
+    responses={200: {"content": {i: {} for i in fmt_map.keys()}}},
 )
 router.add_api_route(
     "/{item_name}/config",
@@ -153,7 +154,7 @@ router.add_api_route(
 )
 
 router.add_api_route(
-    "/{item_name}/refresh",
-    Modules.refresh_metadata_cache_entry,
+    "/refresh",
+    Modules.refresh_catalog,
     methods=["PUT"],
 )

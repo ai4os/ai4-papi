@@ -102,30 +102,11 @@ Swagger UI.
 Some of the API methods are authenticated (🔒) via OIDC tokens, so you will need to
 perform the following steps to access those methods.
 
-### Configure the OIDC provider
+#### Generate an OIDC token
 
-1. Create an [EGI Check-In](https://aai.egi.eu/registry/) account.
-2. Enroll (`People > Enroll`) in one of the approved Virtual Organizations:
-    - `vo.ai4eosc.eu`
-    - `vo.imagine-ai.eu`
+First, you will need to [create an AI4OS Keycloak account](https://docs.ai4eosc.eu/en/latest/getting-started/register.html#register-an-account).
 
-You will have to wait until an administrator approves your request before proceeding
-with the next steps.
-Supported OIDC providers and Virtual Organizations are described in the
-[configuration](./etc/main_conf.yaml).
-
-### Generating a valid refresh token
-
-There are two ways of generating a valid refresh user token to access the methods:
-either via an UI or via the terminal.
-
-#### Generate a token with a UI
-
-If have a EGI Check-In account, you can generate a refresh user token with
-[EGI token](https://aai.egi.eu/token): click `Authorise` and sign-in with your account.
-Then use the `Access Token` to authenticate your calls.
-
-#### Generate a token via the terminal
+Then, you will a token via the terminal. For this you need:
 
 1. Install the [OIDC agent](https://github.com/indigo-dc/oidc-agent) in your system.
 
@@ -133,12 +114,19 @@ Then use the `Access Token` to authenticate your calls.
    ```bash
    eval `oidc-agent-service start`
    oidc-gen \
-     --issuer https://aai.egi.eu/auth/realms/egi \
-     --scope "openid profile offline_access eduperson_entitlement email" \
-     egi-checkin
+    --configuration-endpoint https://login.cloud.ai4eosc.eu/realms/ai4eosc/.well-known/openid-configuration \
+    --client-id "ai4-papi" \
+    --client-secret <client-secret> \
+    ai4os-keycloak
    ```
-   It will open the browser so you can authenticate with your EGI account. Then go back to
-  the terminal and finish by setting and encryption password.
+
+   To retrieve the `<client-secret>`, contact [Ignacio Heredia](https://github.com/IgnacioHeredia).
+
+   You will then be ask some question. Use _default values_, except for:
+     - Redirect_uris (space separated): `http://localhost:43985`
+
+   The browser will open so you can authenticate with your AI4OS account.
+   Then go back to the terminal and finish by setting and encryption password.
 
 3. Add the following line to your `.bashrc` to start the agent automatically at startup
    ([ref](https://github.com/indigo-dc/oidc-agent/issues/489#issuecomment-1472189510)):
@@ -148,14 +136,14 @@ Then use the `Access Token` to authenticate your calls.
 
 4. Generate the OIDC token
    ```bash
-   oidc-token egi-checkin
+   oidc-token ai4os-keycloak
    ```
 
 5. `Optional`: You can check you have set everything up correctly by running:
    ```bash
-   flaat-userinfo --oidc-agent-account egi-checkin
+   flaat-userinfo --oidc-agent-account ai4os-keycloak
    ```
-   This should print you EGI user information.
+   This should print you AI4OS user information.
 
 ### Making authenticated calls
 

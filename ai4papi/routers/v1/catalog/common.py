@@ -18,19 +18,23 @@ immutable objects and lists are not. Only immutable objects can have a hash and
 therefore be cached by cachetools.
 ref: https://stackoverflow.com/questions/42203673/in-python-why-is-a-tuple-hashable-but-not-a-list
 
-* Somes names need to be reserved to avoid clashes between URL paths.
+* Some names need to be reserved to avoid clashes between URL paths.
 This means you cannot name your modules like those names (eg. tags, detail, etc)
 """
 
 import configparser
+import importlib
+import json
 import os
 import re
 from typing import Tuple, Union
+import warnings
 import yaml
 
-import ai4_metadata.validate
+import ai4_metadata
 from cachetools import cached, TTLCache
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer
 import requests
 
@@ -38,9 +42,36 @@ from ai4papi import utils
 import ai4papi.conf as papiconf
 
 
+session = requests.Session()
+
 security = HTTPBearer()
 
+# Jenkins token is mandatory in production
 JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
+if not JENKINS_TOKEN:
+    if papiconf.IS_DEV:  # Not enforced for developers
+        print('"JENKINS_TOKEN" envar is not defined')
+    else:
+        raise Exception('You need to define the variable "JENKINS_TOKEN".')
+
+# Check conversions supported in ai4-metadata
+supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]
+mappers = {
+    i: importlib.import_module(f"ai4_metadata.mapping.profiles.{i}")
+    for i in supported_profiles
+}
+supported_accepts = []
+for m in mappers.values():
+    supported_accepts += [f.value for f in m.SupportedOutputFormats]
+
+# Define mapping from accept-types to ai4-metadata values
+fmt_map = {
+    "application/ld+json": "jsonld",
+    "text/turtle": "ttl",
+}
+for f in supported_accepts:
+    if f not in fmt_map.values():
+        warnings.warn(f"Supported format {f} has no defined mapping.")
 
 
 class Catalog:
@@ -73,7 +104,7 @@ class Catalog:
         gitmodules_url = (
             f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
         )
-        r = requests.get(gitmodules_url)
+        r = session.get(gitmodules_url)
 
         cfg = configparser.ConfigParser()
         cfg.read_string(r.text)
@@ -127,7 +158,7 @@ class Catalog:
         Tag-related fields are kept to avoid breaking backward-compatibility but
         aren't actually serving any purpose.
         """
-        modules = self.get_filtered_list()
+        modules = self.get_items()
         summary = []
         ignore = ["description", "links"]  # don't send this info to decrease latency
         for m in modules:
@@ -155,11 +186,80 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
+        profile: str = Query(default="", enum=[""] + supported_profiles),
+        request: Request = None,
     ):
         """
         Get the item's full metadata.
+
+        Parameters
+        ==========
+        - item_name: str
+
+          Item to retrieve
+
+        - profile: str
+
+          Profile used to change the output format of the metadata.
+          Has to be used jointly with the accept-type.
+          For example:
+          * profile: `mldcatap`; accept-type: `application/ld+json`
+          * profile: `mldcatap`; accept-type: `text/turtle`
+
+          Using an empty profile paired with an accept-type `application/json` will
+          return the unmodified AI4OS metadata.
         """
-        return self._get_metadata(item_name=item_name, force=False)
+        metadata = self._get_metadata(item_name=item_name, force=False)
+
+        # Return the metadata in different formats
+        accept = (
+            request.headers.get("accept", "application/json")
+            if request
+            else "application/json"
+        )
+
+        if not profile and accept != "application/json":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Please specify the profile to use to perform the mapping: {supported_profiles}",
+            )
+        elif profile and accept != "application/json":
+            if profile not in supported_profiles:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Profile not supported: {supported_profiles}",
+                )
+            fmt = fmt_map.get(accept)
+            if not fmt:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"Accept-type: {accept} is not supported",
+                )
+            try:
+                # Sometimes even is the accept-type is supported in general,
+                # it might not be supported for a particular profile.
+                # So we use try/except to catch possible InvalidMapping errors.
+                mapped = mappers[profile].generate_mapping(
+                    from_profile="ai4os",
+                    from_metadata=metadata,
+                    to_format=fmt,
+                )
+                if fmt == "jsonld":
+                    return json.loads(mapped)
+                else:
+                    return PlainTextResponse(str(mapped))
+            except Exception as e:
+                status = (
+                    415
+                    if isinstance(e, ai4_metadata.exceptions.InvalidMappingError)
+                    else 500
+                )
+                raise HTTPException(
+                    status_code=status,
+                    detail=str(e),
+                )
+        else:
+            return metadata
 
     @cached(
         cache=TTLCache(maxsize=1024, ttl=7 * 24 * 60 * 60),
@@ -199,7 +299,7 @@ class Catalog:
 
         error = None
         # Try to retrieve the metadata from Github
-        r = requests.get(metadata_url)
+        r = session.get(metadata_url)
         if not r.ok:
             error = (
                 "The metadata of this module could not be retrieved because the "
@@ -271,6 +371,7 @@ class Catalog:
                     "weights": "",
                     "citation": "",
                     "base_model": "",
+                    "self": "",
                 },
                 "tags": ["invalid metadata"],
                 "tasks": [],
@@ -295,12 +396,15 @@ class Catalog:
                 metadata["license"] = gh_info.get("license", "")
                 metadata["links"]["source_code"] = f"https://github.com/{owner}/{repo}"
 
+            # Map license to EU vocabularies
+            metadata["license"] = map_license(metadata["license"])
+
             # Add Jenkins CI/CD links
             metadata["links"]["cicd_url"] = (
-                f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
+                f"https://jenkins.cloud.ai4eosc.eu/job/{github_org}/job/{item_name}/job/{branch}/"
             )
             metadata["links"]["cicd_badge"] = (
-                f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
+                f"https://jenkins.cloud.ai4eosc.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
             )
 
             # Add DockerHub
@@ -310,18 +414,26 @@ class Catalog:
                 "/ "
             )
 
+            # Add self-link
+            item2path = {"module": "modules", "tool": "tools"}
+            metadata["links"]["self"] = (
+                f"{papiconf.MAIN_CONF['self']['domain']}/v1/catalog/{item2path[self.item_type]}/{item_name}/metadata"
+            )
+
             # Add the item name
             metadata["id"] = item_name
 
         return metadata
 
-    def refresh_metadata_cache_entry(
+    def refresh_catalog(
         self,
-        item_name: str,
+        item_name: str = None,
         authorization=Depends(security),
     ):
         """
-        Expire the metadata cache of a given item and recompute new cache value.
+        Refresh PAPI catalog.
+        If a particular item is provided, expire the metadata cache of a given item
+        and recompute new cache value.
         """
         # Check if token is valid
         if authorization.credentials != JENKINS_TOKEN:
@@ -333,6 +445,13 @@ class Catalog:
         # First refresh the items in the catalog, because this item might be a
         # new addition to the catalog (ie. not present since last parsing the catalog)
         self.get_items.cache_clear()
+        self.get_items()
+        self.get_summary.cache_clear()
+        self.get_summary()
+
+        # If no item name, then we refresh only the catalog index
+        if not item_name:
+            return {"message": "Catalog refreshed successfully"}
 
         # Check if the item is indeed valid
         if item_name not in self.get_items().keys():
@@ -370,7 +489,7 @@ def retrieve_docker_tags(
     """
     url = f"https://registry.hub.docker.com/v2/repositories/{repo}/{image}/tags?page_size=100"
     try:
-        r = requests.get(url)
+        r = session.get(url)
         r.raise_for_status()
         r = r.json()
     except Exception:
@@ -380,3 +499,28 @@ def retrieve_docker_tags(
         )
     tags = [i["name"] for i in r["results"]]
     return tags
+
+
+def map_license(license):
+    """
+    Map Github license to EU controlled vocabulary
+
+    References:
+    - https://op.europa.eu/en/web/eu-vocabularies/concept-scheme/-/resource?uri=http://publications.europa.eu/resource/authority/licence
+    - https://publications.europa.eu/resource/authority/licence
+    """
+    mapped = license.upper().replace("-", "_").replace(".", "_")
+
+    # Handle edge cases
+    mapped = (
+        mapped.replace("CLAUSE_CLEAR", "CLAUSECLEAR")
+        .replace("POSTGRESQL", "POSTGRE_SQL")
+        .replace("UNLICENSE", "UNLICENCE")
+        .replace("CC0_1_0", "CC0")
+    )
+
+    # Remove spaces in CC_BY licenses. eg. CC_BY_NC_SA_4 --> CC_BYNCSA_4
+    if "CC_BY" in mapped:
+        mapped = mapped.replace("_NC", "NC").replace("_ND", "ND").replace("_SA", "SA")
+
+    return mapped

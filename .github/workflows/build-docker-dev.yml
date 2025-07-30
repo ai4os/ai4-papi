@@ -40,7 +40,11 @@ jobs:
 
       - name: Test - Basic init (dev mode)
         run: |
-          docker run -e IS_PROD=False --rm test-image /bin/bash -c "python3 -c 'import ai4papi'"
+              docker run \
+                -e IS_PROD=False \
+                --rm \
+                test-image \
+                /bin/bash -c "source /root/.local/share/pipx/venvs/ai4papi/bin/activate && python3 -c 'import ai4papi'"
 
       - name: Build and push
         uses: docker/build-push-action@v6

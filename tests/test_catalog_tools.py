@@ -1,21 +1,10 @@
-import os
 from types import SimpleNamespace
+
+from fastapi import Request
 
 from ai4papi.routers.v1.catalog import common
 from ai4papi.routers.v1.catalog.tools import Tools
 
-
-# Retrieve EGI token (not generated on the fly in case the are rate limiting issues
-# if too many queries)
-token = os.getenv("TMP_EGI_TOKEN")
-if not token:
-    raise Exception(
-        'Please remember to set a token as ENV variable before executing \
-the tests! \n\n \
-   export TMP_EGI_TOKEN="$(oidc-token egi-checkin)" \n\n \
-If running from VScode make sure to launch `code` from that terminal so it can access \
-that ENV variable.'
-    )
 
 # List tools
 tools_list = list(Tools.get_items().keys())
@@ -69,15 +58,37 @@ for tool_name in tools_list:
     assert isinstance(tool_meta, dict)
     assert "title" in tool_meta.keys()
 
-# Refresh metadata cache
+    # Get tool metadata in different formats
+    module_meta = Tools.get_metadata(
+        item_name=tool_name,
+        profile="mldcatap",
+        request=Request(
+            scope={
+                "type": "http",
+                "headers": [(b"accept", b"application/ld+json")],
+            }
+        ),
+    )
+    assert isinstance(module_meta, dict)
+    assert "@context" in module_meta.keys()
+
+# Refresh PAPI catalog
 common.JENKINS_TOKEN = "1234"
-module_meta = Tools.refresh_metadata_cache_entry(
+r = Tools.refresh_catalog(
+    authorization=SimpleNamespace(
+        credentials="1234",
+    ),
+)
+assert isinstance(r, dict)
+
+# Refresh metadata of a particular item
+r = Tools.refresh_catalog(
     item_name=tool_name,
     authorization=SimpleNamespace(
         credentials="1234",
     ),
 )
-assert isinstance(module_meta, dict)
+assert isinstance(r, dict)
 
 # TODO: we should not be able to get config or metadata for a module_name
 
