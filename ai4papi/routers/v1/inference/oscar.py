@@ -265,9 +265,8 @@ def get_service(
     service["endpoint"] = f"{cluster_endpoint}/run/{service_name}"
 
     # Retrieve cluster config for MinIO info
-    info = client.get_cluster_config()
-    info_json = json.loads(info.content)
-    service["storage_providers"]["minio"]["default"] = info_json["minio_provider"]
+    client_conf = client.get_cluster_config().json()
+    service["storage_providers"]["minio"]["default"] = client_conf["minio_provider"]
 
     return service
 
