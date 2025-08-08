@@ -99,6 +99,7 @@ flower:
         'Federated Averaging with Momentum (FedAvgM)', # fedavgm
         'Adaptive Federated Optimization (FedOpt)', # fedopt
         'Adaptive Federated Optimization using Yogi (FedYogi)', # fedyogi
+        'FedAvgOpt', # fedavgopt
       ]
 
   mu:
