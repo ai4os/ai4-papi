@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import asyncio
 from starlette.responses import StreamingResponse
 
-from ai4papi.routers.v1.proxies import ai4_llm
+from ai4papi.routers.v1.proxies.ai4_llm import ai4_llm
 from conf import token
 
 

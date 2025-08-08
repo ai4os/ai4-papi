@@ -22,7 +22,7 @@ from ai4papi import auth
 
 router = APIRouter(
     prefix="/zenodo",
-    tags=["Zenodo datasets"],
+    tags=["Zenodo proxy"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
