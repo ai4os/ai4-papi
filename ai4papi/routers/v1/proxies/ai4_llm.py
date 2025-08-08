@@ -45,7 +45,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] = []
 
 
-@router.post("/chat")
+@router.post("")
 def get_chat_response(
     request: ChatRequest,
     vo: str,
