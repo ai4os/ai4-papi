@@ -93,7 +93,7 @@ Tools.get_config = types.MethodType(get_config, Tools)
 
 router = APIRouter(
     prefix="/tools",
-    tags=["Tools catalog"],
+    tags=["Catalog (tools)"],
     responses={404: {"description": "Not found"}},
 )
 router.add_api_route(

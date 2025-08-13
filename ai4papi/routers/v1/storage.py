@@ -16,7 +16,7 @@ from ai4papi.routers.v1 import secrets as ai4secrets
 
 router = APIRouter(
     prefix="/storage",
-    tags=["Storage utilities"],
+    tags=["Storage"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()

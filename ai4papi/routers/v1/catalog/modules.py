@@ -122,7 +122,7 @@ Modules.get_config = types.MethodType(get_config, Modules)
 
 router = APIRouter(
     prefix="/modules",
-    tags=["Modules catalog"],
+    tags=["Catalog (modules)"],
     responses={404: {"description": "Not found"}},
 )
 router.add_api_route(

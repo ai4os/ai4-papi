@@ -23,7 +23,7 @@ import ai4papi.conf as papiconf
 
 router = APIRouter(
     prefix="/oscar",
-    tags=["OSCAR inference"],
+    tags=["Inference (OSCAR)"],
     responses={404: {"description": "Inference not found"}},
 )
 

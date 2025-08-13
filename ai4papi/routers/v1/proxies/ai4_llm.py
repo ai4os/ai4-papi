@@ -18,7 +18,7 @@ from ai4papi import auth
 
 router = APIRouter(
     prefix="/ai4_llm",
-    tags=["AI4LLM proxy"],
+    tags=["Proxies (AI4OS LLM)"],
     responses={404: {"description": "AI4LLM not found"}},
 )
 

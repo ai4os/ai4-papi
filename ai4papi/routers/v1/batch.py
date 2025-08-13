@@ -19,7 +19,7 @@ from ai4papi.routers.v1 import secrets as ai4secrets
 
 router = APIRouter(
     prefix="/batch",
-    tags=["Modules batch deployments"],
+    tags=["Batch deployments (modules)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()

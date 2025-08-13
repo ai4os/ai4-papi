@@ -24,7 +24,7 @@ import ai4papi.nomad.common as nomad_common
 
 router = APIRouter(
     prefix="/snapshots",
-    tags=["Snapshots of deployments"],
+    tags=["Snapshots (deployments)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()

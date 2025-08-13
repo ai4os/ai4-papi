@@ -23,7 +23,7 @@ from ai4papi.routers.v1 import deployments as ai4_deployments
 
 router = APIRouter(
     prefix="/tools",
-    tags=["Tools deployments"],
+    tags=["Deployments (tools)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()

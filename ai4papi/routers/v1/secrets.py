@@ -11,7 +11,7 @@ from ai4papi import auth
 
 router = APIRouter(
     prefix="/secrets",
-    tags=["Secrets management"],
+    tags=["Secrets"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
