@@ -107,12 +107,6 @@ router.add_api_route(
     methods=["GET"],
 )
 router.add_api_route(
-    "/tags",
-    Tools.get_tags,
-    methods=["GET"],
-    deprecated=True,
-)
-router.add_api_route(
     "/{item_name}/metadata",
     Tools.get_metadata,
     methods=["GET"],

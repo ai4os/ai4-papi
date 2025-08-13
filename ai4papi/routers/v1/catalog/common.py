@@ -173,16 +173,6 @@ class Catalog:
             summary.append(meta)
         return summary
 
-    def get_tags(
-        self,
-    ):
-        """
-        Retrieve a list of all the existing tags.
-        Now deprecated, kept to avoid breaking backward-compatibility.
-        Returns an empty list.
-        """
-        return []
-
     def get_metadata(
         self,
         item_name: str,
