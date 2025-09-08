@@ -352,7 +352,10 @@ def create_deployment(
     # Replace the standard job service (eg. deepaas) with the commands provided
     # by the user
     usertask["Config"]["command"] = "/bin/bash"
-    usertask["Config"]["args"] = ["-c", "mkdir -p /storage/logs && exec /bin/bash /srv/user-batch-commands.sh >> /storage/logs/${NOMAD_ALLOC_ID}.txt 2>&1"]
+    usertask["Config"]["args"] = [
+        "-c",
+        "mkdir -p /storage/logs && exec /bin/bash /srv/user-batch-commands.sh >> /storage/logs/${NOMAD_ALLOC_ID}.txt 2>&1",
+    ]
     usertask["Config"]["mount"] = [
         {
             "source": "local/batch.sh",
