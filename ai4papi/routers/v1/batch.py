@@ -354,7 +354,7 @@ def create_deployment(
     usertask["Config"]["command"] = "/bin/bash"
     usertask["Config"]["args"] = [
         "-c",
-        "mkdir -p /storage/logs && exec /bin/bash /srv/user-batch-commands.sh >> /storage/logs/${NOMAD_ALLOC_ID}.txt 2>&1",
+        "mkdir -p /storage/ai4os-storage/batch/${NOMAD_ALLOC_ID} && exec /bin/bash /srv/user-batch-commands.sh >> /storage/ai4os-storage/batch/${NOMAD_ALLOC_ID}/logs.txt 2>&1",
     ]
     usertask["Config"]["mount"] = [
         {
