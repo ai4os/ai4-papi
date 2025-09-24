@@ -42,4 +42,4 @@ slist = oscar.get_services_list(
 names = [s["name"] for s in slist]
 assert sname not in names, "Service exists"
 
-print("Inference (OSCAR) tests passed!")
+print("🟢 Inference (OSCAR) tests passed!")
