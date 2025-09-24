@@ -50,6 +50,8 @@ export NOMAD_CLIENT_KEY=/path/to/tls/nomad-cli-key.pem
 ```
 For this you will need to ask the administrator of the cluster for the proper certificates.
 
+PAPI also requires an [RCLONE](https://rclone.org/) installation, to be able to connect with storages.
+
 Once you are done you can proceed to install the module:
 ```bash
 pip install git+https://github.com/ai4eosc/ai4-papi.git
