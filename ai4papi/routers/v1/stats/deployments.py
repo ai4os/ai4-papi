@@ -12,7 +12,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth
+from ai4papi import auth, wattprint
 import ai4papi.conf as papiconf
 from ai4papi.nomad.common import Nomad
 
@@ -259,6 +259,12 @@ def get_cluster_stats_bg():
         "disk_used",
     ]
     datacenters = load_datacenters()  # available datacenters info
+
+    # For each datacenter, retrieve the last carbon footprint
+    for v in datacenters.values():
+        v["energy_quality"] = wattprint.last_footprint(lon=v["lon"], lat=v["lat"])
+
+    # Init stats
     stats = {
         "datacenters": datacenters,  # aggregated datacenter usage
         "cluster": {k: 0 for k in resources},  # aggregated cluster usage
