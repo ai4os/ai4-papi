@@ -10,6 +10,8 @@ Notes:
 from datetime import datetime
 import re
 import types
+import urllib3
+
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException
@@ -19,6 +21,9 @@ import requests
 
 import ai4papi.conf as papiconf
 import ai4papi.nomad.patches as nomad_patches
+
+# Disable warning from python-nomad
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 Nomad = nomad.Nomad()
