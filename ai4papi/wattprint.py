@@ -63,7 +63,7 @@ def last_footprint(lon, lat):
                 # are not yet computed. We ignore those.
                 if fp != 0:
                     timestamps.append(ts)
-                    footprints.append(fp)
+                    footprints.append(round(fp, 2))
 
         # Sort timestamps and footprints based on timestamps
         timestamps, footprints = zip(*sorted(zip(timestamps, footprints)))
