@@ -74,3 +74,27 @@ def last_footprint(lon, lat):
         # We return a default value
         print(f"Failed to retrieve footprint: {e}")
         return 301
+
+
+def datacenter_affinities(datacenters):
+    """
+    Map linearly a carbon footprint into a datacenter Nomad affinity.
+    It's an inverse relation:
+    * Maximum carbon footprint should have minimum affinity (e.g. 0)
+    * Minimum carbon footprint should have maximum affinity (e.g. 20)
+
+    We keep the maximum affinity well below the theoretical maximum (100) to not
+    interfere too much with other constraints/affinities
+    """
+    # Affinity range
+    af_min, af_max = 0, 30
+    # Footprint range
+    footprints = [i["energy_quality"] for i in datacenters.values()]
+    fp_min, fp_max = min(footprints), max(footprints)
+
+    # Inverse linear mapping
+    affinities = {}
+    for name, dc in datacenters.items():
+        x = dc["energy_quality"]
+        affinities[name] = af_max + (af_min - af_max) * (x - fp_min) / (fp_max - fp_min)
+    return affinities
