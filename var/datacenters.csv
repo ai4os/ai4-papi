@@ -1,6 +1,6 @@
 name,lat,lon,PUE,energy_quality
 ifca-ai4eosc,43.471668,-3.802318,1.31,300
 ifca-imagine,43.471706,-3.802240,1.31,300
-iisas-ai4eosc,48.170095,17.070058,1.2,300
-incd-imagine,38.759140,-9.142664,1.2,300
-tubitak-imagine,40.785667,29.448592,1.2,300
+iisas-ai4eosc,48.170095,17.070058,1.5,300
+incd-imagine,38.759140,-9.142664,1.5,300
+tubitak-imagine,40.785667,29.448592,1.5,300
