@@ -95,6 +95,11 @@ def datacenter_affinities(datacenters):
     # Inverse linear mapping
     affinities = {}
     for name, dc in datacenters.items():
-        x = dc["energy_quality"]
-        affinities[name] = af_max + (af_min - af_max) * (x - fp_min) / (fp_max - fp_min)
+        if fp_min != fp_max:
+            x = dc["energy_quality"]
+            affinities[name] = af_max + (af_min - af_max) * (x - fp_min) / (
+                fp_max - fp_min
+            )
+        else:  # avoid dividing by zero
+            affinities[name] = 0
     return affinities
