@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/ai4os/ai4-papi/compare/v1.3.0...v1.4.0) (2025-10-22)
+
+
+### Features
+
+* **stats:** use WattPrint for energy quality ([#131](https://github.com/ai4os/ai4-papi/issues/131)) ([29eae82](https://github.com/ai4os/ai4-papi/commit/29eae822f6e417ad901490242fff105806100496))
+* support kmd4eosc ([#133](https://github.com/ai4os/ai4-papi/issues/133)) ([551f5a2](https://github.com/ai4os/ai4-papi/commit/551f5a2eac4e770630f49415697c2a0a118b3543))
+
+
+### Documentation
+
+* update README ([3d8b0e7](https://github.com/ai4os/ai4-papi/commit/3d8b0e7cb38246b38262a9b3870ef6265bda93e1))
+
 ## [1.3.0](https://github.com/ai4os/ai4-papi/compare/v1.2.0...v1.3.0) (2025-08-13)
 
 
