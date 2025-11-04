@@ -7,6 +7,7 @@ fastapi >= 0.104.1, < 1.0
 fastapi-utils[all] >= 0.7.0, < 1.0
 uvicorn[standard] >= 0.20.0, < 1.0
 PyJWT >= 2.6.0, < 3.0
+cryptography >= 41.0.5  # needed for pyjwt "RS256" algorithm
 click == 8.2.1
 # Fixing "click" version is a temporal patch, because higher versions caused the "ai4papi-run"
 # entrypoint to fail. Not sure if it is related to this: https://github.com/pallets/click/issues/3066
