@@ -261,8 +261,10 @@ def get_cluster_stats_bg():
     datacenters = load_datacenters()  # available datacenters info
 
     # For each datacenter, retrieve the last carbon footprint
-    for v in datacenters.values():
-        v["energy_quality"] = wattprint.last_footprint(lon=v["lon"], lat=v["lat"])
+    for k, v in datacenters.items():
+        v["energy_quality"] = wattprint.last_footprint(
+            lon=v["lon"], lat=v["lat"], location=k
+        )
 
     # Init stats
     stats = {

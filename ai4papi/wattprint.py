@@ -10,6 +10,7 @@ import os
 from cachetools import cached, TTLCache
 
 
+WATTPRINT_URL = "https://api.wattnet.eu"
 WATTPRINT_EMAIL = "bot@ai4eosc.eu"
 WATTPRINT_PASS = os.environ.get("WATTPRINT_PASSWORD")
 if not WATTPRINT_PASS:
@@ -22,7 +23,7 @@ def retrieve_token():
     WattPrint tokens last only one day, so we cache the response for 20 hours.
     """
 
-    url = "https://api.wattprint.eu/token-request/get_token"
+    url = f"{WATTPRINT_URL}/token-request/get_token"
     headers = {"Content-Type": "application/json"}
     data = {"email": WATTPRINT_EMAIL, "password": WATTPRINT_PASS}
     response = requests.post(url, headers=headers, data=json.dumps(data))
@@ -30,14 +31,16 @@ def retrieve_token():
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=15 * 60))
-def last_footprint(lon, lat):
+def last_footprint(lon, lat, default=301, location=""):
     """
     Retrieve the last footprint for a given lon-lat location.
     WattPrint has a temporal resolution of 15 minutes, so we cache for that amount of
     time.
+    If we are unable to retrieve a value (e.g. because location is outside Europe),
+    we return a reasonable default value.
     """
     try:
-        url = "https://api.wattprint.eu/v1/footprints"
+        url = f"{WATTPRINT_URL}/v1/footprints"
         end = datetime.datetime.now()
         start = end - datetime.timedelta(hours=6)
 
@@ -72,8 +75,8 @@ def last_footprint(lon, lat):
 
     except Exception as e:
         # We return a default value
-        print(f"Failed to retrieve footprint: {e}")
-        return 301
+        print(f"Failed to retrieve footprint ({location}): {e}")
+        return default
 
 
 def datacenter_affinities(datacenters):
