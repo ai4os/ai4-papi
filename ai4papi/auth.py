@@ -22,30 +22,34 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
 """
 
 from fastapi import HTTPException
-from flaat.fastapi import Flaat
-
-from ai4papi.conf import MAIN_CONF
+import jwt
 
 
-# Initialize flaat
-flaat = Flaat()
-flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
+KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
+jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
 
 
 def get_user_info(token):
     try:
-        user_infos = flaat.get_user_infos_from_access_token(token)
+        signing_key = jwk_client.get_signing_key_from_jwt(token).key
+        user_infos = jwt.decode(
+            token,
+            signing_key,
+            audience="account",  # needed for Vault
+            issuer=KEYCLOAK_URL,
+            algorithms=["RS256"],
+            options={
+                "require": ["sub", "iss", "name", "email"],
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iss": True,
+                "verify_aud": True,
+            },
+        )
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail=str(e),
-        )
-
-    # Check output
-    if user_infos is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid token",
         )
 
     # Create a group dictionary where keys are the access levels and values are the
@@ -60,21 +64,6 @@ def get_user_info(token):
         if project:
             v.append(project)
         groups[access] = v
-
-    # Generate user info dict
-    for k in ["sub", "iss", "name", "email"]:
-        if user_infos.get(k) is None:
-            raise HTTPException(
-                status_code=401,
-                detail=f"You token should have scopes for {k}.",
-            )
-
-    # Check audiences (needed for Vault)
-    if "account" not in user_infos.get("aud"):
-        raise HTTPException(
-            status_code=401,
-            detail="You token should have 'account' in audiences.",
-        )
 
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID

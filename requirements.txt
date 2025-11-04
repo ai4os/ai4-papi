@@ -6,7 +6,7 @@ python-nomad == 2.0.0
 fastapi >= 0.104.1, < 1.0
 fastapi-utils[all] >= 0.7.0, < 1.0
 uvicorn[standard] >= 0.20.0, < 1.0
-flaat >= 1.1.8, < 2.0
+PyJWT >= 2.6.0, < 3.0
 click == 8.2.1
 # Fixing "click" version is a temporal patch, because higher versions caused the "ai4papi-run"
 # entrypoint to fail. Not sure if it is related to this: https://github.com/pallets/click/issues/3066
