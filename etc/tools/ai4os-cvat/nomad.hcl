@@ -292,7 +292,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
@@ -376,7 +376,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
@@ -468,7 +468,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
