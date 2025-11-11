@@ -138,21 +138,21 @@ for container_id in $container_ids; do
                         username='${HARBOR_ROBOT_USER}'
                         password='${HARBOR_ROBOT_PASSWORD}'
 
-                        echo "$password" | sudo docker login https://registry.services.ai4os.eu --username "$username" --password-stdin
+                        echo "$password" | sudo docker login https://registry.cloud.ai4eosc.eu --username "$username" --password-stdin
 
                         echo "Uploading image to registry"
 
-                        sudo docker tag ${FORMATTED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker tag ${FORMATTED_OWNER} registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
 
-                        sudo docker tag ${FORMATTED_OWNER} registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker tag ${FORMATTED_OWNER} registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
 
-                        if ! sudo docker push registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}; then
-                            sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        if ! sudo docker push registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}; then
+                            sudo docker image rm registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
                             sudo docker image rm ${FORMATTED_OWNER}:latest
                             exit 1
                         fi
 
-                        sudo docker image rm registry.services.ai4os.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
+                        sudo docker image rm registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
                         sudo docker image rm ${FORMATTED_OWNER}:latest
 
                 fi

@@ -61,7 +61,7 @@ def validate_conf(conf):
         if image.split("/")[0] not in [
             "deephdc",
             "ai4oshub",
-            "registry.services.ai4os.eu",
+            "registry.cloud.ai4eosc.eu",
         ]:
             raise HTTPException(
                 status_code=400,
