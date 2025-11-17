@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools", "wheel", "pbr>=6.1.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai4papi"
+description = "An API for interacting with the AI4EOSC services."
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "AI4EOSC collaboration", email = "ai4eosc-support@listas.csic.es"}
+]
+requires-python = ">=3.10"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ai4papi.version.release_string"}
+
+[project.urls]
+Homepage = "https://github.com/ai4eosc/ai4-papi"
+
+[project.scripts]
+ai4papi-run = "ai4papi.cli:run"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai4papi"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"tests/main.py" = ["E402", "F401"]
