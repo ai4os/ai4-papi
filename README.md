@@ -26,8 +26,8 @@ The API is currently deployed here:
 
 Images of both API are accessible in the project's Harbor registry:
 
-* `registry.services.ai4os.eu/ai4os/ai4-papi:prod`
-* `registry.services.ai4os.eu/ai4os/ai4-papi:dev`
+* `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod`
+* `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:dev`
 
 The Dashboards pointing to those APIs are respectively:
 
@@ -86,7 +86,7 @@ To deploy the API, the are several options:
 
 4. From Dockerhub
    ```bash
-   docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 registry.services.ai4os.eu/ai4os/ai4-papi:prod
+   docker run  -v /local-path-to/nomad-certs:/home/nomad-certs -p 8080:80 registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod
    ```
 
 5. Building from our [Dockerfile](./docker/Dockerfile).

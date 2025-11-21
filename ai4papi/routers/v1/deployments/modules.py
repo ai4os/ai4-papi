@@ -309,7 +309,7 @@ def create_deployment(
 
     # If the image belong to Harbor, then it's a user snapshot
     docker_image = user_conf["general"]["docker_image"]
-    if docker_image.split("/")[0] == "registry.services.ai4os.eu":
+    if docker_image.split("/")[0] == "registry.cloud.ai4eosc.eu":
         # Check the user is the owner of the image
         if docker_image.split("/")[-1] != auth_info["id"].replace("@", "_at_"):
             raise HTTPException(
