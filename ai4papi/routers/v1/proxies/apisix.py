@@ -16,6 +16,8 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth
 
+import ai4papi.conf as papiconf
+
 router = APIRouter(
     prefix="/apisix",
     tags=["Proxies (APISIX)"],
@@ -27,12 +29,18 @@ security = HTTPBearer()
 # APISIX Admin API configuration
 APISIX_URL = os.environ.get("APISIX_URL")
 if not APISIX_URL:
-    raise RuntimeError("APISIX_URL not set in environment variables.")
+    if papiconf.IS_DEV:  # Not enforced for developers
+        print('"APISIX_URL" envar is not defined')
+    else:
+        raise Exception('You need to define the variable "APISIX_URL".')
 
 APISIX_API_KEY = os.environ.get("APISIX_API_KEY")
 if not APISIX_API_KEY:
-    raise RuntimeError("APISIX_API_KEY not set in environment variables.")
-
+    if papiconf.IS_DEV:  # Not enforced for developers
+        print('"APISIX_API_KEY" envar is not defined')
+    else:
+        raise Exception('You need to define the variable "APISIX_API_KEY".')
+        
 # Session used only to call APISIX
 session = requests.Session()
 session.headers.update({
