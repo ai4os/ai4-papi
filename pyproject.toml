@@ -23,6 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dynamic = ["version"]
+dependencies = [
+    "fastapi>=0.104.1,<1.0",
+    "uvicorn>=0.20.0,< 1.0",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "ai4papi.version.release_string"}
