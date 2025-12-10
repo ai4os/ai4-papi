@@ -8,7 +8,6 @@ a Bearer token. The internal call to LiteLLM uses the LiteLLM admin API token.
 
 import os
 import requests
-import secrets
 import json
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer
@@ -55,19 +54,22 @@ def get_api_keys(authorization=Depends(security)):
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
 
-    resp = session.get(f"{LITELLM_URL}/key/list", params={"user_id": {auth_info['id']}, "return_full_object": "true"})
+    resp = session.get(
+        f"{LITELLM_URL}/key/list",
+        params={"user_id": {auth_info["id"]}, "return_full_object": "true"},
+    )
 
     if resp.ok:
         data = json.loads(resp.text)
         result = [
             {
-            "id": item["key_alias"].split("_")[-1],
-            "created_at": item["created_at"],
+                "id": item["key_alias"].split("_")[-1],
+                "created_at": item["created_at"],
             }
             for item in data["keys"]
         ]
     else:
-        raise HTTPException(status_code=resp.status_code, detail=json.loads(resp.text))       
+        raise HTTPException(status_code=resp.status_code, detail=json.loads(resp.text))
 
     return result
 
@@ -79,8 +81,8 @@ def create_api_key(key_name: str, authorization=Depends(security)):
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    id = auth_info['id']
-    
+    id = auth_info["id"]
+
     data = {
         "user_id": id,
         "key_alias": f"{id}_{key_name}",
@@ -93,7 +95,7 @@ def create_api_key(key_name: str, authorization=Depends(security)):
 
     data = json.loads(resp.text)
 
-    return data['key']
+    return data["key"]
 
 
 @router.delete("/api_keys")
@@ -103,11 +105,9 @@ def delete_api_key(key_name: str, authorization=Depends(security)):
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    id = auth_info['id']
-    
-    data = {
-        "key_aliases": [f"{id}_{key_name}"]
-    }
+    id = auth_info["id"]
+
+    data = {"key_aliases": [f"{id}_{key_name}"]}
     resp = session.post(f"{LITELLM_URL}/key/delete", json=data)
 
     if not resp.ok:
