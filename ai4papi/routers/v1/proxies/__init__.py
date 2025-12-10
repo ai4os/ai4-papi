@@ -1,6 +1,6 @@
 import fastapi
 
-from . import ai4_llm, zenodo, apisix
+from . import ai4_llm, zenodo, lite_llm
 
 router = fastapi.APIRouter()
 
@@ -15,6 +15,6 @@ router.include_router(
 )
 
 router.include_router(
-    router=apisix.router,
+    router=lite_llm.router,
     prefix="/proxies",
 )
