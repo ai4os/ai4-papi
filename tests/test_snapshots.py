@@ -8,7 +8,7 @@ from conf import token
 
 # Create Nomad deployment
 njob = modules.create_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     conf={},
     authorization=SimpleNamespace(credentials=token),
 )
@@ -19,7 +19,7 @@ time.sleep(60)
 
 # Make snapshot of that module
 created = snapshots.create_snapshot(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=njob["job_ID"],
     authorization=SimpleNamespace(credentials=token),
 )
@@ -30,7 +30,7 @@ time.sleep(10)
 
 # Retrieve all snapshots
 retrieved = snapshots.get_snapshots(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(retrieved, list)
@@ -39,7 +39,7 @@ assert any([d["snapshot_ID"] == created["snapshot_ID"] for d in retrieved])
 
 # Delete snapshot
 deleted = snapshots.delete_snapshot(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     snapshot_uuid=created["snapshot_ID"],
     authorization=SimpleNamespace(credentials=token),
 )
@@ -49,7 +49,7 @@ assert "status" in deleted.keys()
 
 # Check snapshot no longer exists
 retrieved2 = snapshots.get_snapshots(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(retrieved, list)
@@ -57,7 +57,7 @@ assert not any([d["snapshot_ID"] == created["snapshot_ID"] for d in retrieved2])
 
 # Delete deployment
 ndel = modules.delete_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=njob["job_ID"],
     authorization=SimpleNamespace(credentials=token),
 )

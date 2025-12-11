@@ -49,7 +49,7 @@
 * start using CVAT images from `ai4oshub` Dockerhub ([4ee60d1](https://github.com/ai4os/ai4-papi/commit/4ee60d1b69fd1609a5d23eb842461fc1e962c804))
 * **stats:** keep track of reallocations ([982767d](https://github.com/ai4os/ai4-papi/commit/982767de2ce07adc57a40509a2c34606cc7e9b66))
 * support AI4Life models as a tool ([#86](https://github.com/ai4os/ai4-papi/issues/86)) ([9502b50](https://github.com/ai4os/ai4-papi/commit/9502b50bf9b5c55a659d21c05da25b63ca14a323))
-* support AI4Life project (`vo.ai4life.eu`) ([#57](https://github.com/ai4os/ai4-papi/issues/57)) ([f183423](https://github.com/ai4os/ai4-papi/commit/f18342304a7ca13db588bd7ae4a006547468c072))
+* support AI4Life project (`ai4life`) ([#57](https://github.com/ai4os/ai4-papi/issues/57)) ([f183423](https://github.com/ai4os/ai4-papi/commit/f18342304a7ca13db588bd7ae4a006547468c072))
 * support deleting CVAT snapshots from storage ([#77](https://github.com/ai4os/ai4-papi/issues/77)) ([695e7a3](https://github.com/ai4os/ai4-papi/commit/695e7a3861aaa1e82961b8e5e6fafcdfe744cd9a))
 * support docker tags and custom port in `ai4life` tool ([#90](https://github.com/ai4os/ai4-papi/issues/90)) ([0aee8f3](https://github.com/ai4os/ai4-papi/commit/0aee8f3640094ab8279e8a072faad6549b93175f))
 * support making snapshots from deployments ([#62](https://github.com/ai4os/ai4-papi/issues/62)) ([b49d07d](https://github.com/ai4os/ai4-papi/commit/b49d07d9c7caac162d3947288299f6e51da522ec))

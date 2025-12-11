@@ -53,7 +53,7 @@ for tname, tconfig in tools_config.items():
 
     # Create tool
     rcreate = tools.create_deployment(
-        vo="vo.ai4eosc.eu",
+        vo="ai4eosc",
         tool_name=tname,
         conf=tconfig,
         authorization=SimpleNamespace(credentials=token),
@@ -65,7 +65,7 @@ for tname, tconfig in tools_config.items():
 
     # Retrieve that tool
     rdep = tools.get_deployment(
-        vo="vo.ai4eosc.eu",
+        vo="ai4eosc",
         deployment_uuid=rcreate["job_ID"],
         authorization=SimpleNamespace(credentials=token),
     )
@@ -77,7 +77,7 @@ for tname, tconfig in tools_config.items():
 
     # Retrieve all tools
     rdeps = tools.get_deployments(
-        vos=["vo.ai4eosc.eu"],
+        vos=["ai4eosc"],
         authorization=SimpleNamespace(credentials=token),
     )
     assert isinstance(rdeps, list)
@@ -87,7 +87,7 @@ for tname, tconfig in tools_config.items():
     # Check that we cannot retrieve that tool from modules
     # This should break!
     # modules.get_deployment(
-    #     vo='vo.ai4eosc.eu',
+    #     vo='ai4eosc',
     #     deployment_uuid=rcreate['job_ID'],
     #     authorization=SimpleNamespace(
     #         credentials=token
@@ -96,7 +96,7 @@ for tname, tconfig in tools_config.items():
 
     # Check that we cannot retrieve that tool from modules list
     rdeps2 = modules.get_deployments(
-        vos=["vo.ai4eosc.eu"],
+        vos=["ai4eosc"],
         authorization=SimpleNamespace(credentials=token),
     )
     assert isinstance(rdeps2, list)
@@ -104,7 +104,7 @@ for tname, tconfig in tools_config.items():
 
     # Delete tool
     rdel = tools.delete_deployment(
-        vo="vo.ai4eosc.eu",
+        vo="ai4eosc",
         deployment_uuid=rcreate["job_ID"],
         authorization=SimpleNamespace(credentials=token),
     )
@@ -115,7 +115,7 @@ for tname, tconfig in tools_config.items():
 
     # Check tool no longer exists
     rdeps3 = tools.get_deployments(
-        vos=["vo.ai4eosc.eu"],
+        vos=["ai4eosc"],
         authorization=SimpleNamespace(credentials=token),
     )
     assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])

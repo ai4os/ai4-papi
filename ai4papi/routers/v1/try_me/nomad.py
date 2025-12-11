@@ -25,7 +25,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 # (!) try-me jobs are always deployed in AI4EOSC
-VO = "vo.ai4eosc.eu"
+VO = "ai4eosc"
 NAMESPACE = papiconf.MAIN_CONF["nomad"]["namespaces"][VO]
 
 # Set platform hardware requirements for try-me
@@ -53,7 +53,7 @@ def get_deployments(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, requested_vo="demo")
+    auth.check_authorization(auth_info, access_level="ap-a")
 
     # Retrieve all jobs in namespace
     jobs = nomad.get_deployments(
@@ -104,7 +104,7 @@ def get_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, requested_vo="demo")
+    auth.check_authorization(auth_info, access_level="ap-a")
 
     job = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
@@ -133,7 +133,7 @@ def create_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, requested_vo="demo")
+    auth.check_authorization(auth_info, access_level="ap-a")
 
     # Retrieve docker_image from module_name
     meta = Modules.get_metadata(module_name)
@@ -252,7 +252,7 @@ def delete_deployment(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, requested_vo="demo")
+    auth.check_authorization(auth_info, access_level="ap-a")
 
     # Delete deployment
     r = nomad.delete_deployment(

@@ -42,7 +42,7 @@ for tool_name in tools_list:
     # Get tool config
     tool_conf = Tools.get_config(
         item_name=tool_name,
-        vo="vo.ai4eosc.eu",
+        vo="ai4eosc",
     )
     assert isinstance(tool_conf, dict)
     assert "general" in tool_conf.keys()

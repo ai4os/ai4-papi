@@ -210,7 +210,7 @@ def create_deployment(
         )
 
     # Check if your are allowed to deploy the tool
-    restrictions = {"ai4os-llm": ["vo.imagine-ai.eu"]}
+    restrictions = {"ai4os-llm": ["imagine"]}
     if vo in restrictions.get(tool_name, []):
         raise HTTPException(
             status_code=403,

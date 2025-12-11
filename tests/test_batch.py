@@ -17,7 +17,7 @@ sleep 6000
 """)
 batch_file.seek(0)
 rcreate = batch.create_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     user_cmd=UploadFile(file=batch_file),
     conf="""
     {
@@ -42,7 +42,7 @@ time.sleep(0.2)  # Nomad takes some time to allocate deployment
 
 # Retrieve that job
 rdep = batch.get_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=rcreate["job_ID"],
     full_info=True,
     authorization=SimpleNamespace(credentials=token),
@@ -55,7 +55,7 @@ assert "templates" in rdep  # user batch script
 
 # Retrieve all jobs
 rdeps = batch.get_deployments(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(rdeps, list)
@@ -64,7 +64,7 @@ assert all([d["job_ID"] != "error" for d in rdeps])
 
 # Delete job
 rdel = batch.delete_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=rcreate["job_ID"],
     authorization=SimpleNamespace(credentials=token),
 )
@@ -75,7 +75,7 @@ time.sleep(3)  # Nomad takes some time to delete
 
 # Check job no longer exists
 rdeps3 = batch.get_deployments(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])

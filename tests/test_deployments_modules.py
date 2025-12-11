@@ -8,7 +8,7 @@ from conf import token
 
 # Create module
 rcreate = modules.create_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     conf={},
     authorization=SimpleNamespace(credentials=token),
 )
@@ -19,7 +19,7 @@ time.sleep(0.2)  # Nomad takes some time to allocate deployment
 
 # Retrieve that module
 rdep = modules.get_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=rcreate["job_ID"],
     authorization=SimpleNamespace(credentials=token),
 )
@@ -30,7 +30,7 @@ assert rdep["status"] != "error"
 
 # Retrieve all modules
 rdeps = modules.get_deployments(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(rdeps, list)
@@ -40,7 +40,7 @@ assert all([d["job_ID"] != "error" for d in rdeps])
 # Check that we cannot retrieve that module from tools
 # This should break!
 # tools.get_deployment(
-#     vo='vo.ai4eosc.eu',
+#     vo='ai4eosc',
 #     deployment_uuid=rcreate['job_ID'],
 #     authorization=SimpleNamespace(
 #         credentials=token
@@ -49,7 +49,7 @@ assert all([d["job_ID"] != "error" for d in rdeps])
 
 # Check that we cannot retrieve that module from tools list
 rdeps2 = tools.get_deployments(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(rdeps2, list)
@@ -57,7 +57,7 @@ assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps2])
 
 # Delete module
 rdel = modules.delete_deployment(
-    vo="vo.ai4eosc.eu",
+    vo="ai4eosc",
     deployment_uuid=rcreate["job_ID"],
     authorization=SimpleNamespace(credentials=token),
 )
@@ -68,7 +68,7 @@ time.sleep(3)  # Nomad takes some time to delete
 
 # Check module no longer exists
 rdeps3 = modules.get_deployments(
-    vos=["vo.ai4eosc.eu"],
+    vos=["ai4eosc"],
     authorization=SimpleNamespace(credentials=token),
 )
 assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
