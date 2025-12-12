@@ -9,7 +9,7 @@ SECRET_DATA = {"pwd": 12345}
 
 # Create secret
 r = secrets.create_secret(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     secret_path=SECRET_PATH,
     secret_data=SECRET_DATA,
     authorization=SimpleNamespace(credentials=token),
@@ -17,7 +17,7 @@ r = secrets.create_secret(
 
 # Check that secret is in list
 r = secrets.get_secrets(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     authorization=SimpleNamespace(credentials=token),
 )
 assert SECRET_PATH in r.keys()
@@ -25,14 +25,14 @@ assert r[SECRET_PATH] == SECRET_DATA
 
 # Delete
 r = secrets.delete_secret(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     secret_path=SECRET_PATH,
     authorization=SimpleNamespace(credentials=token),
 )
 
 # Check that secret is no longer in list
 r = secrets.get_secrets(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     authorization=SimpleNamespace(credentials=token),
 )
 assert SECRET_PATH not in r.keys()

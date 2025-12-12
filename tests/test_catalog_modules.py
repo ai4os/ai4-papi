@@ -39,7 +39,7 @@ module_name = modules_list[0]
 # Get module config
 module_conf = Modules.get_config(
     item_name=module_name,
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
 )
 assert isinstance(module_conf, dict)
 assert "general" in module_conf.keys()

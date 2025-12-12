@@ -168,7 +168,7 @@ To make authenticated calls, you have several options:
   from ai4papi.routers.v1 import deployments
 
   deployments.get_deployments(
-      vos=['ai4eosc'],
+      vos=['vo.ai4eosc.eu'],
       authorization=SimpleNamespace(
           credentials='your-OIDC-token'
       ),
@@ -224,7 +224,7 @@ from ai4papi.routers.v1 import deployments
 
 # Get all the user's deployments
 deployments.modules.get_deployments(
-    vos=['ai4eosc'],
+    vos=['vo.ai4eosc.eu'],
     authorization=SimpleNamespace(
         credentials='your-OIDC-token'
     ),

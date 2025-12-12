@@ -27,9 +27,9 @@ auth:
 
   VO:  # Virtual Organizations
 
-    - ai4eosc
-    - imagine
-    - ai4life
+    - vo.ai4eosc.eu
+    - vo.imagine-ai.eu
+    - vo.ai4life.eu
     - kmd4eosc
     - training.egi.eu  # this membership lasts only 1 month
 
@@ -37,21 +37,9 @@ nomad:
 
   namespaces:  # map VO to Nomad namespace
 
-    ai4eosc: ai4eosc
-    imagine: imagine
-    ai4life: ai4life
-    kmd4eosc: kmd4eosc
-    training.egi.eu: tutorials
-
-vault:
-
-  namespaces:  # map VO to Vault namespace
-    # We are mapping back to original VO names because in the beginning we used plain
-    # VO names for Vault namespaces
-    # In the future, if we ever reset Vault, we can get rid of this.
-    ai4eosc: vo.ai4eosc.eu
-    imagine: vo.imagine-ai.eu
-    ai4life: vo.ai4life.eu
+    vo.ai4eosc.eu: ai4eosc
+    vo.imagine-ai.eu: imagine
+    vo.ai4life.eu: ai4life
     kmd4eosc: kmd4eosc
     training.egi.eu: tutorials
 
@@ -59,9 +47,9 @@ lb:  # load balancer, Traefik
 
   domain:  # each VO accesses deployments through their domain
 
-    ai4eosc: deployments.cloud.ai4eosc.eu
-    imagine: deployments.cloud.imagine-ai.eu
-    ai4life: deployments.cloud.ai4eosc.eu
+    vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
+    vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
+    vo.ai4life.eu: deployments.cloud.ai4eosc.eu
     kmd4eosc: deployments.cloud.ai4eosc.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu
 
@@ -69,15 +57,15 @@ oscar:
 
   clusters:
 
-    ai4eosc:
+    vo.ai4eosc.eu:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
-    imagine:
+    vo.imagine-ai.eu:
       endpoint:  https://inference-walton.cloud.imagine-ai.eu
       cluster_id: oscar-imagine-cluster
 
-    ai4life:
+    vo.ai4life.eu:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
@@ -91,8 +79,8 @@ oscar:
 
 mlflow:
 
-    ai4eosc: https://mlflow.cloud.ai4eosc.eu/
-    imagine: https://mlflow.cloud.imagine-ai.eu/
-    ai4life: https://mlflow.cloud.ai4eosc.eu/
+    vo.ai4eosc.eu: https://mlflow.cloud.ai4eosc.eu/
+    vo.imagine-ai.eu: https://mlflow.cloud.imagine-ai.eu/
+    vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
     kmd4eosc: https://mlflow.cloud.ai4eosc.eu/
     training.egi.eu: https://mlflow.cloud.ai4eosc.eu/

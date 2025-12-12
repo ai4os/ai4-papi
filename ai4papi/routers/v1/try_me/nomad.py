@@ -25,7 +25,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 # (!) try-me jobs are always deployed in AI4EOSC
-VO = "ai4eosc"
+VO = "vo.ai4eosc.eu"
 NAMESPACE = papiconf.MAIN_CONF["nomad"]["namespaces"][VO]
 
 # Set platform hardware requirements for try-me

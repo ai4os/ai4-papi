@@ -12,7 +12,7 @@ message = ai4_llm.ChatMessage(role="user", content="Hello")
 request = ai4_llm.ChatRequest(model="AI4EOSC/Qwen3", messages=[message])
 r = ai4_llm.get_chat_response(
     request=request,
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     authorization=SimpleNamespace(credentials=token),
 )
 assert isinstance(r, StreamingResponse)

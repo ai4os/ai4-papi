@@ -6,7 +6,7 @@ import hvac
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, conf
+from ai4papi import auth
 
 
 router = APIRouter(
@@ -112,9 +112,6 @@ def get_secrets(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, vo)
 
-    # Map VO to Vault subfolder
-    vo = conf.MAIN_CONF["vault"]["namespaces"][vo]
-
     # Init the Vault client
     client = vault_client(jwt=authorization.credentials)
 
@@ -179,9 +176,6 @@ def create_secret(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, vo)
 
-    # Map VO to Vault subfolder
-    vo = conf.MAIN_CONF["vault"]["namespaces"][vo]
-
     # Init the Vault client
     client = vault_client(jwt=authorization.credentials)
 
@@ -214,9 +208,6 @@ def delete_secret(
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, vo)
-
-    # Map VO to Vault subfolder
-    vo = conf.MAIN_CONF["vault"]["namespaces"][vo]
 
     # Init the Vault client
     client = vault_client(jwt=authorization.credentials)

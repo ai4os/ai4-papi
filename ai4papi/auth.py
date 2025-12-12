@@ -56,7 +56,7 @@ def get_user_info(token):
 
     # Create a group dictionary where keys are the access levels and values are the
     # projects that enabled the user into that access level.
-    # eg. {"ap-a": ["ai4eosc", "imagine"]}
+    # eg. {"ap-a": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
     groups = {}
     for role in user_infos.get("realm_access", {}).get("roles", []):
         # Roles should be structured as "access:<vo>:<level>"

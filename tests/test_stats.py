@@ -9,7 +9,7 @@ SECRET_DATA = {"pwd": 12345}
 
 # Retrieve user stats
 r = stats.deployments.get_user_stats(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
     authorization=SimpleNamespace(credentials=token),
 )
 assert r, "User stats dict is empty"
@@ -17,7 +17,7 @@ assert r, "User stats dict is empty"
 # Retrieve cluster stats
 _ = stats.deployments.get_cluster_stats_bg()
 r = stats.deployments.get_cluster_stats(
-    vo="ai4eosc",
+    vo="vo.ai4eosc.eu",
 )
 assert r, "Cluster stats dict is empty"
 
