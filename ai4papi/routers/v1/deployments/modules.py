@@ -217,7 +217,7 @@ def create_deployment(
     job_uuid = uuid.uuid1()
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    if vo == "training.egi.eu":
+    if vo == "tutorials":
         priority = 25
     else:
         priority = 50
