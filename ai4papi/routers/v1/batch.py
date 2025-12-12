@@ -213,7 +213,7 @@ def create_deployment(
     job_uuid = uuid.uuid1()
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    priority = 25 if vo == "training.egi.eu" else 50
+    priority = 25 if vo == "tutorials" else 50
 
     # Retrieve MLflow credentials
     user_secrets = ai4secrets.get_secrets(

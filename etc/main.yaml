@@ -31,7 +31,7 @@ auth:
     - vo.imagine-ai.eu
     - vo.ai4life.eu
     - kmd4eosc
-    - training.egi.eu  # this membership lasts only 1 month
+    - tutorials
 
 nomad:
 
@@ -41,7 +41,7 @@ nomad:
     vo.imagine-ai.eu: imagine
     vo.ai4life.eu: ai4life
     kmd4eosc: kmd4eosc
-    training.egi.eu: tutorials
+    tutorials: tutorials
 
 lb:  # load balancer, Traefik
 
@@ -51,7 +51,7 @@ lb:  # load balancer, Traefik
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     vo.ai4life.eu: deployments.cloud.ai4eosc.eu
     kmd4eosc: deployments.cloud.ai4eosc.eu
-    training.egi.eu: deployments.cloud.ai4eosc.eu
+    tutorials: deployments.cloud.ai4eosc.eu
 
 oscar:
 
@@ -73,7 +73,7 @@ oscar:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
-    training.egi.eu:
+    tutorials:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
@@ -83,4 +83,4 @@ mlflow:
     vo.imagine-ai.eu: https://mlflow.cloud.imagine-ai.eu/
     vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
     kmd4eosc: https://mlflow.cloud.ai4eosc.eu/
-    training.egi.eu: https://mlflow.cloud.ai4eosc.eu/
+    tutorials: https://mlflow.cloud.ai4eosc.eu/

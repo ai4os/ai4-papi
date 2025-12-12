@@ -87,7 +87,7 @@ def limit_resources(
     conf = conf["hardware"]
 
     # Limit resources for tutorial users
-    if vo == "training.egi.eu":
+    if vo == "tutorials":
         if "cpu_num" in conf.keys():
             conf["cpu_num"]["value"] = 2
             conf["cpu_num"]["range"] = [2, 4]
