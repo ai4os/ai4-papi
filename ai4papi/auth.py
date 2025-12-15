@@ -21,6 +21,8 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
  button where you can copy paste your token. So you will be able to access authenticated methods from the interface.
 """
 
+import re
+
 from fastapi import HTTPException
 import jwt
 
@@ -54,16 +56,15 @@ def get_user_info(token):
 
     # Create a group dictionary where keys are the access levels and values are the
     # projects that enabled the user into that access level.
-    # eg. {"platform-access": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
+    # eg. {"ap-a": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
     groups = {}
-    for i in user_infos.get("realm_access", {}).get("roles", []):
-        i = i.split(":")
-        access = i[0]  # eg. "platform-access"
-        project = i[1] if len(i) > 1 else None  # eg. "vo.ai4eosc.eu"
-        v = groups.get(access, [])
-        if project:
-            v.append(project)
-        groups[access] = v
+    for role in user_infos.get("realm_access", {}).get("roles", []):
+        # Roles should be structured as "access:<vo>:<level>"
+        match = re.match(r"access:(?P<vo>[^:]+):(?P<level>.+)", role)
+        if not match:
+            continue
+        groups.setdefault(match["level"], [])
+        groups[match["level"]].append(match["vo"])
 
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
@@ -79,11 +80,11 @@ def get_user_info(token):
 def check_authorization(
     auth_info: dict,
     requested_vo: str = None,
-    access_level: str = "platform-access",
+    access_level: str = "ap-u",
 ):
     """
-    Check that the user has permissions to use the resource (usually "platform-access")
-    and check he indeed belongs to the requested VO if one is specified.
+    Check that the user has permissions to use the resource (usually "ap-u")
+    and check he indeed belongs to the requested VO.
     """
     if access_level not in auth_info["groups"].keys():
         raise HTTPException(
@@ -95,5 +96,5 @@ def check_authorization(
     if requested_vo and (requested_vo not in user_vos):
         raise HTTPException(
             status_code=401,
-            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}.",
+            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs for that access level: {user_vos}.",
         )
