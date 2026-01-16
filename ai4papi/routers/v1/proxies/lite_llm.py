@@ -138,8 +138,9 @@ def get_api_keys(authorization=Depends(security)):
         data = json.loads(resp.text)
         result = [
             {
-                "id": item["key_alias"],
+                "id": item["key_alias"].split("_")[-1],
                 "created_at": item["created_at"],
+                "team_id": item["team_id"]
             }
             for item in data["keys"]
         ]
@@ -150,7 +151,7 @@ def get_api_keys(authorization=Depends(security)):
 
 
 @router.post("/api_keys")
-def create_api_key(key_name: str, authorization=Depends(security)):
+def create_api_key(key_name: str, team_id: str, authorization=Depends(security)):
     """
     Create a new credential in LiteLLM.
     """
@@ -160,8 +161,9 @@ def create_api_key(key_name: str, authorization=Depends(security)):
 
     data = {
         "user_id": id,
-        "key_alias": key_name,
+        "key_alias": f"{id}_{key_name}",
         "key_type": "llm_api",
+        "team_id": team_id
     }
     resp = session.post(f"{LITELLM_URL}/key/generate", json=data)
 
@@ -182,7 +184,7 @@ def delete_api_key(key_name: str, authorization=Depends(security)):
     auth_info = auth.get_user_info(token=authorization.credentials)
     id = auth_info["id"]
 
-    data = {"key_aliases": [key_name]}
+    data = {"key_aliases": [f"{id}_{key_name}"]}
     resp = session.post(f"{LITELLM_URL}/key/delete", json=data)
 
     if not resp.ok:
