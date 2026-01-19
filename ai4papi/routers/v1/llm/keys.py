@@ -120,6 +120,7 @@ def get_api_keys(authorization=Depends(security)):
             "id": item["key_alias"].split("_")[-1],
             "created_at": item["created_at"],
             "team_id": item["team_id"],
+            "expires": item["expires"],
         }
         for item in r.json()["keys"]
     ]
