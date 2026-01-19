@@ -20,30 +20,24 @@ IS_DEV = not IS_PROD
 def load_env(varname: str):
     """
     Load environment variables.
-    To make the occasional developer's life easier, we raise warnings
-    (instead of errors) if the variable is not defined. To avoid making them define variables needed for sections of code they are not developing/using.
     """
     var = os.getenv(varname)
 
-    if IS_DEV:  # Not enforced for developers
-        warnings.warn(f'"{varname}" envar is not defined')
-    else:
-        raise Exception(f'You need to define the variable "{varname}".')
+    if not var:
+        if IS_DEV:
+            # To make the occasional developer's life easier, we raise warnings
+            # (instead of errors) if the variable is not defined. To avoid making
+            # them define variables needed for sections of code they are not developing.
+            warnings.warn(f'"{varname}" envar is not defined')
+        else:
+            raise Exception(f'You need to define the variable "{varname}".')
 
     return var
 
 
-# Harbor token is kind of mandatory in production, otherwise snapshots won't work.
+# Harbor credentials
 HARBOR_USER = "robot$user-snapshots+snapshot-api"
-HARBOR_PASS = os.environ.get("HARBOR_ROBOT_PASSWORD")
-if not HARBOR_PASS:
-    if IS_DEV:
-        # Not enforce this for developers
-        print(
-            'You should define the variable "HARBOR_ROBOT_PASSWORD" to use the "/snapshots" endpoint.'
-        )
-    else:
-        raise Exception('You need to define the variable "HARBOR_ROBOT_PASSWORD".')
+HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 
 # Paths
 main_path = Path(__file__).parent.absolute()
