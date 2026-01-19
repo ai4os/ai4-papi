@@ -36,9 +36,7 @@ class LiteLLMSession(requests.Session):
     def request(self, *args, **kwargs):
         response = super().request(*args, **kwargs)
         if not response.ok:
-            raise HTTPException(
-                status_code=response.status_code, detail=response.json()
-            )
+            raise HTTPException(status_code=response.status_code, detail=response.text)
         return response
 
 
