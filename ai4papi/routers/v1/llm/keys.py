@@ -23,7 +23,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 # LiteLLM API configuration
-LITELLM_URL = "https://vllm-adm-dev.cloud.ai4eosc.eu"
+LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
 LITELLM_API_KEY = papiconf.load_env("LITELLM_API_KEY")
 
 
