@@ -129,11 +129,19 @@ def get_api_keys(authorization=Depends(security)):
 def create_api_key(
     key_name: str,
     team_id: str,
-    duration: str = "1y",
+    duration: str = None,
     authorization=Depends(security),
 ):
     """
     Create a new API key in LiteLLM.
+
+    Parameters
+    ----------
+    * team_id: str
+      Team to which the key will be associated
+    * duration: str
+      Expiration date of the key (e.g. "30d", "1y").
+      If left empty, the key does not expire
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
