@@ -46,89 +46,78 @@ session.headers.update(
 )
 
 
-def update_teams(user_id: str, teams_to_add: list, teams_to_remove: list):
-    """
-    Update user teams in LiteLLM based on the current available roles for the
-    authenticated user.
-    """
-    for team in teams_to_add:
-        data = {"team_id": team, "member": {"user_id": user_id, "role": "user"}}
-        session.post(f"{LITELLM_URL}/team/member_add", json=data)
-
-    for team in teams_to_remove:
-        data = {"team_id": team, "user_id": user_id}
-        session.post(f"{LITELLM_URL}/team/member_delete", json=data)
-
-
-def get_user(user_id: str):
-    """
-    Get user from LiteLLM based on the current authenticated user.
-    Returns None if user does not exist.
-    """
-    r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
-    user = r.json()
-    if "user_id" in user["user_info"]:
-        return user
-    else:  # The user does not exist
-        return None
-
-
-def create_user(user_id: str, user_email: str, teams: list):
-    """
-    Create user inside LiteLLM based on the current authenticated user.
-    """
-    data = {"user_id": user_id, "user_email": user_email, "teams": teams}
-    session.post(f"{LITELLM_URL}/user/new", json=data)
-
-
 @router.get("")
 def get_api_keys(authorization=Depends(security)):
     """
     Retrieve existing credentials for a user in LiteLLM.
-    We also check that the user exists and belongs to the correct teams in LiteLLM.
+
+    We also use this function as an LiteLLM init:
+    * check that the user exists, otherwise creates it
+    * check that the user belongs to the correct teams in LiteLLM, otherwise update the
+      teams
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     user_id = auth_info["id"]
     user_email = auth_info.get("email")
-    current_teams = list(auth_info["groups"].keys())
+    current_levels = list(auth_info["groups"].keys())
+    top_level = auth.get_highest_level(current_levels)
 
-    # Check if user exists in LiteLLM, if not create it
-    user = get_user(user_id)
-    if user is None:
-        create_user(user_id, user_email, current_teams)
-    else:
-        # Check and update user teams
-        old_teams = [team["team_id"] for team in user["teams"]]
-        old_set = set(old_teams)
-        current_set = set(current_teams)
+    # Retrieve the LiteLLM user
+    r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
+    user = r.json()
 
-        teams_to_add = list(current_set - old_set)
-        teams_to_remove = list(old_set - current_set)
-        update_teams(user_id, teams_to_add, teams_to_remove)
+    # If user does not exist, create it and return no keys
+    if "user_id" not in user["user_info"]:
+        data = {"user_id": user_id, "user_email": user_email, "teams": [top_level]}
+        session.post(f"{LITELLM_URL}/user/new", json=data)
+        return [{}]
 
     # Retrieve the API keys
     r = session.get(
         f"{LITELLM_URL}/key/list",
         params={"user_id": {auth_info["id"]}, "return_full_object": "true"},
     )
+    keys = r.json()["keys"]
 
-    result = [
+    # Check if user belongs to the team of their current top level
+    if top_level not in [team["team_id"] for team in user["teams"]]:
+        data = {"team_id": top_level, "member": {"user_id": user_id, "role": "user"}}
+        session.post(f"{LITELLM_URL}/team/member_add", json=data)
+
+    # Check that API keys indeed belong to that top level team. Otherwise we migrate
+    # the API keys.
+    for k in keys:
+        if k["team_id"] != top_level:
+            data = {"key": k["token"], "team_id": top_level}
+            session.post(f"{LITELLM_URL}/key/update", json=data)
+
+    # Remove user from all teams that are not his top level
+    # ⚠️ Do not update teams before changing API key team, otherwise the API keys will
+    # be erased.
+    teams_to_remove = set([team["team_id"] for team in user["teams"]])
+    teams_to_remove.discard(top_level)
+    for team in teams_to_remove:
+        data = {"team_id": team, "user_id": user_id}
+        session.post(f"{LITELLM_URL}/team/member_delete", json=data)
+
+    # Build final key dict
+    out = [
         {
             "id": item["key_alias"].split("_")[-1],
             "created_at": item["created_at"],
-            "team_id": item["team_id"],
+            "team_id": top_level,
             "expires": item["expires"],
         }
-        for item in r.json()["keys"]
+        for item in keys
     ]
-    return result
+
+    return out
 
 
 @router.post("")
 def create_api_key(
     key_name: str,
-    team_id: str,
     duration: str = None,
     authorization=Depends(security),
 ):
@@ -137,8 +126,6 @@ def create_api_key(
 
     Parameters
     ----------
-    * team_id: str
-      Team to which the key will be associated
     * duration: str
       Expiration date of the key (e.g. "30d", "1y").
       If left empty, the key does not expire
@@ -146,6 +133,10 @@ def create_api_key(
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     id = auth_info["id"]
+
+    # Get user current top access level
+    current_levels = list(auth_info["groups"].keys())
+    team_id = auth.get_highest_level(current_levels)
 
     # Keys alias are created with pattern "<user_id>_<keyname>" as they must be globally unique.
     data = {
