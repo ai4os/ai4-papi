@@ -68,6 +68,9 @@ def get_user_info(token):
         groups.setdefault(match["level"], [])
         groups[match["level"]].append(match["vo"])
 
+    # Sort user access levels
+    groups = {level: groups[level] for level in AI4OS_LEVELS if level in groups}
+
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
         "issuer": user_infos.get("iss"),  # URL of the access token issuer
