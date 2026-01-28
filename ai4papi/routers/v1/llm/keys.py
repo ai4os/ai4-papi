@@ -82,7 +82,10 @@ def get_api_keys(authorization=Depends(security)):
 
     # Check if user belongs to the team of their current top level
     if top_level not in [team["team_id"] for team in user["teams"]]:
-        data = {"team_id": top_level, "member": {"user_id": user_id, "role": "user"}}
+        data = {
+            "team_id": top_level,
+            "member": {"user_id": user_id, "user_email": user_email, "role": "user"},
+        }
         session.post(f"{LITELLM_URL}/team/member_add", json=data)
 
     # Check that API keys indeed belong to that top level team. Otherwise we migrate
@@ -132,7 +135,7 @@ def create_api_key(
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    id = auth_info["id"]
+    user_id = auth_info["id"]
 
     # Get user current top access level
     current_levels = list(auth_info["groups"].keys())
@@ -140,8 +143,8 @@ def create_api_key(
 
     # Keys alias are created with pattern "<user_id>_<keyname>" as they must be globally unique.
     data = {
-        "user_id": id,
-        "key_alias": f"{id}_{key_name}",
+        "user_id": user_id,
+        "key_alias": f"{user_id}_{key_name}",
         "key_type": "llm_api",
         "team_id": team_id,
         "duration": duration,
@@ -157,8 +160,8 @@ def delete_api_key(key_name: str, authorization=Depends(security)):
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
-    id = auth_info["id"]
+    user_id = auth_info["id"]
 
-    data = {"key_aliases": [f"{id}_{key_name}"]}
+    data = {"key_aliases": [f"{user_id}_{key_name}"]}
     session.post(f"{LITELLM_URL}/key/delete", json=data)
     return {"status": "success"}
