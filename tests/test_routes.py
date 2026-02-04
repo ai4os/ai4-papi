@@ -50,7 +50,11 @@ assert ("/v1/batch/{deployment_uuid}", {"DELETE"}) in routes
 
 assert ("/v1/storage/{storage_name}/ls", {"GET"}) in routes
 
+assert ("/v1/llm/chat", {"POST"}) in routes
+assert ("/v1/llm/api_keys", {"POST"}) in routes
+assert ("/v1/llm/api_keys", {"GET"}) in routes
+assert ("/v1/llm/api_keys", {"DELETE"}) in routes
+
 assert ("/v1/proxies/zenodo", {"POST"}) in routes
-assert ("/v1/proxies/ai4_llm", {"POST"}) in routes
 
 print("🟢 Checks for API routes passed!")

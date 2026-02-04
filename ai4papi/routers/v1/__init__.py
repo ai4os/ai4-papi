@@ -5,6 +5,7 @@ from . import (
     catalog,
     deployments,
     inference,
+    llm,
     secrets,
     stats,
     storage,
@@ -20,6 +21,7 @@ router.include_router(deployments.router)
 router.include_router(batch.router)
 router.include_router(try_me.router)
 router.include_router(inference.router)
+router.include_router(llm.router)
 router.include_router(snapshots.router)
 router.include_router(stats.router)
 router.include_router(secrets.router)

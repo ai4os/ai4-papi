@@ -25,7 +25,6 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 import configparser
 import importlib
 import json
-import os
 import re
 from typing import Tuple, Union
 import warnings
@@ -47,12 +46,7 @@ session = requests.Session()
 security = HTTPBearer()
 
 # Jenkins token is mandatory in production
-JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
-if not JENKINS_TOKEN:
-    if papiconf.IS_DEV:  # Not enforced for developers
-        print('"JENKINS_TOKEN" envar is not defined')
-    else:
-        raise Exception('You need to define the variable "JENKINS_TOKEN".')
+JENKINS_TOKEN = papiconf.load_env("PAPI_JENKINS_TOKEN")
 
 # Check conversions supported in ai4-metadata
 supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]

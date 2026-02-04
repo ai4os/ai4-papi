@@ -1,5 +1,5 @@
 """
-Proxy to manage AI4LLM requests.
+Manage Dashboard chatbot requests to the AI4OS LLM Assistante.
 """
 
 import os
@@ -17,8 +17,8 @@ from ai4papi import auth
 
 
 router = APIRouter(
-    prefix="/ai4_llm",
-    tags=["Proxies (AI4OS LLM)"],
+    prefix="/chat",
+    tags=["AI4OS LLM (chat)"],
     responses={404: {"description": "AI4LLM not found"}},
 )
 
@@ -28,7 +28,7 @@ security = HTTPBearer()
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 if LLM_API_KEY:
     client = OpenAI(
-        base_url="https://llm.dev.ai4eosc.eu/api",
+        base_url="https://chat.cloud.ai4eosc.eu/api",
         api_key=LLM_API_KEY,
     )
 else:

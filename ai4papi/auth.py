@@ -30,6 +30,8 @@ import jwt
 KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
 jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
 
+AI4OS_LEVELS = ["ap-a", "ap-a1", "ap-b", "ap-u", "ap-d"]
+
 
 def get_user_info(token):
     try:
@@ -66,6 +68,9 @@ def get_user_info(token):
         groups.setdefault(match["level"], [])
         groups[match["level"]].append(match["vo"])
 
+    # Sort user access levels
+    groups = {level: groups[level] for level in AI4OS_LEVELS if level in groups}
+
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
         "issuer": user_infos.get("iss"),  # URL of the access token issuer
@@ -98,3 +103,13 @@ def check_authorization(
             status_code=401,
             detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs for that access level: {user_vos}.",
         )
+
+
+def get_highest_level(user_levels: list):
+    """
+    Find what is the highest level among a set of user levels.
+    """
+    for level in AI4OS_LEVELS[::-1]:
+        if level in user_levels:
+            return level
+    return None
