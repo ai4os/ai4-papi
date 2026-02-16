@@ -350,11 +350,17 @@ def create_deployment(
     del usertask["Config"]["ports"]
 
     # Replace the standard job service (eg. deepaas) with the commands provided
-    # by the user
+    # by the user. We save the logs of the batch job in a dedicated folder.
+    # We don't prepend the timestamp to make it easier for the Dashboard to find
+    # the log file. Folder can be sorted by modified date in Nextcloud anyway.
     usertask["Config"]["command"] = "/bin/bash"
     usertask["Config"]["args"] = [
         "-c",
-        "mkdir -p /storage/ai4os-storage/batch/${NOMAD_ALLOC_ID} && exec /bin/bash /srv/user-batch-commands.sh >> /storage/ai4os-storage/batch/${NOMAD_ALLOC_ID}/logs.txt 2>&1",
+        (
+            "export BATCH_DIR=/storage/ai4os-storage/batch/${NOMAD_JOB_ID} && "
+            "mkdir -p $BATCH_DIR && "
+            "exec /bin/bash /srv/user-batch-commands.sh >> $BATCH_DIR/log.txt 2>&1"
+        ),
     ]
     usertask["Config"]["mount"] = [
         {
