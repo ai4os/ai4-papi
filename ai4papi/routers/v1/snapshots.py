@@ -32,7 +32,7 @@ security = HTTPBearer()
 # Init the Harbor client
 if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
     client = HarborClient(
-        url="https://registry.services.ai4os.eu/api/v2.0/",
+        url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
         username=papiconf.HARBOR_USER,
         secret=papiconf.HARBOR_PASS,
     )
@@ -292,7 +292,7 @@ def get_harbor_snapshots(
                 "title": a_labels["TITLE"],
                 "description": a_labels["DESCRIPTION"],
                 "nomad_ID": None,
-                "docker_image": f"registry.services.ai4os.eu/user-snapshots/{user_str}",
+                "docker_image": f"registry.cloud.ai4eosc.eu/user-snapshots/{user_str}",
             }
         )
     return snapshots

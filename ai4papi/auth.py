@@ -21,60 +21,55 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
  button where you can copy paste your token. So you will be able to access authenticated methods from the interface.
 """
 
+import re
+
 from fastapi import HTTPException
-from flaat.fastapi import Flaat
-
-from ai4papi.conf import MAIN_CONF
+import jwt
 
 
-# Initialize flaat
-flaat = Flaat()
-flaat.set_trusted_OP_list(MAIN_CONF["auth"]["OP"])
+KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
+jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
+
+AI4OS_LEVELS = ["ap-a", "ap-a1", "ap-b", "ap-u", "ap-d"]
 
 
 def get_user_info(token):
     try:
-        user_infos = flaat.get_user_infos_from_access_token(token)
+        signing_key = jwk_client.get_signing_key_from_jwt(token).key
+        user_infos = jwt.decode(
+            token,
+            signing_key,
+            audience="account",  # needed for Vault
+            issuer=KEYCLOAK_URL,
+            algorithms=["RS256"],
+            options={
+                "require": ["sub", "iss", "name", "email"],
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iss": True,
+                "verify_aud": True,
+            },
+        )
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail=str(e),
         )
 
-    # Check output
-    if user_infos is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid token",
-        )
-
     # Create a group dictionary where keys are the access levels and values are the
     # projects that enabled the user into that access level.
-    # eg. {"platform-access": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
+    # eg. {"ap-a": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
     groups = {}
-    for i in user_infos.get("realm_access", {}).get("roles", []):
-        i = i.split(":")
-        access = i[0]  # eg. "platform-access"
-        project = i[1] if len(i) > 1 else None  # eg. "vo.ai4eosc.eu"
-        v = groups.get(access, [])
-        if project:
-            v.append(project)
-        groups[access] = v
+    for role in user_infos.get("realm_access", {}).get("roles", []):
+        # Roles should be structured as "access:<vo>:<level>"
+        match = re.match(r"access:(?P<vo>[^:]+):(?P<level>.+)", role)
+        if not match:
+            continue
+        groups.setdefault(match["level"], [])
+        groups[match["level"]].append(match["vo"])
 
-    # Generate user info dict
-    for k in ["sub", "iss", "name", "email"]:
-        if user_infos.get(k) is None:
-            raise HTTPException(
-                status_code=401,
-                detail=f"You token should have scopes for {k}.",
-            )
-
-    # Check audiences (needed for Vault)
-    if "account" not in user_infos.get("aud"):
-        raise HTTPException(
-            status_code=401,
-            detail="You token should have 'account' in audiences.",
-        )
+    # Sort user access levels
+    groups = {level: groups[level] for level in AI4OS_LEVELS if level in groups}
 
     out = {
         "id": user_infos.get("sub"),  # subject, user-ID
@@ -90,11 +85,11 @@ def get_user_info(token):
 def check_authorization(
     auth_info: dict,
     requested_vo: str = None,
-    access_level: str = "platform-access",
+    access_level: str = "ap-u",
 ):
     """
-    Check that the user has permissions to use the resource (usually "platform-access")
-    and check he indeed belongs to the requested VO if one is specified.
+    Check that the user has permissions to use the resource (usually "ap-u")
+    and check he indeed belongs to the requested VO.
     """
     if access_level not in auth_info["groups"].keys():
         raise HTTPException(
@@ -106,5 +101,15 @@ def check_authorization(
     if requested_vo and (requested_vo not in user_vos):
         raise HTTPException(
             status_code=401,
-            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs: {user_vos}.",
+            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs for that access level: {user_vos}.",
         )
+
+
+def get_highest_level(user_levels: list):
+    """
+    Find what is the highest level among a set of user levels.
+    """
+    for level in AI4OS_LEVELS[::-1]:
+        if level in user_levels:
+            return level
+    return None

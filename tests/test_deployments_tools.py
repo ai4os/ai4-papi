@@ -16,7 +16,7 @@ tools_config = {
         },
         "storage": {
             "rclone_conf": "/srv/.rclone/rclone.conf",
-            "rclone_url": "https://share.services.ai4os.eu/remote.php/webdav",
+            "rclone_url": "https://share.cloud.ai4eosc.eu/remote.php/webdav",
             "rclone_vendor": "nextcloud",
             "rclone_user": "mock_user",
             "rclone_password": "mock_password",

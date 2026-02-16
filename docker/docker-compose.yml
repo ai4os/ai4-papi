@@ -3,7 +3,7 @@ version: "3.9"
 services:
 
     ai4-papi-prod:
-        image: "registry.services.ai4os.eu/ai4os/ai4-papi:prod"
+        image: "registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod"
         restart: always
         environment:
             - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy
@@ -24,7 +24,7 @@ services:
 
 
     ai4-papi-dev:
-        image: "registry.services.ai4os.eu/ai4os/ai4-papi:dev"
+        image: "registry.cloud.ai4eosc.eu/ai4os/ai4-papi:dev"
         restart: always
         environment:
             - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy

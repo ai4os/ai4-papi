@@ -20,24 +20,18 @@ auth:
     - https://dashboard-stage.cloud.ai4eosc.eu
 
     - https://ai4life.cloud.ai4eosc.eu
+    - https://kmd4eosc.cloud.ai4eosc.eu
     - https://tutorials.cloud.ai4eosc.eu
     - http://localhost:8080
     - ${DASHBOARD_URL}
-
-
-  OP:  # OIDC providers
-
-    # - https://aai-demo.egi.eu/auth/realms/egi
-    # - https://aai-dev.egi.eu/auth/realms/egi
-    # - https://aai.egi.eu/auth/realms/egi
-    - https://login.cloud.ai4eosc.eu/realms/ai4eosc
 
   VO:  # Virtual Organizations
 
     - vo.ai4eosc.eu
     - vo.imagine-ai.eu
     - vo.ai4life.eu
-    - training.egi.eu  # this membership lasts only 1 month
+    - kmd4eosc
+    - tutorials
 
 nomad:
 
@@ -46,7 +40,8 @@ nomad:
     vo.ai4eosc.eu: ai4eosc
     vo.imagine-ai.eu: imagine
     vo.ai4life.eu: ai4life
-    training.egi.eu: tutorials
+    kmd4eosc: kmd4eosc
+    tutorials: tutorials
 
 lb:  # load balancer, Traefik
 
@@ -55,7 +50,8 @@ lb:  # load balancer, Traefik
     vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     vo.ai4life.eu: deployments.cloud.ai4eosc.eu
-    training.egi.eu: deployments.cloud.ai4eosc.eu
+    kmd4eosc: deployments.cloud.ai4eosc.eu
+    tutorials: deployments.cloud.ai4eosc.eu
 
 oscar:
 
@@ -73,7 +69,11 @@ oscar:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
-    training.egi.eu:
+    kmd4eosc:
+      endpoint: https://inference.cloud.ai4eosc.eu
+      cluster_id: oscar-ai4eosc-cluster
+
+    tutorials:
       endpoint: https://inference.cloud.ai4eosc.eu
       cluster_id: oscar-ai4eosc-cluster
 
@@ -82,4 +82,5 @@ mlflow:
     vo.ai4eosc.eu: https://mlflow.cloud.ai4eosc.eu/
     vo.imagine-ai.eu: https://mlflow.cloud.imagine-ai.eu/
     vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
-    training.egi.eu: https://mlflow.cloud.ai4eosc.eu/
+    kmd4eosc: https://mlflow.cloud.ai4eosc.eu/
+    tutorials: https://mlflow.cloud.ai4eosc.eu/

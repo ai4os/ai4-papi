@@ -26,7 +26,7 @@ rcreate = batch.create_deployment(
         },
         "storage": {
             "rclone_conf": "/srv/.rclone/rclone.conf",
-            "rclone_url": "https://share.services.ai4os.eu/remote.php/dav/files/EGI_Checkin-0000000000000000000000000000000000",
+            "rclone_url": "https://share.cloud.ai4eosc.eu/remote.php/dav/files/EGI_Checkin-0000000000000000000000000000000000",
             "rclone_vendor": "nextcloud",
             "rclone_user": "EGI_Checkin-0000000000000000000000000000000000",
             "rclone_password": "0000000000000000000000000000"
