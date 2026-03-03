@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from ai4papi import quotas, nomad, utils
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
+import ai4papi.routers.v1.stats.deployments as stats_router
 
 
 gpu_specs = utils.gpu_specs()
@@ -43,6 +44,12 @@ def get_config(
     tags = retrieve_docker_tags(image=image, repo=repo)
     conf["general"]["docker_tag"]["options"] = tags
     conf["general"]["docker_tag"]["value"] = tags[0]
+
+    # Add available datacenters
+    cluster_stats = stats_router.get_cluster_stats(vo)
+    conf["general"]["datacenter"]["options"] += list(
+        cluster_stats["datacenters"].keys()
+    )
 
     # Modify the resources limits for a given user or VO
     conf["hardware"] = quotas.limit_resources(

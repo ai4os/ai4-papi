@@ -249,6 +249,7 @@ def create_deployment(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+            "DATACENTER": user_conf["general"]["datacenter"],
             "PRIORITY": priority,
             "OWNER": auth_info["id"],
             "OWNER_NAME": auth_info["name"],
@@ -296,6 +297,13 @@ def create_deployment(
     usertask = module_patches.patch_nextcloud_mount(
         user_conf["general"]["docker_image"], usertask
     )
+
+    # If the user didn't provide a datacenter in the conf, remove that constraint from
+    # the job
+    if not user_conf["general"]["datacenter"]:
+        nomad_conf["Constraints"] = [
+            c for c in nomad_conf["Constraints"] if c["LTarget"] != "${node.datacenter}"
+        ]
 
     # Modify the GPU section
     if user_conf["hardware"]["gpu_num"] <= 0:
