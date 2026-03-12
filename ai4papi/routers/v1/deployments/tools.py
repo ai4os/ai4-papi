@@ -707,6 +707,9 @@ def create_deployment(
             if not user_conf["hardware"]["gpu_type"]:
                 usertask["Resources"]["Devices"][0]["Constraints"] = None
 
+    # Add affinity from greener datacenter
+    nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
+
     # Submit job
     r = nomad.create_deployment(nomad_conf)
 

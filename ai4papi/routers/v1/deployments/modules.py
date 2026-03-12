@@ -289,6 +289,9 @@ def create_deployment(
     # Convert template to Nomad conf
     nomad_conf = nomad.load_job_conf(nomad_conf)
 
+    # Add affinity from greener datacenter
+    nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
+
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
     usertask = [t for t in tasks if t["Name"] == "main"][0]
 
