@@ -49,49 +49,45 @@ job "snapshot-${JOB_UUID}" {
         args = ["-c", <<EOF
 #!/bin/bash
 
+size_limit=$((${SIZE_LIMIT_GB} * 1024 * 1024 * 1024))  # convert to bytes
+
 if ! command -v jq &> /dev/null; then
-  echo "Instalando jq..."
+  echo "Installing jq..."
   sudo apt update
   sudo apt install -y jq
 fi
 
-input_job_id=${TARGET_JOB_ID}
-
 container_ids=$(sudo docker ps -q)
-
-size_limit=$((${SIZE_LIMIT_GB} * 1024 * 1024 * 1024))  # convert to bytes
 
 for container_id in $container_ids; do
 
-        task_name=$(sudo docker exec "$container_id" printenv NOMAD_TASK_NAME)
+  task_name=$(sudo docker exec "$container_id" printenv NOMAD_TASK_NAME)
 
+  if [ "$task_name" == "main" ]; then
 
-        if [ "$task_name" == "main" ]; then
+    job_id=$(sudo docker exec "$container_id" printenv NOMAD_JOB_ID)
 
-                  job_id=$(sudo docker exec "$container_id" printenv NOMAD_JOB_ID)
+    if [ "$job_id" == "${TARGET_JOB_ID}" ]; then
 
-                  if [ "$job_id" == "$input_job_id" ]; then
+      container_size=$(sudo docker inspect --size --format='{{.SizeRootFs}}' "$container_id")
+      echo "Target details:"
+      echo "* Job UUID: $job_id"
+      echo "* Task name: $task_name"
+      echo "* Container ID: $container_id"
+      echo "* Container size: $((container_size / (1024 * 1024 * 1024))) GB"
 
-                          echo "$container_id"
+      if [ "$container_size" -gt "$size_limit" ]; then
+        echo "Error: Snapshot size limit is ${SIZE_LIMIT_GB} GB."
+        exit 1
+      else
+        exit 0
+      fi
 
-                          container_size=$(sudo docker inspect --size --format='{{.SizeRootFs}}' "$container_id")
-
-                          echo "$container_size"
-
-                          if [ "$container_size" -gt "$size_limit" ]; then
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB, limit is ${SIZE_LIMIT_GB} GB."
-                                  exit 1
-                          else
-                                  echo "Container $container_id with NOMAD_JOB_ID $job_id size is $((container_size / (1024 * 1024 * 1024))) GB."
-                                  exit 0
-                          fi
-
-                  fi
-
-        fi
+    fi
+  fi
 done
 
-echo "There is no container with NOMAD_JOB_ID: $input_job_id"
+echo "There is no container with NOMAD_JOB_ID: ${TARGET_JOB_ID}"
 exit 1
 EOF
         ]
@@ -113,54 +109,38 @@ EOF
         args = ["-c", <<EOF
 #!/bin/bash
 
-
-input_job_id=${TARGET_JOB_ID}
-
 container_ids=$(sudo docker ps -q)
 
 for container_id in $container_ids; do
 
-        task_name=$(sudo docker exec "$container_id" printenv NOMAD_TASK_NAME)
+  task_name=$(sudo docker exec "$container_id" printenv NOMAD_TASK_NAME)
 
-        if [ "$task_name" == "main" ]; then
+  if [ "$task_name" == "main" ]; then
 
-                job_id=$(sudo docker exec "$container_id" printenv NOMAD_JOB_ID)
+    job_id=$(sudo docker exec "$container_id" printenv NOMAD_JOB_ID)
 
-                if [ "$job_id" == "$input_job_id" ]; then
+    if [ "$job_id" == "${TARGET_JOB_ID}" ]; then
 
-                        echo "Container ID: $container_id"
-                        echo "Creating a snapshot of docker container"
+      DOCKER_IMAGE_NAME="registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}"
 
-                        sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SUBMIT_TIME}" VO="${VO}"' $container_id ${FORMATTED_OWNER}
+      echo "Creating a snapshot of docker container"
+      sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SUBMIT_TIME}" VO="${VO}"' $container_id $DOCKER_IMAGE_NAME
 
-                        echo "Login on the registry"
+      echo "Login on the registry"
+      echo "${HARBOR_ROBOT_PASSWORD}" | sudo docker login registry.cloud.ai4eosc.eu --username "${HARBOR_ROBOT_USER}" --password-stdin
 
-                        username='${HARBOR_ROBOT_USER}'
-                        password='${HARBOR_ROBOT_PASSWORD}'
+      echo "Uploading image to registry"
+      sudo docker push "$DOCKER_IMAGE_NAME"
+      push_exit_code=$?
+      sudo docker image rm "$DOCKER_IMAGE_NAME"
+      if [ "$push_exit_code" -ne 0 ]; then
+        exit "$push_exit_code"
+      fi
 
-                        echo "$password" | sudo docker login https://registry.cloud.ai4eosc.eu --username "$username" --password-stdin
-
-                        echo "Uploading image to registry"
-
-                        sudo docker tag ${FORMATTED_OWNER} registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-
-                        sudo docker tag ${FORMATTED_OWNER} registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-
-                        if ! sudo docker push registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}; then
-                            sudo docker image rm registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-                            sudo docker image rm ${FORMATTED_OWNER}:latest
-                            exit 1
-                        fi
-
-                        sudo docker image rm registry.cloud.ai4eosc.eu/user-snapshots/${FORMATTED_OWNER}:${TARGET_JOB_ID}_${TIMESTAMP}
-                        sudo docker image rm ${FORMATTED_OWNER}:latest
-
-                fi
-        fi
+    fi
+  fi
 done
 exit 0
-
-
 EOF
         ]
       }
