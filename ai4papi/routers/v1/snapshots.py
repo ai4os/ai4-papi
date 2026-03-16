@@ -15,7 +15,6 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 from harborapi import HarborClient
-from nomad.api import exceptions
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
@@ -195,10 +194,7 @@ def delete_snapshot(
     auth.check_authorization(auth_info, vo)
 
     # Check is the snapshot is in the "completed" list (Harbor)
-    snapshots = get_harbor_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
     if snapshot_uuid in snapshot_ids:
         _ = client.delete_artifact(
@@ -209,40 +205,15 @@ def delete_snapshot(
         return {"status": "success"}
 
     # Check if the snapshot is in the "in progress" list (Nomad)
-    snapshots = get_nomad_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_nomad_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
     if snapshot_uuid in snapshot_ids:
         idx = snapshot_ids.index(snapshot_uuid)
-
-        # Check the deployment exists
-        try:
-            j = Nomad.job.get_job(
-                id_=snapshots[idx]["nomad_ID"],
-                namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-            )
-        except exceptions.URLNotFoundNomadException:
-            raise HTTPException(
-                status_code=400,
-                detail="No deployment exists with this uuid.",
-            )
-
-        # Check job does belong to owner
-        if j["Meta"] and auth_info["id"] != j["Meta"].get("owner", ""):
-            raise HTTPException(
-                status_code=400,
-                detail="You are not the owner of that deployment.",
-            )
-
-        # Delete deployment
         Nomad.job.deregister_job(
             id_=snapshots[idx]["nomad_ID"],
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
             purge=True,
         )
-
         return {"status": "success"}
 
     # If it not in either of those two lists, then the UUID is wrong
