@@ -73,16 +73,10 @@ def get_snapshots(
     snapshots = []
     for vo in vos:
         # Retrieve the completed snapshots from Harbor
-        snapshots += get_harbor_snapshots(
-            owner=auth_info["id"],
-            vo=vo,
-        )
+        snapshots += get_harbor_snapshots(owner=auth_info["id"], vo=vo)
 
         # Retrieve pending/failed snapshots from Nomad
-        snapshots += get_nomad_snapshots(
-            owner=auth_info["id"],
-            vo=vo,
-        )
+        snapshots += get_nomad_snapshots(owner=auth_info["id"], vo=vo)
 
     return snapshots
 
@@ -108,10 +102,7 @@ def create_snapshot(
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
     # Check the user is within our limits
-    snapshots = get_harbor_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     total_size = sum([s["size"] for s in snapshots])
     if total_size > (TOTAL_LIMIT_GB * 10**9):
         raise HTTPException(
@@ -289,20 +280,14 @@ def get_nomad_snapshots(
         + "Meta is not empty and "
         + f'Meta.owner == "{owner}"'
     )
-    jobs = Nomad.jobs.get_jobs(
-        namespace=namespace,
-        filter_=job_filter,
-    )
+    jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
 
     # Retrieve info for those jobs
     # user_jobs = []
     snapshots = []
     for j in jobs:
         # Get job to retrieve the metadata
-        job_info = Nomad.job.get_job(
-            id_=j["ID"],
-            namespace=namespace,
-        )
+        job_info = Nomad.job.get_job(id_=j["ID"], namespace=namespace)
 
         # Generate snapshot info template
         tmp = {
@@ -318,20 +303,12 @@ def get_nomad_snapshots(
         }
 
         # Get allocation to retrieve the task status
-        allocs = Nomad.job.get_allocations(
-            namespace=namespace,
-            id_=j["ID"],
-        )
+        allocs = Nomad.job.get_allocations(namespace=namespace, id_=j["ID"])
 
         # Reorder allocations based on recency
         dates = [a["CreateTime"] for a in allocs]
-        allocs = [
-            x
-            for _, x in sorted(
-                zip(dates, allocs),
-                key=lambda pair: pair[0],
-            )
-        ][::-1]  # more recent first
+        allocs = [x for _, x in sorted(zip(dates, allocs), key=lambda pair: pair[0])]
+        allocs = allocs[::-1]  # more recent first
 
         # Retrieve tasks
         tasks = (
