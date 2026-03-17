@@ -12,7 +12,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, wattprint
+from ai4papi import auth, wattnet
 import ai4papi.conf as papiconf
 from ai4papi.nomad.common import Nomad
 
@@ -27,6 +27,8 @@ security = HTTPBearer()
 main_dir = Path(__file__).resolve().parent
 
 cluster_stats = None
+
+green_director = wattnet.GreenDirector(datacenters=papiconf.datacenters)
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
@@ -151,29 +153,6 @@ def get_proper_allocation(allocs):
     return allocs[idx]["ID"]
 
 
-@cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
-def load_datacenters():
-    # Check if datacenter info file is available
-    pth = papiconf.main_path.parent / "var" / "datacenters.csv"
-
-    # Load datacenter info
-    datacenters = {}
-    with open(pth, "r") as f:
-        reader = csv.DictReader(f, delimiter=",")
-        dc_keys = reader.fieldnames.copy()
-        dc_keys.remove("name")
-        for row in reader:
-            for k, v in row.items():
-                if k == "name":
-                    name = v
-                    datacenters[name] = {k: 0 for k in dc_keys}
-                    datacenters[name]["nodes"] = {}
-                else:
-                    datacenters[name][k] = float(v)
-
-    return datacenters
-
-
 @router.get("/cluster")
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
@@ -235,6 +214,11 @@ def get_cluster_stats(
                 else:
                     stats["cluster"][k] += v
 
+    # Compute green affinities
+    affinities = green_director.rank(stats["datacenters"].keys())
+    for dc_name, affinity in affinities.items():
+        stats["datacenters"][dc_name]["affinity"] = affinity
+
     return stats
 
 
@@ -245,6 +229,8 @@ def get_cluster_stats_bg():
     The TTL of this task should be >= than the repeat frequency of the thread defined
     in main.py.
     """
+    # Start from default datacenters dict
+    datacenters = copy.deepcopy(papiconf.datacenters)
 
     resources = [
         "jobs_num",
@@ -258,13 +244,11 @@ def get_cluster_stats_bg():
         "disk_total",
         "disk_used",
     ]
-    datacenters = load_datacenters()  # available datacenters info
 
-    # For each datacenter, retrieve the last carbon footprint
-    for k, v in datacenters.items():
-        v["energy_quality"] = wattprint.last_footprint(
-            lon=v["lon"], lat=v["lat"], location=k
-        )
+    # Retrieve datacenter footprints
+    green_director.retrieve_footprints()
+    for dc_name, metrics in green_director.metrics.items():
+        datacenters[dc_name]["footprints"] = metrics
 
     # Init stats
     stats = {
