@@ -271,7 +271,7 @@ class Catalog:
         if item_name not in items.keys():
             raise HTTPException(
                 status_code=404,
-                detail=f"Item {item_name} not in catalog: {list(items.keys())}",
+                detail=f"Item {item_name} not in the catalog: https://github.com/{self.repo}",
             )
 
         # Retrieve metadata from default branch
