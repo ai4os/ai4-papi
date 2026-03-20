@@ -160,6 +160,8 @@ with open(pth, "r") as f:
                 name = v
                 datacenters[name] = {k: 0 for k in dc_keys}
                 datacenters[name]["nodes"] = {}
+            elif k == "country":
+                datacenters[name][k] = v
             else:
                 datacenters[name][k] = float(v)
 
