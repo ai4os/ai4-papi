@@ -103,7 +103,11 @@ class GreenDirector:
         token = self._retrieve_token()
         headers = {"Authorization": f"Bearer {token}"}
         response = session.get(url, headers=headers, params=params)
-        response.raise_for_status()
+        if not response.ok:
+            print(
+                f"[wattnet] Failed to retrieve footprint for coordinates ({lat}, {lon})"
+            )
+            return []
         return response.json()
 
     def retrieve_footprints(self):
@@ -118,23 +122,21 @@ class GreenDirector:
         start = end - datetime.timedelta(days=7)
 
         for k, v in self.datacenters.items():
-            try:
-                data = self._fetch_footprint_data(v["lat"], v["lon"])
+            data = self._fetch_footprint_data(v["lat"], v["lon"])
 
-                # For each footprint type, we concatenate all timeseries, irrespectively of
-                # whether they are [valid=True] (meaning their values are final) or
-                # [valid=False] (meaning that they are an estimation, subject to change)
-                for footprint in data:
-                    fp_type = footprint["footprint_type"]
-                    series = []
-                    for sublist in footprint["series"]:
-                        series += sublist["values"]
-                    self.metrics[k][fp_type] = series
+            # For each footprint type, we concatenate all timeseries, irrespectively of
+            # whether they are [valid=True] (meaning their values are final) or
+            # [valid=False] (meaning that they are an estimation, subject to change)
+            for footprint in data:
+                fp_type = footprint["footprint_type"]
+                series = []
+                for sublist in footprint["series"]:
+                    series += sublist["values"]
+                self.metrics[k][fp_type] = series
 
-            except Exception as e:
-                print(f"[wattnet] Failed to retrieve footprint for {k}: {e}")
-
-                # We return timeseries with default values
+            # For datacenters outside Europe (e.g. Tubitak), WattNet offers no data
+            # Therefore we return timeseries with default values
+            if not data:
                 round_end = end.replace(
                     minute=end.minute - (end.minute % 15), second=0, microsecond=0
                 )
