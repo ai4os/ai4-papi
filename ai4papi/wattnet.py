@@ -87,8 +87,9 @@ class GreenDirector:
     @cached(cache=TTLCache(maxsize=1024, ttl=15 * 60))
     def _fetch_footprint_data(self, lat, lon):
         """
-        Fetch footprint data from WattNet for a specific location.
-        Cached outside the class because other.
+        Fetch footprint data from WattNet for a specific lat-lon location.
+        WattPrint has a temporal resolution of 15 minutes, so we cache for that
+        amount of time.
         """
         url = f"{WATTPRINT_URL}/v1/footprints"
         end = datetime.datetime.now()
@@ -112,9 +113,7 @@ class GreenDirector:
 
     def retrieve_footprints(self):
         """
-        Retrieve the last footprint for a given lon-lat location.
-        WattPrint has a temporal resolution of 15 minutes, so we cache for that
-        amount of time.
+        Retrieve the footprints for all datacenters.
         If we are unable to retrieve a value (e.g. because location is outside Europe),
         we return a reasonable default value.
         """
@@ -196,8 +195,8 @@ class GreenDirector:
     def rank(self, subset: list = None):
         """
         Compute affinities for datacenter.
-        We allow to specify a subset of datacenters, to match the fact that each user
-        only sees the datacenters belonging to their VO.
+        We allow to specify a subset of datacenters, to account for the fact that
+        each user only sees the datacenters belonging to their VO.
         """
         if subset is None or not subset:
             subset = self.datacenters.keys()
