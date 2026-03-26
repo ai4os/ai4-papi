@@ -2,6 +2,7 @@
 Manage configurations of the API.
 """
 
+import csv
 from distutils.util import strtobool
 import os
 from pathlib import Path
@@ -145,6 +146,24 @@ nmd = load_nomad_job(paths["conf"] / "snapshots" / "nomad.hcl")
 SNAPSHOTS = {
     "nomad": nmd,
 }
+
+# Load datacenter info file
+pth = main_path.parent / "var" / "datacenters.csv"
+datacenters = {}
+with open(pth, "r") as f:
+    reader = csv.DictReader(f, delimiter=",")
+    dc_keys = reader.fieldnames.copy()
+    dc_keys.remove("name")
+    for row in reader:
+        for k, v in row.items():
+            if k == "name":
+                name = v
+                datacenters[name] = {k: 0 for k in dc_keys}
+                datacenters[name]["nodes"] = {}
+            elif k == "country":
+                datacenters[name][k] = v
+            else:
+                datacenters[name][k] = float(v)
 
 # Retrieve git info from PAPI, to show current version in the docs
 papi_commit = subprocess.run(
