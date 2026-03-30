@@ -421,17 +421,21 @@ def delete_deployment(
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=1 * 60 * 60))
-def get_gpu_models(vo):
+def get_gpu_models(vo: str = None):
     """
-    Retrieve available GPU models in the cluster, filtering nodes by VO.
+    Retrieve available GPU models in the cluster, optionally filtering nodes by VO.
+    If vo is None, do not filter by VO.
     """
     gpu_models = set()
     nodes = Nomad.nodes.get_nodes(resources=True)
     for node in nodes:
-        # Discard nodes that don't belong to the requested VO
+        # Discard nodes that don't belong to the requested VO, if vo is specified
         meta = Nomad.node.get_node(node["ID"])["Meta"]
-        if papiconf.MAIN_CONF["nomad"]["namespaces"][vo] not in meta["namespace"]:
-            continue
+        if vo is not None:
+            if papiconf.MAIN_CONF["nomad"]["namespaces"][vo] not in meta.get(
+                "namespace", ""
+            ):
+                continue
 
         # Discard GPU models of nodes that are not eligible
         if node["SchedulingEligibility"] != "eligible":

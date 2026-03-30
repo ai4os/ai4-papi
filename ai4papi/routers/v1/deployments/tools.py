@@ -600,6 +600,16 @@ def create_deployment(
                 f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
             )
 
+            # Show error message if user does not have T4 GPU available in their VO
+            models = nomad.common.get_gpu_models(vo)
+            if "Tesla T4" not in models:
+                raise HTTPException(
+                    status_code=405,
+                    detail="The deployment of this tool currently requires NVIDIA T4 GPUs,"
+                    "which are not currently not available in your Virtual Organization."
+                    f"Available GPU models: {models}.",
+                )
+
             # Configure VLLM args
             model_id = user_conf["llm"]["vllm_model_id"]
             vllm_args += ["--model", model_id]
