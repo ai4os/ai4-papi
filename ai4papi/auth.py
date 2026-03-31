@@ -91,18 +91,21 @@ def check_authorization(
     Check that the user has permissions to use the resource (usually "ap-u")
     and check he indeed belongs to the requested VO.
     """
-    if access_level not in auth_info["groups"].keys():
-        raise HTTPException(
-            status_code=401,
-            detail=f"Your user has not the required access level to use this resource: {access_level}.",
-        )
+    # Retrieve the user access levels for that particular VO
+    if requested_vo:
+        user_levels = [k for k, v in auth_info["groups"].items() if requested_vo in v]
+    else:
+        user_levels = [k for k, v in auth_info["groups"].items()]
 
-    user_vos = auth_info["groups"][access_level]
-    if requested_vo and (requested_vo not in user_vos):
-        raise HTTPException(
-            status_code=401,
-            detail=f"The requested Virtual Organization ({requested_vo}) does not match with any of your available VOs for that access level: {user_vos}.",
+    # Check if the user highest level is at least equal to the requested level
+    highest = get_highest_level(user_levels)
+    if AI4OS_LEVELS.index(highest) < AI4OS_LEVELS.index(access_level):
+        msg = (
+            "Your user has not the required access level to use this resource:\n"
+            f"* Current level: {highest}\n"
+            f"* Required level: {access_level}"
         )
+        raise HTTPException(status_code=401, detail=msg)
 
 
 def get_highest_level(user_levels: list):
