@@ -131,6 +131,8 @@ class GreenDirector:
                 series = []
                 for sublist in footprint["series"]:
                     series += sublist["values"]
+                # Make sure the joined timeseries is sorted by timestamp
+                series = sorted(series, key=lambda data: data[0])
                 self.metrics[k][fp_type] = series
 
             # For datacenters outside Europe (e.g. Tubitak), WattNet offers no data
