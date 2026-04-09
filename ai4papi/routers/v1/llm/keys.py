@@ -81,7 +81,7 @@ def get_api_keys(authorization=Depends(security)):
     # If user does not exist, create it and return no keys
     if not user_exists:
         data = {"user_id": user_id, "user_email": user_email, "teams": [top_level]}
-        session.post(f"{LITELLM_URL}/user/new", json=data)
+        r = session.post(f"{LITELLM_URL}/user/new", json=data)
         
         # LiteLLM user is created with a key with an empty name, so we delete it
         # to avoid confusion and errors (due to the empty name)
