@@ -8,23 +8,27 @@ import json
 import requests
 import os
 import statistics
+import warnings
 
 from cachetools import cached, TTLCache
 
 
 session = requests.Session()
 
-WATTPRINT_URL = "https://api.wattnet.eu"
-WATTPRINT_EMAIL = "bot@ai4eosc.eu"
-WATTPRINT_PASS = os.environ.get("WATTPRINT_PASSWORD")
-if not WATTPRINT_PASS:
-    print("You should define a WATTPRINT_PASSWORD")
+WATTNET_URL = "https://api.wattnet.eu"
+WATTNET_EMAIL = "bot@ai4eosc.eu"
+WATTNET_PASS = os.environ.get("WATTNET_PASSWORD")
+if not WATTNET_PASS:
+    print("You should define a WATTNET_PASSWORD")
 
 
 class GreenDirector:
     # Define sensible default footprint values for datacenter outside WattNet scope (Europe)
-    DEFAULT_ENERGY_QUALITY = 301  # in gCO2/kWh
-    DEFAULT_WATER_USAGE = 12  # in L/kWh
+    DEFAULTS = {
+        "carbon": 301,  # default energy quality in gCO2/kWh
+        "water": 12,  # default water usage in L/kWh
+        "green-score": 50,  # default green score (combining carbon and water).
+    }
 
     def __init__(self, datacenters: dict[str, dict], algorithm: str = "linear_rank"):
         """
@@ -75,11 +79,11 @@ class GreenDirector:
     @cached(cache=TTLCache(maxsize=1024, ttl=20 * 60 * 60))
     def _retrieve_token(self):
         """
-        WattPrint tokens last only one day, so we cache the response for 20 hours.
+        WattNet tokens last only one day, so we cache the response for 20 hours.
         """
-        url = f"{WATTPRINT_URL}/token-request/get_token"
+        url = f"{WATTNET_URL}/token-request/get_token"
         headers = {"Content-Type": "application/json"}
-        data = {"email": WATTPRINT_EMAIL, "password": WATTPRINT_PASS}
+        data = {"email": WATTNET_EMAIL, "password": WATTNET_PASS}
         response = requests.post(url, headers=headers, data=json.dumps(data))
         response.raise_for_status()
         return response.json()["access_token"]
@@ -87,11 +91,10 @@ class GreenDirector:
     @cached(cache=TTLCache(maxsize=1024, ttl=15 * 60))
     def _fetch_footprint_data(self, lat, lon):
         """
-        Fetch footprint data from WattNet for a specific lat-lon location.
-        WattPrint has a temporal resolution of 15 minutes, so we cache for that
-        amount of time.
+        Fetch footprint data and green score data from WattNet for a specific
+        lat-lon location. WattNet has a temporal resolution of 15 minutes, so we
+        cache for that amount of time.
         """
-        url = f"{WATTPRINT_URL}/v1/footprints"
         end = datetime.datetime.now()
         start = end - datetime.timedelta(days=7)
         params = {
@@ -103,13 +106,22 @@ class GreenDirector:
         }
         token = self._retrieve_token()
         headers = {"Authorization": f"Bearer {token}"}
-        response = session.get(url, headers=headers, params=params)
-        if not response.ok:
-            print(
-                f"[wattnet] Failed to retrieve footprint for coordinates ({lat}, {lon})"
+
+        r1 = session.get(f"{WATTNET_URL}/v1/footprints", headers=headers, params=params)
+        r2 = session.get(
+            f"{WATTNET_URL}/v1/green-score", headers=headers, params=params
+        )
+        if not (r1.ok and r2.ok):
+            warnings.warn(
+                f"[wattnet] Failed to retrieve WattNet data for coordinates ({lat}, {lon})"
             )
             return []
-        return response.json()
+
+        footprints = r1.json()
+        score = r2.json()
+        score[0].update({"footprint_type": "green-score"})
+
+        return footprints + score
 
     def retrieve_footprints(self):
         """
@@ -144,17 +156,13 @@ class GreenDirector:
                 round_start = start.replace(
                     minute=start.minute - (start.minute % 15), second=0, microsecond=0
                 )
-                carbon_series = []
-                water_series = []
+                self.metrics[k] = {fp_type: [] for fp_type in self.DEFAULTS.keys()}
                 current = round_start
                 while current <= round_end:
                     ts = current.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    carbon_series.append([ts, self.DEFAULT_ENERGY_QUALITY])
-                    water_series.append([ts, self.DEFAULT_WATER_USAGE])
+                    for fp_type, default_value in self.DEFAULTS.items():
+                        self.metrics[k][fp_type].append([ts, default_value])
                     current += datetime.timedelta(minutes=15)
-
-                self.metrics[k]["carbon"] = carbon_series
-                self.metrics[k]["water"] = water_series
 
     @staticmethod
     def algorithm(func):
@@ -163,32 +171,51 @@ class GreenDirector:
         return func
 
     @algorithm.__func__
-    def _linear_rank(self, datacenters):
+    def _linear_rank(self, datacenters, metric: str = "green-score"):
         """
-        We map linearly a carbon footprint into a datacenter Nomad affinity.
-        It's an inverse relation:
+        We map linearly a footprint (weighted with datacenter PUE) into a datacenter
+        Nomad affinity.
+
+        In the case of a carbon/water footprint, it's an inverse linear relation:
         * Maximum carbon footprint should have minimum affinity (0)
         * Minimum carbon footprint should have maximum affinity (100)
 
-        Carbon footprint is computed as (energy quality * PUE).
+        In the case of a green score, it's a linear relation:
+        * Minimum green score should have minimum affinity (0)
+        * Maximum green score should have maximum affinity (100)
         """
+        if metric not in ["carbon", "water", "green-score"]:
+            raise Exception(f"Invalid metric: {metric}")
+
         # Affinity range
         af_min, af_max = 0, 100
 
         # Footprint range
         footprints = {}
         for k, v in datacenters.items():
-            mean_quality = statistics.mean([i[1] for i in self.metrics[k]["carbon"]])
-            footprints[k] = mean_quality * v["PUE"]
+            mean = statistics.mean([i[1] for i in self.metrics[k][metric]])
+            # In the case of carbon/water, high PUE should increase the footprint
+            if metric in ["carbon", "water"]:
+                footprints[k] = mean * v["PUE"]
+            # In the case of green score, high PUE should lower the score
+            elif metric in ["green-score"]:
+                footprints[k] = mean / v["PUE"]
         fp_min, fp_max = min(footprints.values()), max(footprints.values())
 
-        # Inverse linear mapping
+        # Compute affinity
         affinities = {}
         for k, x in footprints.items():
             if fp_min != fp_max:
-                affinities[k] = round(
-                    af_max + (af_min - af_max) * (x - fp_min) / (fp_max - fp_min)
-                )
+                # Inverse linear mapping
+                if metric in ["carbon", "water"]:
+                    affinities[k] = round(
+                        af_max + (af_min - af_max) * (x - fp_min) / (fp_max - fp_min)
+                    )
+                # Linear mapping
+                elif metric in ["green-score"]:
+                    affinities[k] = round(
+                        af_min + (af_max - af_min) * (x - fp_min) / (fp_max - fp_min)
+                    )
             else:  # avoid dividing by zero
                 affinities[k] = 0
 
