@@ -63,12 +63,23 @@ def get_api_keys(authorization=Depends(security)):
     current_levels = list(auth_info["groups"].keys())
     top_level = auth.get_highest_level(current_levels)
 
+    user_exists = False
+    user = {}
+    
     # Retrieve the LiteLLM user
-    r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
-    user = r.json()
+    try:
+        r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
+        
+        if r.status_code == 200:
+            user = r.json()
+            if user.get("user_info") and "user_id" in user["user_info"]:
+                user_exists = True
+                
+    except Exception as e:
+        pass 
 
     # If user does not exist, create it and return no keys
-    if "user_id" not in user["user_info"]:
+    if not user_exists:
         data = {"user_id": user_id, "user_email": user_email, "teams": [top_level]}
         session.post(f"{LITELLM_URL}/user/new", json=data)
         return [{}]
