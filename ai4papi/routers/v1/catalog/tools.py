@@ -71,6 +71,7 @@ def get_config(
         conf["general"]["model_id"]["options"] = models
         conf["general"]["model_id"]["value"] = models[0]
 
+    if item_name in ["ai4os-dev-env", "ai4os-ai4life-loader"]:
         # Fill with available GPU models in the cluster
         models = nomad.common.get_gpu_models(vo)
         if models:
