@@ -76,6 +76,44 @@ def run_rclone(command, storage_name, vo, token):
     return result
 
 
+@router.get("/{storage_name}/cat")
+def storage_cat(
+    vo: str,
+    storage_name: str,
+    subpath: str = "",
+    authorization=Depends(security),
+):
+    """
+    Returns the content of TXT file at a given subpath of the specified storage.
+    It is using RCLONE under-the-hood.
+
+    It is used for retrieve the logs of batch jobs to show them in the Dashboard.
+
+    Parameters:
+    * **vo**: Virtual Organization where you want to create your deployment
+    * **storage_name**: storage to parse.
+    * **subpath**: subpath to query
+    """
+    # Retrieve authenticated user info
+    auth_info = auth.get_user_info(token=authorization.credentials)
+    auth.check_authorization(auth_info, vo)
+
+    if storage_name:
+        # Sanitize user path (avoid security risk)
+        subpath = subpath.strip().split(" ")[0]
+        subpath = os.path.normpath(subpath).strip()
+
+        # Run RCLONE command
+        result = run_clone(
+            command=f"rclone cat rshare:/{subpath}",
+            storage_name=storage_name,
+            vo=vo,
+            token=authorization.credentials,
+        )
+
+        return result.stdout
+
+
 @router.get("/{storage_name}/ls")
 def storage_ls(
     vo: str,
