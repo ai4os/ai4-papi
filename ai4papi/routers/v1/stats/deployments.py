@@ -4,6 +4,7 @@ Return stats from the user/VO/cluster
 
 import copy
 import csv
+import time
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ security = HTTPBearer()
 main_dir = Path(__file__).resolve().parent
 
 cluster_stats = None
+cluster_stats_updated_at = None
 
 green_director = wattnet.GreenDirector(datacenters=papiconf.datacenters)
 
@@ -164,13 +166,24 @@ def get_cluster_stats(
     * the total capacity
     """
 
-    global cluster_stats
+    global cluster_stats, cluster_stats_updated_at
     if not cluster_stats:
         # If PAPI is used as a package, cluster_stats will be None, as the background
         # computation of `get_cluster_stats_bg()` is only started when PAPI is launched
         # with uvicorn.
         # So if None, we need to initialize it
         cluster_stats = get_cluster_stats_bg()
+
+    # If the background task fails for some reason (failed Nomad calls, failed WattNet
+    # calls, etc), the stats won't be updated and this endpoint will keep serving the
+    # same (old) stats, which can be misleading because it gives the impression that
+    # everything works normally. So we give a 1 hour grace time and then raise an Error.
+    if (time.time() - cluster_stats_updated_at) > 3600:  # 1 hour
+        raise HTTPException(
+            status_code=500,
+            detail="Cluster stats have not been updated for more than 1 hour.",
+        )
+
     stats = copy.deepcopy(cluster_stats)
 
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
@@ -218,6 +231,11 @@ def get_cluster_stats(
     affinities = green_director.rank(stats["datacenters"].keys())
     for dc_name, affinity in affinities.items():
         stats["datacenters"][dc_name]["affinity"] = affinity
+
+    # Add update time
+    stats["updated_at"] = (
+        datetime.fromtimestamp(cluster_stats_updated_at).isoformat() + "Z"
+    )
 
     return stats
 
@@ -401,7 +419,8 @@ def get_cluster_stats_bg():
                     g_stats["gpu_total"] = n_stats["gpu_used"]
 
     # Set the new shared variable
-    global cluster_stats
+    global cluster_stats, cluster_stats_updated_at
     cluster_stats = stats
+    cluster_stats_updated_at = time.time()
 
     return cluster_stats
