@@ -158,12 +158,17 @@ def get_proper_allocation(allocs):
 @router.get("/cluster")
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
-    vo: str,
+    vo: str = None,
 ):
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
     * the total capacity
+
+    Parameters
+    ----------
+    vo: string
+      Keep only the nodes supporting a specific VO. If not provided, returns all nodes.
     """
 
     global cluster_stats, cluster_stats_updated_at
@@ -186,13 +191,13 @@ def get_cluster_stats(
 
     stats = copy.deepcopy(cluster_stats)
 
-    namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+    namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo] if vo else "all"
 
     for k, v in stats["datacenters"].copy().items():
         # Filter out nodes that do not support the given VO
         nodes = {}
         for n_id, n_stats in v["nodes"].items():
-            if namespace in n_stats["namespaces"]:
+            if namespace == "all" or namespace in n_stats["namespaces"]:
                 nodes[n_id] = n_stats
 
         # Ignore datacenters with no nodes
