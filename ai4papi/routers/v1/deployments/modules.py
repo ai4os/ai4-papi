@@ -24,11 +24,8 @@ router = APIRouter(
 )
 security = HTTPBearer()
 
-
-# When deploying in production, force the definition of a provenance token
-provenance_token = os.environ.get("PAPI_PROVENANCE_TOKEN", None)
-if not papiconf.IS_DEV and not provenance_token:
-    raise Exception('You need to define the variable "PAPI_PROVENANCE_TOKEN".')
+# Provenance token is mandatory in production
+provenance_token = papiconf.load_env("PROVENANCE_TOKEN")
 
 
 @router.get("")

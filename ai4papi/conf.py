@@ -10,7 +10,11 @@ from string import Template
 import subprocess
 import warnings
 
+from dotenv import load_dotenv
 import yaml
+
+
+load_dotenv()
 
 # Check if we are developing in dev mode or production mode, to disable parts of the
 # code that are compute intensive (eg. disables calls to Github API)

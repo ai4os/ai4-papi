@@ -20,7 +20,7 @@ import ai4papi.conf as papiconf
 session = requests.Session()
 
 # Retrieve tokens for better rate limit
-github_token = os.environ.get("PAPI_GITHUB_TOKEN", None)
+github_token = os.environ.get("GITHUB_TOKEN", None)
 
 
 def update_values_conf(submitted, reference):

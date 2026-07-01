@@ -53,6 +53,7 @@ dependencies = [
     "pre-commit>=4.0.1,<=5.0",
     "openai>=1.70.0,<2.0",
     "python-multipart>=0.0.9,<1.0",
+    "python-dotenv>=1.2.2,<2.0",
 ]
 
 [tool.setuptools.dynamic]
