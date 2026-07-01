@@ -55,6 +55,10 @@ def get_chat_response(
     Handle chat response, manage errors during completion creation
     """
 
+    # We temporarily disable this endpoint because we no longer use the OpenwebUI chat
+    # endpoint. We are reimplementing this with LiteLLM + Milvus database.
+    raise HTTPException(status_code=503, detail="Endpoint temporarily disabled")
+
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, access_level="ap-a")
