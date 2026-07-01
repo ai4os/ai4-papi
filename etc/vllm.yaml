@@ -14,6 +14,60 @@ models:
     needs_HF_token: False
     args: ['--quantization', 'awq']
 
+  Qwen/Qwen3-4B-AWQ:
+    name: 'Qwen3-4B-AWQ'
+    description: 'A 4B parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
+  Qwen/Qwen3-8B-AWQ:
+    name: 'Qwen3-8B-AWQ'
+    description: 'A 8B parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
+  Qwen/Qwen3-14B-AWQ:
+    name: 'Qwen3-14B-AWQ'
+    description: 'A 14B parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
+  Qwen/Qwen3-0.6B:
+    name: 'Qwen3-0.6B'
+    description: 'A 0.6 parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
+  Qwen/Qwen3-1.7B:
+    name: 'Qwen3-1.7B'
+    description: 'A 1.7 parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
+  Qwen/Qwen3-4B:
+    name: 'Qwen3-4B'
+    description: 'A 4 parameter instruction-tuned model from the Qwen 3 series, optimized for reasoning, instruction-following, agent capabilities, and multilingual support.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '32.7K'
+    needs_HF_token: False
+    args: ['--dtype', 'float16', '--max-model-len', '8192']
+
   Qwen/Qwen2.5-Coder-7B-Instruct-AWQ:
     name: 'Qwen2.5-Coder-7B-Instruct-AWQ'
     description: 'A 7B parameter model specialized in code generation and understanding, instruction-tuned for programming-related tasks.'
