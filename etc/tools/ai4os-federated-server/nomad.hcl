@@ -63,6 +63,14 @@ job "tool-fl-${JOB_UUID}" {
     weight    = -100  # anti-affinity for ai4eosc clients
   }
 
+  # Sometimes the user wants the deployment to land in a particular datacenter to comply
+  # with ISO or privacy requirements (i.e. data must not leave the datacenter)
+  constraint {
+    attribute = "${node.datacenter}"
+    operator  = "="
+    value     = "${DATACENTER}"
+  }
+
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
   affinity {
