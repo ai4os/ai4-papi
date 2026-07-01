@@ -112,7 +112,7 @@ def get_api_keys(authorization=Depends(security)):
     # Build final key dict
     out = [
         {
-            "id": item["key_alias"].split("_")[-1],
+            "id": "_".join(item["key_alias"].split("_")[1:]),
             "created_at": item["created_at"],
             "team_id": top_level,
             "expires": item["expires"],
