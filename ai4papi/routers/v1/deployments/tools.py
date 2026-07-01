@@ -601,7 +601,7 @@ def create_deployment(
             )
 
             # Show error message if user does not have T4 GPU available in their VO
-            models = nomad.common.get_gpu_models(vo)
+            models = nomad.get_gpu_models(vo)
             if "Tesla T4" not in models:
                 raise HTTPException(
                     status_code=405,
