@@ -26,7 +26,9 @@ created = snapshots.create_snapshot(
 assert isinstance(created, dict)
 assert "snapshot_ID" in created.keys()
 
-time.sleep(10)
+time.sleep(60)
+# we sleep 60s to make sure snapshot is in Harbor. No need to test deleting from Nomad
+# because the process is similar to deleting a standard module.
 
 # Retrieve all snapshots
 retrieved = snapshots.get_snapshots(
@@ -35,7 +37,6 @@ retrieved = snapshots.get_snapshots(
 )
 assert isinstance(retrieved, list)
 assert any([d["snapshot_ID"] == created["snapshot_ID"] for d in retrieved])
-# TODO: waiting 10s the snapshot is still probably queued in Nomad, we should wait more if we want to test also Harbor
 
 # Delete snapshot
 deleted = snapshots.delete_snapshot(
@@ -52,7 +53,7 @@ retrieved2 = snapshots.get_snapshots(
     vos=["vo.ai4eosc.eu"],
     authorization=SimpleNamespace(credentials=token),
 )
-assert isinstance(retrieved, list)
+assert isinstance(retrieved2, list)
 assert not any([d["snapshot_ID"] == created["snapshot_ID"] for d in retrieved2])
 
 # Delete deployment

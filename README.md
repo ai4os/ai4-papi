@@ -36,23 +36,12 @@ The Dashboards pointing to those APIs are respectively:
 
 ## Installation
 
-**Requirements**
-To use this library you need to have
-[Nomad](https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install)
-installed to be able to interact with deployments.
-Once you have Nomad installed you have to export the following variables with the proper
-local paths and http address:
-```bash
-export NOMAD_ADDR=https://some-public-ip:4646
-export NOMAD_CACERT=/path/to/tls/nomad-ca.pem
-export NOMAD_CLIENT_CERT=/path/to/tls/nomad-cli.pem
-export NOMAD_CLIENT_KEY=/path/to/tls/nomad-cli-key.pem
-```
-For this you will need to ask the administrator of the cluster for the proper certificates.
+**External requirements**
+* Install [Nomad](https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install) to be able to interact with deployments. In addition, you will need to ask the administrator of the cluster for the proper access certificates and include the as environment variables.
+* Install [RCLONE](https://rclone.org/) to be able to connect with storages.
+* Define the following [environment variables](./template.env). You can include them in a `.env` file in the root folder.
 
-PAPI also requires an [RCLONE](https://rclone.org/) installation, to be able to connect with storages.
-
-Once you are done you can proceed to install the module:
+Once you are done with the preliminary steps, you can proceed to install the module:
 ```bash
 pip install git+https://github.com/ai4eosc/ai4-papi.git
 ```

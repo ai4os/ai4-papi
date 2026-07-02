@@ -21,6 +21,7 @@ auth:
 
     - https://ai4life.cloud.ai4eosc.eu
     - https://kmd4eosc.cloud.ai4eosc.eu
+    - https://dashboard.kmd4eosc.pcss.pl
     - https://tutorials.cloud.ai4eosc.eu
     - http://localhost:8080
     - ${DASHBOARD_URL}

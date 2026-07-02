@@ -384,13 +384,22 @@ def create_deployment(
     nomad_conf["Affinities"][:] = [
         c
         for c in nomad_conf["Affinities"]
-        if not c
-        == {
-            "LTarget": "${meta.tags}",
-            "Operand": "regexp",
-            "RTarget": "cpu",
-            "Weight": 100,
-        }
+        if not (
+            c
+            == {
+                "LTarget": "${meta.tags}",
+                "Operand": "regexp",
+                "RTarget": "cpu",
+                "Weight": 100,
+            }
+            or c
+            == {
+                "LTarget": "${meta.tags}",
+                "Operand": "regexp",
+                "RTarget": "gpu",
+                "Weight": -100,
+            }
+        )
     ]
     # Batch jobs should have affinity for batch nodes (even if they can also be deployed
     # in compute nodes)

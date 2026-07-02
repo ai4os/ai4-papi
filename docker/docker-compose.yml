@@ -5,17 +5,8 @@ services:
     ai4-papi-prod:
         image: "registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod"
         restart: always
-        environment:
-            - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy
-            - NOMAD_ADDR=https://193.146.75.205:4646
-            - ACCOUNTING_PTH=/home/ai4-accounting
-            - ZENODO_TOKEN=*****************************
-            - PAPI_GITHUB_TOKEN=************************
-            - MAILING_TOKEN=****************************
-            - HARBOR_ROBOT_PASSWORD=********************
-            - PAPI_JENKINS_TOKEN=***********************
-            - PAPI_PROVENANCE_TOKEN=********************
-            - LLM_API_KEY=******************************
+        env_file:
+            - papi.env
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting
@@ -26,17 +17,8 @@ services:
     ai4-papi-dev:
         image: "registry.cloud.ai4eosc.eu/ai4os/ai4-papi:dev"
         restart: always
-        environment:
-            - FORWARDED_ALLOW_IPS=172.16.44.228  # needed when PAPI is deployed behind IFCA's ai4os-proxy
-            - NOMAD_ADDR=https://193.146.75.205:4646
-            - ACCOUNTING_PTH=/home/ai4-accounting
-            - ZENODO_TOKEN=*****************************
-            - PAPI_GITHUB_TOKEN=************************
-            - MAILING_TOKEN=****************************
-            - HARBOR_ROBOT_PASSWORD=********************
-            - PAPI_JENKINS_TOKEN=***********************
-            - PAPI_PROVENANCE_TOKEN=********************
-            - LLM_API_KEY=******************************
+        env_file:
+            - papi.env
         volumes:
             - /home/ubuntu/nomad-certs/nomad-federated:/home/nomad-certs
             - /home/ubuntu/ai4-accounting:/home/ai4-accounting

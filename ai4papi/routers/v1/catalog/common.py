@@ -46,7 +46,7 @@ session = requests.Session()
 security = HTTPBearer()
 
 # Jenkins token is mandatory in production
-JENKINS_TOKEN = papiconf.load_env("PAPI_JENKINS_TOKEN")
+JENKINS_TOKEN = papiconf.load_env("JENKINS_TOKEN")
 
 # Check conversions supported in ai4-metadata
 supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]

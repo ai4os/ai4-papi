@@ -30,8 +30,8 @@ authors:
     orcid: 'https://orcid.org/0000-0002-7662-4667'
 identifiers:
   - type: doi
-    value: 10.48550/arXiv.2512.16455
-    description: AI4EOSC paper (preprint)
+    value: 10.1016/j.future.2026.108672
+    description: AI4EOSC paper
 repository-code: 'https://github.com/ai4os/ai4-papi'
 url: 'https://docs.ai4eosc.eu/'
 license: Apache-2.0

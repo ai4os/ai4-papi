@@ -65,11 +65,19 @@ job "tool-devenv-${JOB_UUID}" {
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
+  # We also add an anti affinity to GPU nodes to make this preference even stronger
   affinity {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
     weight    = 100
+  }
+
+  affinity {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -100
   }
 
   # Avoid rescheduling the job if the job fails the first time
