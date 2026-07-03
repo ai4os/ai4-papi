@@ -3,7 +3,6 @@ import datetime
 import os
 import subprocess
 import types
-from typing import Tuple, Union
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -30,7 +29,7 @@ provenance_token = papiconf.load_env("PROVENANCE_TOKEN")
 
 @router.get("")
 def get_deployments(
-    vos: Union[Tuple, None] = Query(default=None),
+    vos: list[str] | None = Query(default=None),
     full_info: bool = Query(default=False),
     authorization=Depends(security),
 ):
@@ -48,16 +47,19 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -141,7 +143,7 @@ def get_deployment(
 @router.post("")
 def create_deployment(
     vo: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """

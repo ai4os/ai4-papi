@@ -22,6 +22,12 @@ if not WATTNET_PASS:
     print("You should define a WATTNET_PASSWORD")
 
 
+def algorithm(func):
+    """Decorator to mark a method as a ranking algorithm."""
+    func._is_algorithm = True
+    return func
+
+
 class GreenDirector:
     # Define sensible default footprint values for datacenter outside WattNet scope (Europe)
     DEFAULTS = {
@@ -72,7 +78,7 @@ class GreenDirector:
             )
 
         # Init vars
-        self.algorithm = algorithm
+        self.algorithm_name = algorithm
         self.datacenters = datacenters
         self.metrics = {k: {"carbon": [], "water": []} for k in datacenters.keys()}
 
@@ -164,13 +170,7 @@ class GreenDirector:
                         self.metrics[k][fp_type].append([ts, default_value])
                     current += datetime.timedelta(minutes=15)
 
-    @staticmethod
-    def algorithm(func):
-        """Decorator to mark a method as a ranking algorithm."""
-        func._is_algorithm = True
-        return func
-
-    @algorithm.__func__
+    @algorithm
     def _linear_rank(self, datacenters, metric: str = "green-score"):
         """
         We map linearly a footprint (weighted with datacenter PUE) into a datacenter
@@ -221,15 +221,15 @@ class GreenDirector:
 
         return affinities
 
-    def rank(self, subset: list = None):
+    def rank(self, subset: list | None = None):
         """
         Compute affinities for datacenter.
         We allow to specify a subset of datacenters, to account for the fact that
         each user only sees the datacenters belonging to their VO.
         """
         if subset is None or not subset:
-            subset = self.datacenters.keys()
+            subset = list(self.datacenters.keys())
 
         datacenters = {k: v for k, v in self.datacenters.items() if k in subset}
-        algorithm = getattr(self, f"_{self.algorithm}")
-        return algorithm(datacenters)
+        algorithm_func = getattr(self, f"_{self.algorithm_name}")
+        return algorithm_func(datacenters)

@@ -16,6 +16,11 @@ def get_config(
     item_name: str,
     vo: str,
 ):
+    """
+    Returns the default configuration (dict) for creating a deployment
+    for a specific item. It is prefilled with the appropriate
+    docker image and the available docker tags.
+    """
     # Check if module exists
     modules = self.get_items()
     if item_name not in modules.keys():

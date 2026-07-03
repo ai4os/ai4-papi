@@ -26,7 +26,6 @@ import configparser
 import importlib
 import json
 import re
-from typing import Tuple, Union
 import warnings
 import yaml
 
@@ -121,10 +120,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_filtered_list(
         self,
-        tags: Union[Tuple, None] = Query(default=None),
-        tags_any: Union[Tuple, None] = Query(default=None),
-        not_tags: Union[Tuple, None] = Query(default=None),
-        not_tags_any: Union[Tuple, None] = Query(default=None),
+        tags: tuple | None = Query(default=None),
+        tags_any: tuple | None = Query(default=None),
+        not_tags: tuple | None = Query(default=None),
+        not_tags_any: tuple | None = Query(default=None),
     ):
         """
         Retrieve a list of all items.
@@ -141,10 +140,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_summary(
         self,
-        tags: Union[Tuple, None] = Query(default=None),
-        tags_any: Union[Tuple, None] = Query(default=None),
-        not_tags: Union[Tuple, None] = Query(default=None),
-        not_tags_any: Union[Tuple, None] = Query(default=None),
+        tags: tuple | None = Query(default=None),
+        tags_any: tuple | None = Query(default=None),
+        not_tags: tuple | None = Query(default=None),
+        not_tags_any: tuple | None = Query(default=None),
     ):
         """
         Retrieve a list of all items' basic metadata.
@@ -455,6 +454,8 @@ class Catalog:
 
     def get_config(
         self,
+        item_name: str,
+        vo: str,
     ):
         """
         Returns the default configuration (dict) for creating a deployment

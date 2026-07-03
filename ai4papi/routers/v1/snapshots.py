@@ -9,7 +9,6 @@ The strategy for saving in Harbor is:
 
 from copy import deepcopy
 import datetime
-from typing import Tuple, Union
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -29,14 +28,11 @@ router = APIRouter(
 security = HTTPBearer()
 
 # Init the Harbor client
-if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
-    client = HarborClient(
-        url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
-        username=papiconf.HARBOR_USER,
-        secret=papiconf.HARBOR_PASS,
-    )
-else:
-    client = None
+client = HarborClient(
+    url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
+    username=papiconf.HARBOR_USER,
+    secret=papiconf.HARBOR_PASS,
+)
 
 # Use the Nomad cluster inited in nomad.common
 Nomad = nomad_common.Nomad
@@ -48,7 +44,7 @@ TOTAL_LIMIT_GB = 15
 
 @router.get("")
 def get_snapshots(
-    vos: Union[Tuple, None] = Query(default=None),
+    vos: list[str] | None = Query(default=None),
     authorization=Depends(security),
 ):
     """
@@ -62,16 +58,19 @@ def get_snapshots(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     snapshots = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve the completed snapshots from Harbor
         snapshots += get_harbor_snapshots(owner=auth_info["id"], vo=vo)
 

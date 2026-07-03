@@ -6,7 +6,6 @@ from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 import json
-from typing import Union
 import uuid
 import yaml
 
@@ -305,7 +304,7 @@ def make_service_definition(conf, vo):
 @router.post("/services")
 def create_service(
     vo: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -346,7 +345,7 @@ def create_service(
 def update_service(
     vo: str,
     service_name: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """

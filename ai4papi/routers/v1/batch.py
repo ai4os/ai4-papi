@@ -4,7 +4,6 @@ import json
 import os
 import subprocess
 import types
-from typing import Tuple, Union
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -27,7 +26,7 @@ security = HTTPBearer()
 
 @router.get("")
 def get_deployments(
-    vos: Union[Tuple, None] = Query(default=None),
+    vos: list[str] | None = Query(default=None),
     full_info: bool = Query(default=False),
     authorization=Depends(security),
 ):
@@ -45,16 +44,19 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve all jobs in namespace (including dead jobs)
         job_filter = (
             'Name matches "^batch" and '
@@ -140,7 +142,7 @@ def get_deployment(
 def create_deployment(
     vo: str,
     user_cmd: UploadFile,
-    conf: Union[str, None] = Form(None),
+    conf: str | None = Form(None),
     authorization=Depends(security),
 ):
     """
