@@ -2,10 +2,8 @@ from copy import deepcopy
 import datetime
 import json
 import os
-from string import Template
 import subprocess
 import types
-import typing
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -13,7 +11,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 
@@ -178,7 +176,7 @@ def create_deployment(
     # Load module configuration
     # To avoid duplicating too much code, we use the standard job deployment
     # and then remove/replace the parts we don't need
-    nomad_template = typing.cast(Template, deepcopy(papiconf.MODULES["nomad"]))
+    nomad_template = deepcopy(papiconf.MODULES["nomad"])
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
     if conf is not None:

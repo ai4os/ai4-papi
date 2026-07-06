@@ -9,17 +9,14 @@ The strategy for saving in Harbor is:
 
 from copy import deepcopy
 import datetime
-from string import Template
-import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 from harborapi import HarborClient
 
-from ai4papi import auth
+from ai4papi import auth, nomad
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad_common
 
 
 router = APIRouter(
@@ -36,8 +33,8 @@ client = HarborClient(
     secret=papiconf.HARBOR_PASS,
 )
 
-# Use the Nomad cluster inited in nomad.common
-Nomad = nomad_common.Nomad
+# Use the Nomad cluster inited in nomad utils
+Nomad = nomad.Nomad
 
 # Define limits for snapshots size
 INDIVIDUAL_LIMIT_GB = 10
@@ -115,10 +112,10 @@ def create_snapshot(
         )
 
     # Load module configuration
-    nomad_template = typing.cast(Template, deepcopy(papiconf.SNAPSHOTS["nomad"]))
+    nomad_template = deepcopy(papiconf.SNAPSHOTS["nomad"])
 
     # Get target job info
-    job_info = nomad_common.get_deployment(
+    job_info = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info["id"],
@@ -157,10 +154,10 @@ def create_snapshot(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad_common.load_job_conf(nomad_conf_str)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Submit job
-    _ = nomad_common.create_deployment(nomad_conf)
+    _ = nomad.create_deployment(nomad_conf)
 
     return {
         "status": "success",

@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer
 import natsort
 
 from ai4papi import quotas, utils
-import ai4papi.nomad.common as nomad_common
+import ai4papi.nomad as nomad_common
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
 

@@ -3,10 +3,10 @@ Manage configurations of the API.
 """
 
 import csv
+from distutils.util import strtobool
 import os
 from pathlib import Path
 from string import Template
-from typing import Any, TypedDict
 import subprocess
 import warnings
 
@@ -18,7 +18,7 @@ load_dotenv()
 
 # Check if we are developing in dev mode or production mode, to disable parts of the
 # code that are compute intensive (eg. disables calls to Github API)
-IS_PROD = os.getenv("IS_PROD", "false").lower() in ("true", "1", "t")
+IS_PROD = bool(strtobool(i)) if (i := os.getenv("IS_PROD")) else False
 IS_DEV = not IS_PROD
 
 
@@ -56,19 +56,22 @@ with open(paths["conf"] / "main.yaml", "r") as f:
     MAIN_CONF = yaml.safe_load(f)
 
 
-def load_nomad_job(fpath: Path) -> Template:
+def load_nomad_job(fpath):
     """
     Load default Nomad job configuration
     """
-    return Template(fpath.read_text(encoding="utf-8"))
+    with open(fpath, "r") as f:
+        raw_job = f.read()
+        job_template = Template(raw_job)
+    return job_template
 
 
-def load_yaml_conf(fpath: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def load_yaml_conf(fpath):
     """
     Load user customizable parameters
     """
     with open(fpath, "r") as f:
-        conf_full: dict[str, Any] = yaml.safe_load(f)
+        conf_full = yaml.safe_load(f)
 
     conf_values = {}
     for group_name, params in conf_full.items():
@@ -84,14 +87,9 @@ def load_yaml_conf(fpath: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 # Standard modules
-class AssetConfig(TypedDict):
-    nomad: Template
-    user: dict[str, Any]
-
-
 nmd = load_nomad_job(paths["conf"] / "modules" / "nomad.hcl")
 yml = load_yaml_conf(paths["conf"] / "modules" / "user.yaml")
-MODULES: AssetConfig = {
+MODULES = {
     "nomad": nmd,
     "user": {
         "full": yml[0],
@@ -102,7 +100,7 @@ MODULES: AssetConfig = {
 # Tools
 tool_dir = paths["conf"] / "tools"
 tool_list = [f for f in tool_dir.iterdir() if f.is_dir()]
-TOOLS: dict[str, AssetConfig] = {}
+TOOLS = {}
 for tool_path in tool_list:
     nmd = load_nomad_job(tool_path / "nomad.hcl")
     yml = load_yaml_conf(tool_path / "user.yaml")
@@ -128,8 +126,7 @@ for tool in TOOLS.keys():
         raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
 
 # OSCAR template
-
-OSCAR: dict[str, Any] = {}
+OSCAR = {}
 with open(paths["conf"] / "oscar" / "service.yaml", "r") as f:
     OSCAR["service"] = Template(f.read())
 yml = load_yaml_conf(paths["conf"] / "oscar" / "user.yaml")

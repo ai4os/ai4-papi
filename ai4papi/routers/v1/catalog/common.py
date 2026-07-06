@@ -30,6 +30,7 @@ import warnings
 import yaml
 
 import ai4_metadata
+import ai4_metadata.exceptions
 from cachetools import cached, TTLCache
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse

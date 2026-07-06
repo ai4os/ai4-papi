@@ -15,7 +15,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, wattnet
 import ai4papi.conf as papiconf
-from ai4papi.nomad.common import Nomad
+from ai4papi.nomad import Nomad
 
 
 router = APIRouter(

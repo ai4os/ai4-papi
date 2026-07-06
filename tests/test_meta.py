@@ -5,7 +5,7 @@ Test that PAPI is correctly configured
 # Check that the GPU models defined in the /var CSV file match those present in
 # the cluster
 
-from ai4papi.nomad.common import get_gpu_models
+from ai4papi.nomad import get_gpu_models
 from ai4papi.utils import gpu_specs
 
 cluster_models = get_gpu_models()

@@ -79,7 +79,7 @@ class ModulesCatalog(Catalog):
 
         # Fill with available GPU models in the cluster
         # Additionally filter out models that do not meet user requirements
-        nomad_models = nomad.common.get_gpu_models(vo)
+        nomad_models = nomad.get_gpu_models(vo)
         models = []
         for m in nomad_models:
             if m not in gpu_specs.keys():

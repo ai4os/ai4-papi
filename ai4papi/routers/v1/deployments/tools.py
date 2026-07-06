@@ -4,11 +4,9 @@ import os
 import json
 import re
 import secrets
-from string import Template
 import subprocess
 import types
 from types import SimpleNamespace
-import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +14,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, quotas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
@@ -221,7 +219,7 @@ def create_deployment(
             detail="Your VO doesn't allow to deploy this tool.",
         )
 
-    nomad_template = typing.cast(Template, deepcopy(papiconf.TOOLS[tool_name]["nomad"]))
+    nomad_template = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
     # TODO: given that some parts of the configuration are dynamically generated
     # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog

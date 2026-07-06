@@ -4,9 +4,7 @@ required). We deploy jobs by default in the AI4EOSC namespace.
 """
 
 from copy import deepcopy
-from string import Template
 import types
-import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +14,7 @@ from ai4papi import auth
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 
 
 router = APIRouter(
@@ -143,7 +141,7 @@ def create_deployment(
     docker_image = "/".join(registry.split("/")[-2:])
 
     # Load module configuration
-    nomad_template = typing.cast(Template, deepcopy(papiconf.TRY_ME["nomad"]))
+    nomad_template = deepcopy(papiconf.TRY_ME["nomad"])
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
