@@ -2,8 +2,10 @@ from copy import deepcopy
 import datetime
 import json
 import os
+from string import Template
 import subprocess
 import types
+import typing
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
@@ -176,7 +178,7 @@ def create_deployment(
     # Load module configuration
     # To avoid duplicating too much code, we use the standard job deployment
     # and then remove/replace the parts we don't need
-    nomad_conf = deepcopy(papiconf.MODULES["nomad"])
+    nomad_template = typing.cast(Template, deepcopy(papiconf.MODULES["nomad"]))
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
     if conf is not None:
@@ -228,7 +230,7 @@ def create_deployment(
     mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -262,7 +264,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
     usertask = [t for t in tasks if t["Name"] == "main"][0]

@@ -9,6 +9,8 @@ The strategy for saving in Harbor is:
 
 from copy import deepcopy
 import datetime
+from string import Template
+import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -113,7 +115,7 @@ def create_snapshot(
         )
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.SNAPSHOTS["nomad"])
+    nomad_template = typing.cast(Template, deepcopy(papiconf.SNAPSHOTS["nomad"]))
 
     # Get target job info
     job_info = nomad_common.get_deployment(
@@ -133,7 +135,7 @@ def create_snapshot(
 
     # Replace the Nomad job template
     now = datetime.datetime.now()
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": uuid.uuid1(),
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -155,7 +157,7 @@ def create_snapshot(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad_common.load_job_conf(nomad_conf)
+    nomad_conf = nomad_common.load_job_conf(nomad_conf_str)
 
     # Submit job
     _ = nomad_common.create_deployment(nomad_conf)

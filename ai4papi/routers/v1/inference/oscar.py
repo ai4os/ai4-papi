@@ -6,6 +6,8 @@ from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 import json
+from string import Template
+import typing
 import uuid
 import yaml
 
@@ -277,8 +279,10 @@ def make_service_definition(conf, vo):
     """
 
     # Create service definition
-    service = deepcopy(papiconf.OSCAR["service"])  # init from template
-    service = service.safe_substitute(
+    service_template = typing.cast(
+        Template, deepcopy(papiconf.OSCAR["service"])
+    )  # init from template
+    service_str = service_template.safe_substitute(
         {
             "CLUSTER_ID": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
             "NAME": conf["name"],
@@ -296,7 +300,7 @@ def make_service_definition(conf, vo):
             },
         }
     )
-    service = yaml.safe_load(service)
+    service = yaml.safe_load(service_str)
 
     return service
 

@@ -170,7 +170,7 @@ class Catalog:
         self,
         item_name: str,
         profile: str = Query(default="", enum=[""] + supported_profiles),
-        request: Request = None,
+        request: Request | None = None,
     ):
         """
         Get the item's full metadata.
@@ -292,6 +292,8 @@ class Catalog:
             # Try to load the YML file
             try:
                 metadata = yaml.safe_load(r.text)
+                if not isinstance(metadata, dict):
+                    raise ValueError("Metadata is not a dictionary")
             except Exception:
                 metadata = None
                 error = (
@@ -364,6 +366,8 @@ class Catalog:
             }
 
         else:
+            assert isinstance(metadata, dict)
+
             # Replace some fields with the info gathered from Github
             pattern = r"github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$"
             match = re.search(pattern, items[item_name]["url"])
@@ -410,7 +414,7 @@ class Catalog:
 
     def refresh_catalog(
         self,
-        item_name: str = None,
+        item_name: str | None = None,
         authorization=Depends(security),
     ):
         """

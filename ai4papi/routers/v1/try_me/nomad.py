@@ -4,7 +4,9 @@ required). We deploy jobs by default in the AI4EOSC namespace.
 """
 
 from copy import deepcopy
+from string import Template
 import types
+import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -141,7 +143,7 @@ def create_deployment(
     docker_image = "/".join(registry.split("/")[-2:])
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.TRY_ME["nomad"])
+    nomad_template = typing.cast(Template, deepcopy(papiconf.TRY_ME["nomad"]))
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
@@ -168,7 +170,7 @@ def create_deployment(
         warning = "<ul>" + warning + "</ul>"
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": NAMESPACE,
@@ -187,7 +189,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing

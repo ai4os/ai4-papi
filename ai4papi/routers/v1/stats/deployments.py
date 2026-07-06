@@ -62,6 +62,8 @@ def load_stats(
 
         with open(pth, "r") as f:
             reader = csv.DictReader(f, delimiter=";")
+            if not reader.fieldnames:
+                raise Exception("CSV is missing fieldnames")
             stats[name] = {k: [] for k in reader.fieldnames}
             for row in reader:
                 for k, v in row.items():
@@ -158,7 +160,7 @@ def get_proper_allocation(allocs):
 @router.get("/cluster")
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
-    vo: str = None,
+    vo: str | None = None,
 ):
     """
     Returns the following stats of the nodes and the cluster (per resource type):
@@ -183,7 +185,7 @@ def get_cluster_stats(
     # calls, etc), the stats won't be updated and this endpoint will keep serving the
     # same (old) stats, which can be misleading because it gives the impression that
     # everything works normally. So we give a 1 hour grace time and then raise an Error.
-    if (time.time() - cluster_stats_updated_at) > 3600:  # 1 hour
+    if (time.time() - cluster_stats_updated_at) > 3600:  # ty: ignore[unsupported-operator]
         raise HTTPException(
             status_code=500,
             detail="Cluster stats have not been updated for more than 1 hour.",
@@ -239,7 +241,7 @@ def get_cluster_stats(
 
     # Add update time
     stats["updated_at"] = (
-        datetime.fromtimestamp(cluster_stats_updated_at).isoformat() + "Z"
+        datetime.fromtimestamp(cluster_stats_updated_at).isoformat() + "Z"  # ty: ignore[invalid-argument-type]
     )
 
     return stats

@@ -4,9 +4,11 @@ import os
 import json
 import re
 import secrets
+from string import Template
 import subprocess
 import types
 from types import SimpleNamespace
+import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -219,8 +221,7 @@ def create_deployment(
             detail="Your VO doesn't allow to deploy this tool.",
         )
 
-    # Load tool configuration
-    nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
+    nomad_template = typing.cast(Template, deepcopy(papiconf.TOOLS[tool_name]["nomad"]))
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
     # TODO: given that some parts of the configuration are dynamically generated
     # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog
@@ -295,7 +296,7 @@ def create_deployment(
             )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -333,7 +334,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -397,7 +398,7 @@ def create_deployment(
         )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -442,7 +443,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -484,7 +485,7 @@ def create_deployment(
             user_conf["general"]["title"][:45],
         )  # make title foldername-friendly
 
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -513,7 +514,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Deploy an NVFlare Federated server and Dashboard
     elif tool_name == "ai4os-nvflare":
@@ -525,7 +526,7 @@ def create_deployment(
             )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -554,7 +555,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
@@ -628,7 +629,7 @@ def create_deployment(
                 )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -650,7 +651,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         # Define what to exclude
         if user_conf["llm"]["type"] == "vllm":
@@ -675,7 +676,7 @@ def create_deployment(
     # Deploy AI4Life tool
     elif tool_name == "ai4os-ai4life-loader":
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -705,7 +706,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]

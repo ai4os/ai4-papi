@@ -82,25 +82,35 @@ def root(
     root = str(request.url_for("root"))
     versions = [v1.get_version(request)]
 
-    response = {
-        "versions": versions,
-        "links": [
+    links = []
+    if app.docs_url is not None:
+        links.append(
             {
                 "rel": "help",
                 "type": "text/html",
                 "href": f"{root}" + app.docs_url.strip("/"),
-            },
+            }
+        )
+    if app.redoc_url is not None:
+        links.append(
             {
                 "rel": "help",
                 "type": "text/html",
                 "href": f"{root}" + app.redoc_url.strip("/"),
-            },
+            }
+        )
+    if app.openapi_url is not None:
+        links.append(
             {
                 "rel": "describedby",
                 "type": "application/json",
                 "href": f"{root}" + app.openapi_url.strip("/"),
-            },
-        ],
+            }
+        )
+
+    response = {
+        "versions": versions,
+        "links": links,
     }
     return response
 
@@ -116,8 +126,8 @@ async def favicon():
 def run(
     host: str = "0.0.0.0",
     port: int = 8080,
-    ssl_keyfile: str = None,
-    ssl_certfile: str = None,
+    ssl_keyfile: str | None = None,
+    ssl_certfile: str | None = None,
 ):
     uvicorn.run(
         app,

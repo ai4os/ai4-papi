@@ -1,8 +1,10 @@
 from copy import deepcopy
 import datetime
 import os
+from string import Template
 import subprocess
 import types
+import typing
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -174,7 +176,7 @@ def create_deployment(
     auth.check_authorization(auth_info, vo)
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.MODULES["nomad"])
+    nomad_template = typing.cast(Template, deepcopy(papiconf.MODULES["nomad"]))
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
     # Update values conf in case we received a submitted conf
@@ -244,7 +246,7 @@ def create_deployment(
         )
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -286,7 +288,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Add affinity from greener datacenter
     nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
