@@ -153,17 +153,20 @@ SNAPSHOTS = {
 
 # Load datacenter info file
 pth = main_path.parent / "var" / "datacenters.csv"
-datacenters = {}
+datacenters: dict[str, dict] = {}
 with open(pth, "r") as f:
     reader = csv.DictReader(f, delimiter=",")
-    dc_keys = reader.fieldnames.copy()
+    if not reader.fieldnames:
+        raise Exception("CSV is missing fieldnames")
+    dc_keys = list(reader.fieldnames)
     dc_keys.remove("name")
     for row in reader:
         for k, v in row.items():
             if k == "name":
-                name = v
-                datacenters[name] = {k: 0 for k in dc_keys}
-                datacenters[name]["nodes"] = {}
+                name = str(v)
+                dc_val: dict[str, str | float | dict] = {key: 0 for key in dc_keys}
+                dc_val["nodes"] = {}
+                datacenters[name] = dc_val
             elif k == "country":
                 datacenters[name][k] = v
             else:

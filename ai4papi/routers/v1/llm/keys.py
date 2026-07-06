@@ -126,7 +126,7 @@ def get_api_keys(authorization=Depends(security)):
 @router.post("")
 def create_api_key(
     key_name: str,
-    duration: str = None,
+    duration: str | None = None,
     authorization=Depends(security),
 ):
     """

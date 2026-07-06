@@ -209,7 +209,9 @@ def gpu_specs():
     models = {}
     with open(pth, "r") as f:
         reader = csv.DictReader(f, delimiter=",")
-        dc_keys = reader.fieldnames.copy()
+        if not reader.fieldnames:
+            raise Exception("CSV is missing fieldnames")
+        dc_keys = list(reader.fieldnames)
         dc_keys.remove("name")
         for row in reader:
             for k, v in row.items():

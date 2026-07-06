@@ -52,7 +52,7 @@ def get_deployment(
     deployment_uuid: str,
     namespace: str,
     owner: str,
-    full_info: True,
+    full_info: bool = True,
 ):
     """
     Retrieve the info of a specific deployment.
@@ -162,7 +162,10 @@ def get_deployment(
         service = re.search(
             "deep-start --(.*)$",
             info["docker_command"],
-        ).group(1)
+        )
+        if not service:
+            raise Exception(f"[{deployment_uuid}] Failed to parse Docker command.")
+        service = service.group(1)
 
         info["main_endpoint"] = service2endpoint[service]
 
@@ -415,7 +418,7 @@ def delete_deployment(
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=1 * 60 * 60))
-def get_gpu_models(vo: str = None):
+def get_gpu_models(vo: str | None = None):
     """
     Retrieve available GPU models in the cluster, optionally filtering nodes by VO.
     If vo is None, do not filter by VO.

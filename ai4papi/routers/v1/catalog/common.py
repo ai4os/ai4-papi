@@ -170,7 +170,7 @@ class Catalog:
         self,
         item_name: str,
         profile: str = Query(default="", enum=[""] + supported_profiles),
-        request: Request | None = None,
+        request: Request = None,  # ty: ignore
     ):
         """
         Get the item's full metadata.
@@ -284,10 +284,16 @@ class Catalog:
         # Try to retrieve the metadata from Github
         r = session.get(metadata_url)
         if not r.ok:
-            error = (
-                "The metadata of this module could not be retrieved because the "
-                "module is lacking a metadata file (`ai4-metadata.yml`)."
-            )
+            if r.status_code == 429:
+                error = (
+                    "The metadata of this module could not be retrieved because of "
+                    "rate limiting from the GitHub API."
+                )
+            else:
+                error = (
+                    "The metadata of this module could not be retrieved because the "
+                    "module is lacking a metadata file (`ai4-metadata.yml`)."
+                )
         else:
             # Try to load the YML file
             try:

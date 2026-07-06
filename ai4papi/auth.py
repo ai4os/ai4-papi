@@ -84,7 +84,7 @@ def get_user_info(token):
 
 def check_authorization(
     auth_info: dict,
-    requested_vo: str = None,
+    requested_vo: str | None = None,
     access_level: str = "ap-u",
 ):
     """
