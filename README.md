@@ -108,14 +108,12 @@ Then, you will a token via the terminal. For this you need:
     --configuration-endpoint https://login.cloud.ai4eosc.eu/realms/ai4eosc/.well-known/openid-configuration \
     --client-id "ai4-papi" \
     --client-secret <client-secret> \
+    --scope="openid profile email roles" \
+    --redirect-uri "http://localhost:43985" \
     ai4os-keycloak
    ```
 
    To retrieve the `<client-secret>`, contact [Ignacio Heredia](https://github.com/IgnacioHeredia).
-
-   You will then be ask some question. Use _default values_, except for:
-     - Redirect_uris (space separated): `http://localhost:43985`
-
    The browser will open so you can authenticate with your AI4OS account.
    Then go back to the terminal and finish by setting and encryption password.
 
