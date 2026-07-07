@@ -92,8 +92,9 @@ def check_authorization(
     and check he indeed belongs to the requested VO.
     """
     # Retrieve the user access levels for that particular VO
+    short_vo = get_short_vo(requested_vo)
     if requested_vo:
-        user_levels = [k for k, v in auth_info["groups"].items() if requested_vo in v]
+        user_levels = [k for k, v in auth_info["groups"].items() if short_vo in v]
     else:
         user_levels = [k for k, v in auth_info["groups"].items()]
 
@@ -116,3 +117,12 @@ def get_highest_level(user_levels: list):
         if level in user_levels:
             return level
     return None
+
+
+
+def get_short_vo(requested_vo):
+    match = re.match(r"access:(?P<vo>[^:]+):(?P<level>.+)", requested_vo)
+    if match:
+        return match["vo"]
+    else:
+        return requested_vo

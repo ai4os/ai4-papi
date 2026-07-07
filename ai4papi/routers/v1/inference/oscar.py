@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 import json
+import re
 from typing import Union
 import uuid
 import yaml
@@ -68,9 +69,10 @@ def get_client_from_auth(token, vo):
     """
     Retrieve authenticated user info and init OSCAR client.
     """
+    short_vo = auth.get_short_vo(vo)
     client_options = {
-        "cluster_id": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
-        "endpoint": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"],
+        "cluster_id": papiconf.MAIN_CONF["oscar"]["clusters"][short_vo]["cluster_id"],
+        "endpoint": papiconf.MAIN_CONF["oscar"]["clusters"][short_vo]["endpoint"],
         "oidc_token": token,
         "ssl": "true",
     }
@@ -224,7 +226,7 @@ def get_services_list(
             continue
 
         # Add service endpoint for sync calls
-        cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+        cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][auth.get_short_vo(vo)]["endpoint"]
         s["endpoint"] = f"{cluster_endpoint}/run/{s['name']}"
 
         # Info for async calls
@@ -261,7 +263,7 @@ def get_service(
     service = json.loads(r.text)
 
     # Add service endpoint
-    cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][vo]["endpoint"]
+    cluster_endpoint = papiconf.MAIN_CONF["oscar"]["clusters"][auth.get_short_vo(vo)]["endpoint"]
     service["endpoint"] = f"{cluster_endpoint}/run/{service_name}"
 
     # Retrieve cluster config for MinIO info
@@ -281,7 +283,7 @@ def make_service_definition(conf, vo):
     service = deepcopy(papiconf.OSCAR["service"])  # init from template
     service = service.safe_substitute(
         {
-            "CLUSTER_ID": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
+            "CLUSTER_ID": papiconf.MAIN_CONF["oscar"]["clusters"][auth.get_short_vo(vo)]["cluster_id"],
             "NAME": conf["name"],
             "IMAGE": conf["general"]["docker_image"],
             "CPU": conf["hardware"]["cpu_num"],
