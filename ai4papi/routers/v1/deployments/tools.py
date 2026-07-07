@@ -297,6 +297,7 @@ def create_deployment(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "DATACENTER": user_conf["general"]["datacenter"],
                 "PRIORITY": priority,
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
@@ -332,6 +333,15 @@ def create_deployment(
 
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        # If the user didn't provide a datacenter in the conf, remove that constraint from
+        # the job
+        if not user_conf["general"]["datacenter"]:
+            nomad_conf["Constraints"] = [
+                c
+                for c in nomad_conf["Constraints"]
+                if c["LTarget"] != "${node.datacenter}"
+            ]
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]

@@ -20,6 +20,12 @@ general:
     value: ''
     description: Provide some additional extended information about this deployment.
 
+  datacenter:
+    name: Datacenter
+    value: ''
+    options: ['']
+    description: Sometimes, due to ISO or privacy compliance, you are required to deploy on a particular datacenter. This option allows to force your deployment to land on a specific datacenter.
+
 nvflare:
   username:
     name: NVFlare Dashboard username
