@@ -192,16 +192,16 @@ def create_deployment(
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing
     # We check for every resource metric (cpu, disk, ram)
-    stats = get_cluster_stats(vo=VO)
+    cluster_stats = get_cluster_stats(vo=VO)
     resources = ["cpu", "ram", "disk"]
     keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
     status = {k: 0 for k in keys}
 
-    for _, datacenter in stats["datacenters"].items():
-        for _, node in datacenter["nodes"].items():
-            if node["type"] == "tryme" and node["status"] == "ready":
+    for _, datacenter in cluster_stats.datacenters.items():
+        for _, node in datacenter.nodes.items():
+            if node.type == "tryme" and node.status == "ready":
                 for k in keys:
-                    status[k] += node[k]
+                    status[k] += getattr(node, k)
     for r in resources:
         if (
             status[f"{r}_total"] == 0

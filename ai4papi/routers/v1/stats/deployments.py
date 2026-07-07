@@ -13,7 +13,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, wattnet
+from ai4papi import auth, wattnet, schemas
 import ai4papi.conf as papiconf
 from ai4papi.nomad import Nomad
 
@@ -157,11 +157,11 @@ def get_proper_allocation(allocs):
     return allocs[idx]["ID"]
 
 
-@router.get("/cluster")
+@router.get("/cluster", response_model=schemas.ClusterStats)
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
     vo: str | None = None,
-):
+) -> schemas.ClusterStats:
     """
     Returns the following stats of the nodes and the cluster (per resource type):
     * the aggregated usage
@@ -195,52 +195,51 @@ def get_cluster_stats(
 
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo] if vo else "all"
 
-    for k, v in stats["datacenters"].copy().items():
+    for k, v in list(stats.datacenters.items()):
         # Filter out nodes that do not support the given VO
         nodes = {}
-        for n_id, n_stats in v["nodes"].items():
-            if namespace == "all" or namespace in n_stats["namespaces"]:
+        for n_id, n_stats in v.nodes.items():
+            if namespace == "all" or namespace in n_stats.namespaces:
                 nodes[n_id] = n_stats
 
         # Ignore datacenters with no nodes
         if not nodes:
-            del stats["datacenters"][k]
+            del stats.datacenters[k]
         else:
-            stats["datacenters"][k]["nodes"] = nodes
+            stats.datacenters[k].nodes = nodes
+
+    # Reset cluster stats for clean aggregation
+    stats.cluster = schemas.ResourceStats(gpu_models={})
 
     # Compute cluster stats after node filtering is done
-    for dc_stats in stats["datacenters"].values():
-        for n_stats in dc_stats["nodes"].values():
-            for k, v in n_stats.items():
-                # Ignore keys that are not meant to be aggregated
-                if k in ["name", "namespaces", "eligibility", "status", "tags", "type"]:
-                    continue
+    for dc_stats in stats.datacenters.values():
+        for n_stats in dc_stats.nodes.values():
+            for field in schemas.ResourceStats.model_fields:
+                if field != "gpu_models":
+                    setattr(
+                        stats.cluster,
+                        field,
+                        getattr(stats.cluster, field) + getattr(n_stats, field),
+                    )
 
-                # Aggregate nested gpu_models dict
-                elif k == "gpu_models":
-                    for k1, v1 in v.items():
-                        model_stats = stats["cluster"]["gpu_models"].get(
-                            k1,
-                            {
-                                "gpu_total": 0,
-                                "gpu_used": 0,
-                            },  # init value
+            for model_name, g_stats in n_stats.gpu_models.items():
+                if model_name not in stats.cluster.gpu_models:
+                    stats.cluster.gpu_models[model_name] = (
+                        schemas.ResourceStats.GpuModelStats(
+                            gpu_total=0,
+                            gpu_used=0,
                         )
-                        for k2, v2 in v1.items():
-                            model_stats[k2] += v2
-                        stats["cluster"]["gpu_models"][k1] = model_stats
-
-                # Aggregate other resources
-                else:
-                    stats["cluster"][k] += v
+                    )
+                stats.cluster.gpu_models[model_name].gpu_total += g_stats.gpu_total
+                stats.cluster.gpu_models[model_name].gpu_used += g_stats.gpu_used
 
     # Compute green affinities
-    affinities = green_director.rank(stats["datacenters"].keys())
+    affinities = green_director.rank(stats.datacenters.keys())
     for dc_name, affinity in affinities.items():
-        stats["datacenters"][dc_name]["affinity"] = affinity
+        stats.datacenters[dc_name].affinity = affinity
 
     # Add update time
-    stats["updated_at"] = (
+    stats.updated_at = (
         datetime.fromtimestamp(cluster_stats_updated_at).isoformat() + "Z"  # ty: ignore[invalid-argument-type]
     )
 
@@ -248,39 +247,37 @@ def get_cluster_stats(
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
-def get_cluster_stats_bg():
+def get_cluster_stats_bg() -> schemas.ClusterStats:
     """
     Background task that computes the stats of the nodes.
     The TTL of this task should be >= than the repeat frequency of the thread defined
     in main.py.
     """
     # Start from default datacenters dict
-    datacenters = copy.deepcopy(papiconf.datacenters)
-
-    resources = [
-        "jobs_num",
-        "reallocations",
-        "cpu_total",
-        "cpu_used",
-        "gpu_total",
-        "gpu_used",
-        "ram_total",
-        "ram_used",
-        "disk_total",
-        "disk_used",
-    ]
+    datacenters_conf = copy.deepcopy(papiconf.datacenters)
 
     # Retrieve datacenter footprints
     green_director.retrieve_footprints()
     for dc_name, metrics in green_director.metrics.items():
-        datacenters[dc_name]["footprints"] = metrics
+        if dc_name in datacenters_conf:
+            datacenters_conf[dc_name]["footprints"] = metrics
 
-    # Init stats
-    stats = {
-        "datacenters": datacenters,  # aggregated datacenter usage
-        "cluster": {k: 0 for k in resources},  # aggregated cluster usage
-    }
-    stats["cluster"]["gpu_models"] = {}
+    # Instantiate datacenters dictionary containing schemas.DatacenterStats objects
+    datacenters = {}
+    for dc_name, dc in datacenters_conf.items():
+        datacenters[dc_name] = schemas.DatacenterStats(
+            lat=dc.get("lat", 0.0),
+            lon=dc.get("lon", 0.0),
+            PUE=dc.get("PUE", 0.0),
+            nodes={},
+            footprints=dc.get("footprints"),
+        )
+
+    # Init stats using schemas.ClusterStats
+    stats = schemas.ClusterStats(
+        datacenters=datacenters,
+        cluster=schemas.ResourceStats(gpu_models={}),
+    )
 
     # Load nodes
     nodes = Nomad.nodes.get_nodes(resources=True)
@@ -289,88 +286,87 @@ def get_cluster_stats_bg():
     # Get total stats for each node
     for n in nodes:
         node = Nomad.node.get_node(n["ID"])
-        n_stats = {k: 0 for k in resources}
-        n_stats["name"] = node["Name"]
-        n_stats["eligibility"] = node["SchedulingEligibility"]
-        n_stats["cpu_total"] = int(node["Attributes"]["cpu.numcores"])
-        n_stats["ram_total"] = int(node["Attributes"]["memory.totalbytes"]) / 2**20
-        n_stats["disk_total"] = (
-            int(node["Attributes"]["unique.storage.bytestotal"]) / 2**20
-        )
-        n_stats["gpu_models"] = {}
-        n_stats["namespaces"] = node["Meta"].get("namespace", "")
-        n_stats["type"] = node["Meta"].get("type", "")
+
         # Sometimes nodes disconnect. And since they disconnect, their metadata cannot
         # longer be updated. So we use the fine-grained status in the metadata *only if*
         # the node status is ready.
-        n_stats["status"] = (
+        status = (
             node["Meta"].get("status", "")
             if node["Status"] == "ready"
             else node["Status"]
         )
-        n_stats["tags"] = node["Meta"].get("tags", "")
 
+        # Track stats per GPU model type
+        gpu_total = 0
+        gpu_models = {}
         if n["NodeResources"]["Devices"]:
             for devices in n["NodeResources"]["Devices"]:
                 if devices["Type"] == "gpu":
-                    n_stats["gpu_total"] += len(devices["Instances"])
+                    gpu_total += len(devices["Instances"])
 
-                    # Track stats per GPU model type
-                    if devices["Name"] not in n_stats["gpu_models"].keys():
-                        n_stats["gpu_models"][devices["Name"]] = {
-                            "gpu_total": 0,
-                            "gpu_used": 0,
-                        }
+                    if devices["Name"] not in gpu_models:
+                        gpu_models[devices["Name"]] = (
+                            schemas.ResourceStats.GpuModelStats(
+                                gpu_total=0,
+                                gpu_used=0,
+                            )
+                        )
 
-                    n_stats["gpu_models"][devices["Name"]]["gpu_total"] += len(
-                        devices["Instances"]
-                    )
+                    gpu_models[devices["Name"]].gpu_total += len(devices["Instances"])
 
         # If datacenter is not in csv, load default info
-        if n["Datacenter"] not in stats["datacenters"]:
-            stats["datacenters"][n["Datacenter"]] = {
-                "lat": 0,
-                "lon": 0,
-                "PUE": 0,
-                "energy_quality": 0,
-                "nodes": {},
-            }
+        if n["Datacenter"] not in stats.datacenters:
+            stats.datacenters[n["Datacenter"]] = schemas.DatacenterStats(
+                lat=0.0,
+                lon=0.0,
+                PUE=0.0,
+                nodes={},
+            )
             print(
                 f"Warning: Datacenter {n['Datacenter']} not found in datacenters.csv file"
             )
 
-        stats["datacenters"][n["Datacenter"]]["nodes"][n["ID"]] = n_stats
+        n_stats = schemas.NodeInfo(
+            name=node["Name"],
+            eligibility=node["SchedulingEligibility"],
+            namespaces=node["Meta"].get("namespace", ""),
+            type=node["Meta"].get("type", ""),
+            status=status,
+            tags=node["Meta"].get("tags", ""),
+            cpu_total=int(node["Attributes"]["cpu.numcores"]),
+            ram_total=int(node["Attributes"]["memory.totalbytes"]) / 2**20,
+            disk_total=int(node["Attributes"]["unique.storage.bytestotal"]) / 2**20,
+            gpu_total=gpu_total,
+            gpu_models=gpu_models,
+        )
+
+        stats.datacenters[n["Datacenter"]].nodes[n["ID"]] = n_stats
         nodes_dc[n["ID"]] = n["Datacenter"]
 
     # Get aggregated usage stats for each node
-    namespaces = ["default"] + list(papiconf.MAIN_CONF["nomad"]["namespaces"].values())
+    namespaces_list = ["default"] + list(
+        papiconf.MAIN_CONF["nomad"]["namespaces"].values()
+    )
 
-    for namespace in namespaces:
-        jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_='Status == "running"')
+    for ns in namespaces_list:
+        jobs = Nomad.jobs.get_jobs(namespace=ns, filter_='Status == "running"')
         for j in jobs:
             # Retrieve full job for meta
-            job = Nomad.job.get_job(
-                id_=j["ID"],
-                namespace=namespace,
-            )
-
-            allocs = Nomad.job.get_allocations(
-                id_=job["ID"],
-                namespace=namespace,
-            )
+            job = Nomad.job.get_job(id_=j["ID"], namespace=ns)
 
             # Keep the proper allocation
+            allocs = Nomad.job.get_allocations(id_=job["ID"], namespace=ns)
             a = Nomad.allocation.get_allocation(get_proper_allocation(allocs))
 
             # Add resources
             datacenter = nodes_dc[a["NodeID"]]
-            n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
+            n_stats = stats.datacenters[datacenter].nodes[a["NodeID"]]
 
             # TODO: we are ignoring resources consumed by other jobs
             if not (job["Name"].startswith("module") or job["Name"].startswith("tool")):
                 continue
 
-            n_stats["jobs_num"] += 1
+            n_stats.jobs_num += 1
 
             # TODO: we are ignoring resources consumed by other tasks
             if "main" in a["AllocatedResources"]["Tasks"]:
@@ -378,17 +374,17 @@ def get_cluster_stats_bg():
 
                 # cpu
                 if res["Cpu"]["ReservedCores"]:
-                    n_stats["cpu_used"] += len(res["Cpu"]["ReservedCores"])
+                    n_stats.cpu_used += len(res["Cpu"]["ReservedCores"])
 
                 # ram
-                n_stats["ram_used"] += res["Memory"]["MemoryMB"]
+                n_stats.ram_used += res["Memory"]["MemoryMB"]
 
                 # disk
                 # Note: In theory we can get the total disk used in a node looking at the
                 # metadata (ie. "unique.storage.bytesfree"). But that gave us the disk that
                 # is actually used. But we are instead interested on the disk that is reserved
                 # by users (regardless of whether they are actually using it).
-                n_stats["disk_used"] += a["AllocatedResources"]["Shared"]["DiskMB"]
+                n_stats.disk_used += a["AllocatedResources"]["Shared"]["DiskMB"]
 
                 # gpu
                 if res["Devices"]:
@@ -398,32 +394,35 @@ def get_cluster_stats_bg():
                     # Sometimes the node fails and GPUs are not detected [1].
                     # In that case, avoid counting that GPU in the stats.
                     # [1]: https://docs.ai4os.eu/en/latest/user/others/faq.html#my-gpu-just-disappeared-from-my-deployment
-                    if n_stats["gpu_models"]:
-                        n_stats["gpu_used"] += gpu_num
-                        n_stats["gpu_models"][gpu["Name"]]["gpu_used"] += gpu_num
+                    if n_stats.gpu_models:
+                        n_stats.gpu_used += gpu_num
+                        if gpu["Name"] not in n_stats.gpu_models:
+                            n_stats.gpu_models[gpu["Name"]] = (
+                                schemas.ResourceStats.GpuModelStats(
+                                    gpu_total=0, gpu_used=0
+                                )
+                            )
+                        n_stats.gpu_models[gpu["Name"]].gpu_used += gpu_num
 
             # We also want to keep track of how many allocations in a node were reallocated
             # (frequent reallocation is a sign of node malfunctioning)
             if len(allocs) > 1:  # the job has been reallocated
-                for a in allocs:
-                    if a["NextAllocation"]:  # this alloc has been reallocated
-                        datacenter = nodes_dc[a["NodeID"]]
-                        n_stats = stats["datacenters"][datacenter]["nodes"][a["NodeID"]]
-                        n_stats["reallocations"] += 1
-
-            else:
-                continue
+                for a_alloc in allocs:
+                    if a_alloc["NextAllocation"]:  # this alloc has been reallocated
+                        datacenter = nodes_dc[a_alloc["NodeID"]]
+                        n_stats = stats.datacenters[datacenter].nodes[a_alloc["NodeID"]]
+                        n_stats.reallocations += 1
 
     # Keep ineligible nodes, but set (used=total) for all resources
     # We don't remove the node altogether because jobs might still be running there
     # and we want to show them in the stats
-    for datacenter in stats["datacenters"].values():
-        for n_stats in datacenter["nodes"].values():
-            if n_stats["eligibility"] == "ineligible":
+    for datacenter in stats.datacenters.values():
+        for n_stats in datacenter.nodes.values():
+            if n_stats.eligibility == "ineligible":
                 for r in ["cpu", "gpu", "ram", "disk"]:
-                    n_stats[f"{r}_total"] = n_stats[f"{r}_used"]
-                for g_stats in n_stats["gpu_models"].values():
-                    g_stats["gpu_total"] = n_stats["gpu_used"]
+                    setattr(n_stats, f"{r}_total", getattr(n_stats, f"{r}_used"))
+                for g_stats in n_stats.gpu_models.values():
+                    g_stats.gpu_total = n_stats.gpu_used
 
     # Set the new shared variable
     global cluster_stats, cluster_stats_updated_at
