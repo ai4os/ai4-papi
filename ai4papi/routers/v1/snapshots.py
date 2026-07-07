@@ -225,7 +225,7 @@ def get_harbor_snapshots(
     """
     # Check if the user exists in Harbor (ie. Docker image exists)
     repos = client.get_repositories(project_name="user-snapshots")
-    users = [r.name.split("/")[1] for r in repos]
+    users = [r.name.split("/")[1] for r in repos]  # ty: ignore[not-iterable]
     user_str = owner.replace("@", "_at_")
     if user_str not in users:
         return []
@@ -236,7 +236,7 @@ def get_harbor_snapshots(
         repository_name=user_str,
     )
     snapshots = []
-    for a in artifacts:
+    for a in artifacts:  # ty: ignore[not-iterable]
         # Ignore snapshot if it doesn't belong to the VO
         a_labels = a.extra_attrs.root["config"]["Labels"]
         if a_labels.get("VO") != vo:

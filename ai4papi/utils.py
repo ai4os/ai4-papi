@@ -206,7 +206,7 @@ def gpu_specs():
         return {}
 
     # Load datacenter info
-    models = {}
+    models: dict[str, dict[str, str | int | float]] = {}
     with open(pth, "r") as f:
         reader = csv.DictReader(f, delimiter=",")
         if not reader.fieldnames:

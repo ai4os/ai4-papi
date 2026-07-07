@@ -3,6 +3,7 @@ Utilities for the integration with WattNet.
 API reference: https://api.wattnet.eu/v1/docs
 """
 
+from collections.abc import Collection
 import datetime
 import json
 import requests
@@ -12,6 +13,7 @@ import warnings
 
 from cachetools import cached, TTLCache
 
+from ai4papi import schemas
 
 session = requests.Session()
 
@@ -36,7 +38,7 @@ class GreenDirector:
         "green-score": 50,  # default green score (combining carbon and water).
     }
 
-    def __init__(self, datacenters: dict[str, dict], algorithm: str = "linear_rank"):
+    def __init__(self, datacenters, algorithm: str = "linear_rank"):
         """
         Green metrics are saved in the metrics var.
 
@@ -221,15 +223,17 @@ class GreenDirector:
 
         return affinities
 
-    def rank(self, subset: list | None = None):
+    def rank(self, subset: Collection[str] | None = None):
         """
         Compute affinities for datacenter.
         We allow to specify a subset of datacenters, to account for the fact that
         each user only sees the datacenters belonging to their VO.
         """
         if subset is None or not subset:
-            subset = list(self.datacenters.keys())
+            subset_set = set(self.datacenters.keys())
+        else:
+            subset_set = set(subset)
 
-        datacenters = {k: v for k, v in self.datacenters.items() if k in subset}
+        datacenters = {k: v for k, v in self.datacenters.items() if k in subset_set}
         algorithm_func = getattr(self, f"_{self.algorithm_name}")
         return algorithm_func(datacenters)
