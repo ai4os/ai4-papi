@@ -27,11 +27,14 @@ router = APIRouter(
 security = HTTPBearer()
 
 # Init the Harbor client
-client = HarborClient(
-    url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
-    username=papiconf.HARBOR_USER,
-    secret=papiconf.HARBOR_PASS,
-)
+if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
+    client = HarborClient(
+        url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
+        username=papiconf.HARBOR_USER,
+        secret=papiconf.HARBOR_PASS,
+    )
+else:
+    client = None
 
 # Use the Nomad cluster inited in nomad utils
 Nomad = nomad.Nomad
@@ -185,7 +188,7 @@ def delete_snapshot(
     # Check is the snapshot is in the "completed" list (Harbor)
     snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
-    if snapshot_uuid in snapshot_ids:
+    if client and (snapshot_uuid in snapshot_ids):
         _ = client.delete_artifact(
             project_name="user-snapshots",
             repository_name=auth_info["id"].replace("@", "_at_"),
@@ -224,6 +227,8 @@ def get_harbor_snapshots(
     * **vo**: Virtual Organization the snapshot belongs to
     """
     # Check if the user exists in Harbor (ie. Docker image exists)
+    if not client:
+        return []
     repos = client.get_repositories(project_name="user-snapshots")
     users = [r.name.split("/")[1] for r in repos]  # ty: ignore[not-iterable]
     user_str = owner.replace("@", "_at_")
