@@ -13,7 +13,6 @@ import warnings
 
 from cachetools import cached, TTLCache
 
-from ai4papi import schemas
 
 session = requests.Session()
 
