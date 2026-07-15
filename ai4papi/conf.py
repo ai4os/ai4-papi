@@ -35,7 +35,7 @@ def load_env(varname: str):
             # them define variables needed for sections of code they are not developing.
             warnings.warn(f'"{varname}" envar is not defined')
         else:
-            raise Exception(f'You need to define the variable "{varname}".')
+            raise RuntimeError(f'You need to define the variable "{varname}".')
 
     return var
 
@@ -74,10 +74,9 @@ def load_yaml_conf(fpath: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     for group_name, params in conf_full.items():
         conf_values[group_name] = {}
         for k, v in params.items():
-            if "name" not in v.keys():
-                raise Exception(f"Parameter {k} needs to have a name.")
-            if "value" not in v.keys():
-                raise Exception(f"Parameter {k} needs to have a value.")
+            for i in ["name", "value"]:
+                if i not in v:
+                    raise ValueError(f"Parameter {k} needs to have an {i}.")
             conf_values[group_name][k] = v["value"]
 
     return conf_full, conf_values
@@ -125,7 +124,7 @@ tools_nomad2id = {
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():
-        raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
+        raise KeyError(f"The tool {tool} is missing from the mapping dictionary.")
 
 # OSCAR template
 
@@ -160,14 +159,14 @@ datacenters: dict[str, dict] = {}
 with open(pth, "r") as f:
     reader = csv.DictReader(f, delimiter=",")
     if not reader.fieldnames:
-        raise Exception("CSV is missing fieldnames")
+        raise ValueError("CSV is missing fieldnames")
     dc_keys = list(reader.fieldnames)
     dc_keys.remove("name")
     for row in reader:
         for k, v in row.items():
             if k == "name":
                 name = str(v)
-                dc_val: dict[str, str | float | dict] = {key: 0 for key in dc_keys}
+                dc_val: dict[str, str | float | dict] = dict.fromkeys(dc_keys, 0)
                 dc_val["nodes"] = {}
                 datacenters[name] = dc_val
             elif k == "country":

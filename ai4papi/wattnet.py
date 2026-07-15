@@ -185,8 +185,9 @@ class GreenDirector:
         * Minimum green score should have minimum affinity (0)
         * Maximum green score should have maximum affinity (100)
         """
-        if metric not in ["carbon", "water", "green-score"]:
-            raise Exception(f"Invalid metric: {metric}")
+        metrics = ["carbon", "water", "green-score"]
+        if metric not in metrics:
+            raise ValueError(f"Invalid metric: {metric}. Must be one of: {metrics}")
 
         # Affinity range
         af_min, af_max = 0, 100

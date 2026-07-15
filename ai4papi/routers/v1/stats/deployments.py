@@ -63,7 +63,7 @@ def load_stats(
         with open(pth, "r") as f:
             reader = csv.DictReader(f, delimiter=";")
             if not reader.fieldnames:
-                raise Exception("CSV is missing fieldnames")
+                raise ValueError("CSV is missing fieldnames")
             stats[name] = {k: [] for k in reader.fieldnames}
             for row in reader:
                 for k, v in row.items():

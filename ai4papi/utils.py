@@ -210,7 +210,7 @@ def gpu_specs():
     with open(pth, "r") as f:
         reader = csv.DictReader(f, delimiter=",")
         if not reader.fieldnames:
-            raise Exception("CSV is missing fieldnames")
+            raise ValueError("CSV is missing fieldnames")
         dc_keys = list(reader.fieldnames)
         dc_keys.remove("name")
         for row in reader:

@@ -164,7 +164,7 @@ def get_deployment(
             info["docker_command"],
         )
         if not service:
-            raise Exception(f"[{deployment_uuid}] Failed to parse Docker command.")
+            raise ValueError(f"[{deployment_uuid}] Failed to parse Docker command.")
         service = service.group(1)
 
         info["main_endpoint"] = service2endpoint[service]
