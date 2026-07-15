@@ -157,7 +157,7 @@ def get_proper_allocation(allocs):
     return allocs[idx]["ID"]
 
 
-@router.get("/cluster", response_model=schemas.ClusterStats)
+@router.get("/cluster")
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
     vo: str | None = None,
@@ -195,7 +195,7 @@ def get_cluster_stats(
 
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo] if vo else "all"
 
-    for k, v in list(stats.datacenters.items()):
+    for k, v in list(stats.datacenters.items()):  # we make an object copy with list()
         # Filter out nodes that do not support the given VO
         nodes = {}
         for n_id, n_stats in v.nodes.items():
@@ -363,7 +363,7 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
             n_stats = stats.datacenters[datacenter].nodes[a["NodeID"]]
 
             # TODO: we are ignoring resources consumed by other jobs
-            if not (job["Name"].startswith("module") or job["Name"].startswith("tool")):
+            if not job["Name"].startswith(("module", "tool")):
                 continue
 
             n_stats.jobs_num += 1

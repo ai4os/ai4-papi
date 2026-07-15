@@ -103,7 +103,7 @@ def get_api_keys(authorization=Depends(security)):
     # Remove user from all teams that are not his top level
     # ⚠️ Do not update teams before changing API key team, otherwise the API keys will
     # be erased.
-    teams_to_remove = set([team["team_id"] for team in user["teams"]])
+    teams_to_remove = {team["team_id"] for team in user["teams"]}
     teams_to_remove.discard(top_level)
     for team in teams_to_remove:
         data = {"team_id": team, "user_id": user_id}

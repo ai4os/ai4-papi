@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 import fastapi
 import uvicorn
 import logging
-import traceback
 
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -149,10 +148,8 @@ def get_cluster_stats_thread():
     try:
         get_cluster_stats_bg.cache_clear()
         get_cluster_stats_bg()
-    except Exception as e:
-        # We have to explicitly print the exceptions or otherwise they will go silent
-        logging.error(f"Error in background task get_cluster_stats_bg: {e}")
-        logging.error(traceback.format_exc())
+    except Exception:
+        logging.exception("Error in background task get_cluster_stats_bg")
 
 
 if __name__ == "__main__":

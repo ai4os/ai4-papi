@@ -73,15 +73,11 @@ def get_deployments(
             )
         except HTTPException:  # not a try-me
             continue
-        except Exception as e:  # unexpected error
-            raise (e)
 
         user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -195,10 +191,10 @@ def create_deployment(
     cluster_stats = get_cluster_stats(vo=VO)
     resources = ["cpu", "ram", "disk"]
     keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
-    status = {k: 0 for k in keys}
+    status = dict.fromkeys(keys, 0)
 
-    for _, datacenter in cluster_stats.datacenters.items():
-        for _, node in datacenter.nodes.items():
+    for datacenter in cluster_stats.datacenters.values():
+        for node in datacenter.nodes.values():
             if node.type == "tryme" and node.status == "ready":
                 for k in keys:
                     status[k] += getattr(node, k)

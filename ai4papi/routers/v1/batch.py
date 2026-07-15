@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import types
+from typing import Annotated
 import uuid
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
@@ -81,15 +82,11 @@ def get_deployments(
                 )
             except HTTPException:  # not a module
                 continue
-            except Exception as e:  # unexpected error
-                raise (e)
 
             user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -142,7 +139,7 @@ def get_deployment(
 def create_deployment(
     vo: str,
     user_cmd: UploadFile,
-    conf: str | None = Form(None),
+    conf: Annotated[str | None, Form()] = None,
     authorization=Depends(security),
 ):
     """
@@ -371,7 +368,7 @@ def create_deployment(
     nomad_conf["Constraints"][:] = [
         c
         for c in nomad_conf["Constraints"]
-        if not c == {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "compute"}
+        if c != {"LTarget": "${meta.type}", "Operand": "=", "RTarget": "compute"}
     ]
     # Batch jobs should be able to deploy both in "type=batch" OR "type=compute"
     nomad_conf["Constraints"].append(

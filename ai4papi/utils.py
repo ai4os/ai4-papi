@@ -57,17 +57,16 @@ def validate_conf(conf):
     # Check that the Dockerhub image belongs either to "deephdc" or "ai4oshub"
     # or that it points to our Harbor instance (eg. CVAT)
     image = conf.get("general", {}).get("docker_image")
-    if image:
-        if image.split("/")[0] not in [
-            "deephdc",
-            "ai4oshub",
-            "registry.cloud.ai4eosc.eu",
-        ]:
-            raise HTTPException(
-                status_code=400,
-                detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
+    if image and image.split("/")[0] not in [
+        "deephdc",
+        "ai4oshub",
+        "registry.cloud.ai4eosc.eu",
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
                 DockerHub organizations or be hosted in the project's Harbor.",
-            )
+        )
 
     # Check datasets_info list
     datasets = conf.get("storage", {}).get("datasets")
@@ -75,11 +74,11 @@ def validate_conf(conf):
         for d in datasets:
             # Validate DOI and URL
             # ref: https://stackoverflow.com/a/48524047/18471590
-            doiPattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
-            urlPattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
+            doi_pattern = r"^10.\d{4,9}/[-._;()/:A-Z0-9]+$"
+            url_pattern = r"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)"
             if not (
-                re.match(doiPattern, d["doi"], re.IGNORECASE)
-                or re.match(urlPattern, d["doi"], re.IGNORECASE)
+                re.match(doi_pattern, d["doi"], re.IGNORECASE)
+                or re.match(url_pattern, d["doi"], re.IGNORECASE)
             ):
                 raise HTTPException(status_code=400, detail="Invalid DOI or URL.")
 
@@ -136,7 +135,6 @@ def get_github_info(owner, repo):
             .strftime("%Y-%m-%d")
         )
         out["license"] = (repo_data["license"] or {}).get("spdx_id", "")
-        # out['stars'] = repo_data['stargazers_count']
     else:
         msg = "API rate limit exceeded" if r.status_code == 403 else ""
         print(f"  [Error] Failed to parse Github repo info: {msg}")
@@ -167,7 +165,7 @@ def retrieve_from_snapshots(
     snapshot_dir = Path(main_dir) / "snapshots"
 
     # Iterate over snapshots, from recent to old
-    for snapshot_pth in sorted(snapshot_dir.glob("**/*.json"))[::-1]:
+    for snapshot_pth in sorted(snapshot_dir.glob("**/*.json"), reverse=True):
         # Load the snapshot
         with open(snapshot_pth, "r") as f:
             snapshot = json.load(f)
@@ -217,7 +215,7 @@ def gpu_specs():
             for k, v in row.items():
                 if k == "name":
                     name = v
-                    models[name] = {k: 0 for k in dc_keys}
+                    models[name] = dict.fromkeys(dc_keys, 0)
                 else:
                     models[name][k] = float(v)
 

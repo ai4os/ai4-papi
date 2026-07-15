@@ -81,15 +81,11 @@ def get_deployments(
                 )
             except HTTPException:  # not a tool
                 continue
-            except Exception as e:  # unexpected error
-                raise (e)
 
             user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 

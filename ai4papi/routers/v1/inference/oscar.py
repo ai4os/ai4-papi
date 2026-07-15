@@ -380,7 +380,7 @@ def update_service(
     return user_conf["name"]
 
 
-@router.delete("/services/{service_uuid}")
+@router.delete("/services/{service_name}")
 def delete_service(
     vo: str,
     service_name: str,
