@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import Any, Dict, Optional
+from fastapi import Query
+from typing import Annotated, Any, Dict, Optional
+
+
+TagList = Annotated[tuple | None, Query()]
+VoList = Annotated[list[str] | None, Query()]
 
 
 class ResourceStats(BaseModel):

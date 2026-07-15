@@ -26,6 +26,7 @@ import configparser
 import importlib
 import json
 import re
+from typing import Annotated
 import warnings
 import yaml
 
@@ -37,7 +38,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer
 import requests
 
-from ai4papi import utils
+from ai4papi import schemas, utils
 import ai4papi.conf as papiconf
 
 
@@ -121,10 +122,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_filtered_list(
         self,
-        tags: tuple | None = Query(default=None),
-        tags_any: tuple | None = Query(default=None),
-        not_tags: tuple | None = Query(default=None),
-        not_tags_any: tuple | None = Query(default=None),
+        tags: schemas.TagList = None,
+        tags_any: schemas.TagList = None,
+        not_tags: schemas.TagList = None,
+        not_tags_any: schemas.TagList = None,
     ):
         """
         Retrieve a list of all items.
@@ -141,10 +142,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_summary(
         self,
-        tags: tuple | None = Query(default=None),
-        tags_any: tuple | None = Query(default=None),
-        not_tags: tuple | None = Query(default=None),
-        not_tags_any: tuple | None = Query(default=None),
+        tags: schemas.TagList = None,
+        tags_any: schemas.TagList = None,
+        not_tags: schemas.TagList = None,
+        not_tags_any: schemas.TagList = None,
     ):
         """
         Retrieve a list of all items' basic metadata.
@@ -170,7 +171,7 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
-        profile: str = Query(default="", enum=[""] + supported_profiles),
+        profile: Annotated[str, Query(enum=[""] + supported_profiles)] = "",
         request: Request = None,  # ty: ignore
     ):
         """
@@ -473,6 +474,7 @@ class Catalog:
         for a specific item. It is prefilled with the appropriate
         docker image and the available docker tags.
         """
+        _ = (item_name, vo)  # dummy reference to mark them as "used"
         return {}
 
 

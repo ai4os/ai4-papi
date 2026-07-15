@@ -7,7 +7,7 @@ from copy import deepcopy
 import types
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
@@ -38,7 +38,7 @@ REQUIREMENTS = {
 
 @router.get("")
 def get_deployments(
-    full_info: bool = Query(default=False),
+    full_info: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -89,7 +89,7 @@ def get_deployments(
 @router.get("/{deployment_uuid}")
 def get_deployment(
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -122,7 +122,7 @@ def get_deployment(
 @router.post("")
 def create_deployment(
     module_name: str,
-    title: str = Query(default=""),
+    title: str = "",
     authorization=Depends(security),
 ):
     """

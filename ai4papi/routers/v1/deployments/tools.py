@@ -9,10 +9,10 @@ import types
 from types import SimpleNamespace
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, quotas, utils
+from ai4papi import auth, quotas, schemas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad as nomad
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
@@ -30,8 +30,8 @@ security = HTTPBearer()
 
 @router.get("")
 def get_deployments(
-    vos: list[str] | None = Query(default=None),
-    full_info: bool = Query(default=False),
+    vos: schemas.VoList = None,
+    full_info: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -98,7 +98,7 @@ def get_deployments(
 def get_deployment(
     vo: str,
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
     authorization=Depends(security),
 ):
     """

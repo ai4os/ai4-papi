@@ -316,7 +316,6 @@ def get_deployment(
         info["error_msg"] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
-        # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
         info["status"] = "queued"
 
         # Fill info with _requested_ resources instead
@@ -428,11 +427,11 @@ def get_gpu_models(vo: str | None = None):
     for node in nodes:
         # Discard nodes that don't belong to the requested VO, if vo is specified
         meta = Nomad.node.get_node(node["ID"])["Meta"]
-        if vo is not None:
-            if papiconf.MAIN_CONF["nomad"]["namespaces"][vo] not in meta.get(
-                "namespace", ""
-            ):
-                continue
+        if (vo is not None) and (
+            papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+            not in meta.get("namespace", "")
+        ):
+            continue
 
         # Discard GPU models of nodes that are not eligible
         if node["SchedulingEligibility"] != "eligible":

@@ -9,7 +9,7 @@ import json
 import uuid
 import yaml
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
 import requests
@@ -184,7 +184,7 @@ def get_service_conf(
 @router.get("/services")
 def get_services_list(
     vo: str,
-    public: bool = Query(default=False),
+    public: bool = False,
     authorization=Depends(security),
 ):
     """

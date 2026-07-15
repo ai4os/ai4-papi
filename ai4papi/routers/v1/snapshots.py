@@ -11,11 +11,11 @@ from copy import deepcopy
 import datetime
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from harborapi import HarborClient
 
-from ai4papi import auth, nomad
+from ai4papi import auth, nomad, schemas
 import ai4papi.conf as papiconf
 
 
@@ -46,7 +46,7 @@ TOTAL_LIMIT_GB = 15
 
 @router.get("")
 def get_snapshots(
-    vos: list[str] | None = Query(default=None),
+    vos: schemas.VoList = None,
     authorization=Depends(security),
 ):
     """
