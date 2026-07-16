@@ -18,6 +18,6 @@ except Exception:
     token = os.getenv("PAPI_TESTS_TOKEN")
 
 if not token:
-    raise Exception(
+    raise PermissionError(
         "PAPI needs to retrieve an OIDC token either using oidc-agent or ENV variables."
     )
