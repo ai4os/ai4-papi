@@ -536,7 +536,7 @@ def create_deployment(
                 "RAM": user_conf["hardware"]["ram"],
                 "DISK": user_conf["hardware"]["disk"],
                 "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
-                "NVFL_VERSION": "2.8.0",
+                "NVFL_VERSION": "2.8.1",
                 "NVFL_USERNAME": user_conf["nvflare"]["username"],
                 "NVFL_PASSWORD": user_conf["nvflare"]["password"],
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
