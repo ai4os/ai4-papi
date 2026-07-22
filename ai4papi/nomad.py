@@ -52,7 +52,7 @@ def get_deployment(
     deployment_uuid: str,
     namespace: str,
     owner: str,
-    full_info: True,
+    full_info: bool = True,
 ):
     """
     Retrieve the info of a specific deployment.
@@ -162,7 +162,10 @@ def get_deployment(
         service = re.search(
             "deep-start --(.*)$",
             info["docker_command"],
-        ).group(1)
+        )
+        if not service:
+            raise ValueError(f"[{deployment_uuid}] Failed to parse Docker command.")
+        service = service.group(1)
 
         info["main_endpoint"] = service2endpoint[service]
 
@@ -313,7 +316,6 @@ def get_deployment(
         info["error_msg"] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
-        # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
         info["status"] = "queued"
 
         # Fill info with _requested_ resources instead
@@ -415,7 +417,7 @@ def delete_deployment(
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=1 * 60 * 60))
-def get_gpu_models(vo: str = None):
+def get_gpu_models(vo: str | None = None):
     """
     Retrieve available GPU models in the cluster, optionally filtering nodes by VO.
     If vo is None, do not filter by VO.
@@ -425,11 +427,11 @@ def get_gpu_models(vo: str = None):
     for node in nodes:
         # Discard nodes that don't belong to the requested VO, if vo is specified
         meta = Nomad.node.get_node(node["ID"])["Meta"]
-        if vo is not None:
-            if papiconf.MAIN_CONF["nomad"]["namespaces"][vo] not in meta.get(
-                "namespace", ""
-            ):
-                continue
+        if (vo is not None) and (
+            papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+            not in meta.get("namespace", "")
+        ):
+            continue
 
         # Discard GPU models of nodes that are not eligible
         if node["SchedulingEligibility"] != "eligible":

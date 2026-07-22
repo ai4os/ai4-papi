@@ -103,7 +103,7 @@ def get_api_keys(authorization=Depends(security)):
     # Remove user from all teams that are not his top level
     # ⚠️ Do not update teams before changing API key team, otherwise the API keys will
     # be erased.
-    teams_to_remove = set([team["team_id"] for team in user["teams"]])
+    teams_to_remove = {team["team_id"] for team in user["teams"]}
     teams_to_remove.discard(top_level)
     for team in teams_to_remove:
         data = {"team_id": team, "user_id": user_id}
@@ -112,7 +112,7 @@ def get_api_keys(authorization=Depends(security)):
     # Build final key dict
     out = [
         {
-            "id": item["key_alias"].split("_")[-1],
+            "id": "_".join(item["key_alias"].split("_")[1:]),
             "created_at": item["created_at"],
             "team_id": top_level,
             "expires": item["expires"],
@@ -126,7 +126,7 @@ def get_api_keys(authorization=Depends(security)):
 @router.post("")
 def create_api_key(
     key_name: str,
-    duration: str = None,
+    duration: str | None = None,
     authorization=Depends(security),
 ):
     """

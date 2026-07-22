@@ -1,4 +1,4 @@
-import tempfile
+import io
 import time
 from types import SimpleNamespace
 
@@ -9,16 +9,15 @@ from conf import token
 
 
 # Create a job
-batch_file = tempfile.SpooledTemporaryFile()
-batch_file.write(b"""
+content = b"""
 echo "Test started"
 date > /storage/test-batch.txt
 sleep 6000
-""")
-batch_file.seek(0)
+"""
+binary_buffer = io.BytesIO(content)
 rcreate = batch.create_deployment(
     vo="vo.ai4eosc.eu",
-    user_cmd=UploadFile(file=batch_file),
+    user_cmd=UploadFile(file=binary_buffer),
     conf="""
     {
         "general": {

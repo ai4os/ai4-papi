@@ -7,14 +7,14 @@ from copy import deepcopy
 import types
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 
 
 router = APIRouter(
@@ -38,7 +38,7 @@ REQUIREMENTS = {
 
 @router.get("")
 def get_deployments(
-    full_info: bool = Query(default=False),
+    full_info: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -73,15 +73,11 @@ def get_deployments(
             )
         except HTTPException:  # not a try-me
             continue
-        except Exception as e:  # unexpected error
-            raise (e)
 
         user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -89,7 +85,7 @@ def get_deployments(
 @router.get("/{deployment_uuid}")
 def get_deployment(
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -122,7 +118,7 @@ def get_deployment(
 @router.post("")
 def create_deployment(
     module_name: str,
-    title: str = Query(default=""),
+    title: str = "",
     authorization=Depends(security),
 ):
     """
@@ -141,7 +137,7 @@ def create_deployment(
     docker_image = "/".join(registry.split("/")[-2:])
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.TRY_ME["nomad"])
+    nomad_template = deepcopy(papiconf.TRY_ME["nomad"])
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
@@ -168,7 +164,7 @@ def create_deployment(
         warning = "<ul>" + warning + "</ul>"
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": NAMESPACE,
@@ -187,21 +183,21 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing
     # We check for every resource metric (cpu, disk, ram)
-    stats = get_cluster_stats(vo=VO)
+    cluster_stats = get_cluster_stats(vo=VO)
     resources = ["cpu", "ram", "disk"]
     keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
-    status = {k: 0 for k in keys}
+    status = dict.fromkeys(keys, 0)
 
-    for _, datacenter in stats["datacenters"].items():
-        for _, node in datacenter["nodes"].items():
-            if node["type"] == "tryme" and node["status"] == "ready":
+    for datacenter in cluster_stats.datacenters.values():
+        for node in datacenter.nodes.values():
+            if node.type == "tryme" and node.status == "ready":
                 for k in keys:
-                    status[k] += node[k]
+                    status[k] += getattr(node, k)
     for r in resources:
         if (
             status[f"{r}_total"] == 0

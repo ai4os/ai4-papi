@@ -3,15 +3,14 @@ import datetime
 import os
 import subprocess
 import types
-from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, module_patches, quotas, utils
+from ai4papi import auth, module_patches, quotas, schemas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
@@ -30,8 +29,8 @@ provenance_token = papiconf.load_env("PROVENANCE_TOKEN")
 
 @router.get("")
 def get_deployments(
-    vos: Union[Tuple, None] = Query(default=None),
-    full_info: bool = Query(default=False),
+    vos: schemas.VoList = None,
+    full_info: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -48,16 +47,19 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -78,15 +80,11 @@ def get_deployments(
                 )
             except HTTPException:  # not a module
                 continue
-            except Exception as e:  # unexpected error
-                raise (e)
 
             user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -95,7 +93,7 @@ def get_deployments(
 def get_deployment(
     vo: str,
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -141,7 +139,7 @@ def get_deployment(
 @router.post("")
 def create_deployment(
     vo: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -172,7 +170,7 @@ def create_deployment(
     auth.check_authorization(auth_info, vo)
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.MODULES["nomad"])
+    nomad_template = deepcopy(papiconf.MODULES["nomad"])
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
     # Update values conf in case we received a submitted conf
@@ -242,7 +240,7 @@ def create_deployment(
         )
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -284,7 +282,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Add affinity from greener datacenter
     nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
