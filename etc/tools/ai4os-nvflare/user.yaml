@@ -33,7 +33,7 @@ nvflare:
 
   app_location:
     name: NVFlare project docker image download link
-    value: 'registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-client:2.5-Stifo'
+    value: 'registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-client:2.8.0'
     description: NVFlare project docker image download link
 
   public_project:
