@@ -3,6 +3,7 @@ Manage user secrets with Vault
 """
 
 import hvac
+import hvac.exceptions
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 
@@ -11,7 +12,7 @@ from ai4papi import auth
 
 router = APIRouter(
     prefix="/secrets",
-    tags=["Secrets management"],
+    tags=["Secrets"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()

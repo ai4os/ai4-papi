@@ -9,22 +9,19 @@ The strategy for saving in Harbor is:
 
 from copy import deepcopy
 import datetime
-from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from harborapi import HarborClient
-from nomad.api import exceptions
 
-from ai4papi import auth
+from ai4papi import auth, nomad, schemas
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad_common
 
 
 router = APIRouter(
     prefix="/snapshots",
-    tags=["Snapshots of deployments"],
+    tags=["Snapshots (deployments)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
@@ -32,15 +29,15 @@ security = HTTPBearer()
 # Init the Harbor client
 if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
     client = HarborClient(
-        url="https://registry.services.ai4os.eu/api/v2.0/",
+        url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
         username=papiconf.HARBOR_USER,
         secret=papiconf.HARBOR_PASS,
     )
 else:
     client = None
 
-# Use the Nomad cluster inited in nomad.common
-Nomad = nomad_common.Nomad
+# Use the Nomad cluster inited in nomad utils
+Nomad = nomad.Nomad
 
 # Define limits for snapshots size
 INDIVIDUAL_LIMIT_GB = 10
@@ -49,7 +46,7 @@ TOTAL_LIMIT_GB = 15
 
 @router.get("")
 def get_snapshots(
-    vos: Union[Tuple, None] = Query(default=None),
+    vos: schemas.VoList = None,
     authorization=Depends(security),
 ):
     """
@@ -63,27 +60,24 @@ def get_snapshots(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     snapshots = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve the completed snapshots from Harbor
-        snapshots += get_harbor_snapshots(
-            owner=auth_info["id"],
-            vo=vo,
-        )
+        snapshots += get_harbor_snapshots(owner=auth_info["id"], vo=vo)
 
         # Retrieve pending/failed snapshots from Nomad
-        snapshots += get_nomad_snapshots(
-            owner=auth_info["id"],
-            vo=vo,
-        )
+        snapshots += get_nomad_snapshots(owner=auth_info["id"], vo=vo)
 
     return snapshots
 
@@ -109,10 +103,7 @@ def create_snapshot(
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
     # Check the user is within our limits
-    snapshots = get_harbor_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     total_size = sum([s["size"] for s in snapshots])
     if total_size > (TOTAL_LIMIT_GB * 10**9):
         raise HTTPException(
@@ -124,10 +115,10 @@ def create_snapshot(
         )
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.SNAPSHOTS["nomad"])
+    nomad_template = deepcopy(papiconf.SNAPSHOTS["nomad"])
 
     # Get target job info
-    job_info = nomad_common.get_deployment(
+    job_info = nomad.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info["id"],
@@ -144,7 +135,7 @@ def create_snapshot(
 
     # Replace the Nomad job template
     now = datetime.datetime.now()
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": uuid.uuid1(),
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -166,10 +157,10 @@ def create_snapshot(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad_common.load_job_conf(nomad_conf)
+    nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Submit job
-    _ = nomad_common.create_deployment(nomad_conf)
+    _ = nomad.create_deployment(nomad_conf)
 
     return {
         "status": "success",
@@ -195,12 +186,9 @@ def delete_snapshot(
     auth.check_authorization(auth_info, vo)
 
     # Check is the snapshot is in the "completed" list (Harbor)
-    snapshots = get_harbor_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
-    if snapshot_uuid in snapshot_ids:
+    if client and (snapshot_uuid in snapshot_ids):
         _ = client.delete_artifact(
             project_name="user-snapshots",
             repository_name=auth_info["id"].replace("@", "_at_"),
@@ -209,40 +197,15 @@ def delete_snapshot(
         return {"status": "success"}
 
     # Check if the snapshot is in the "in progress" list (Nomad)
-    snapshots = get_nomad_snapshots(
-        owner=auth_info["id"],
-        vo=vo,
-    )
+    snapshots = get_nomad_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
     if snapshot_uuid in snapshot_ids:
         idx = snapshot_ids.index(snapshot_uuid)
-
-        # Check the deployment exists
-        try:
-            j = Nomad.job.get_job(
-                id_=snapshots[idx]["nomad_ID"],
-                namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-            )
-        except exceptions.URLNotFoundNomadException:
-            raise HTTPException(
-                status_code=400,
-                detail="No deployment exists with this uuid.",
-            )
-
-        # Check job does belong to owner
-        if j["Meta"] and auth_info["id"] != j["Meta"].get("owner", ""):
-            raise HTTPException(
-                status_code=400,
-                detail="You are not the owner of that deployment.",
-            )
-
-        # Delete deployment
         Nomad.job.deregister_job(
             id_=snapshots[idx]["nomad_ID"],
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
             purge=True,
         )
-
         return {"status": "success"}
 
     # If it not in either of those two lists, then the UUID is wrong
@@ -264,8 +227,10 @@ def get_harbor_snapshots(
     * **vo**: Virtual Organization the snapshot belongs to
     """
     # Check if the user exists in Harbor (ie. Docker image exists)
+    if not client:
+        return []
     repos = client.get_repositories(project_name="user-snapshots")
-    users = [r.name.split("/")[1] for r in repos]
+    users = [r.name.split("/")[1] for r in repos]  # ty: ignore[not-iterable]
     user_str = owner.replace("@", "_at_")
     if user_str not in users:
         return []
@@ -276,7 +241,7 @@ def get_harbor_snapshots(
         repository_name=user_str,
     )
     snapshots = []
-    for a in artifacts:
+    for a in artifacts:  # ty: ignore[not-iterable]
         # Ignore snapshot if it doesn't belong to the VO
         a_labels = a.extra_attrs.root["config"]["Labels"]
         if a_labels.get("VO") != vo:
@@ -292,7 +257,7 @@ def get_harbor_snapshots(
                 "title": a_labels["TITLE"],
                 "description": a_labels["DESCRIPTION"],
                 "nomad_ID": None,
-                "docker_image": f"registry.services.ai4os.eu/user-snapshots/{user_str}",
+                "docker_image": f"registry.cloud.ai4eosc.eu/user-snapshots/{user_str}",
             }
         )
     return snapshots
@@ -318,20 +283,14 @@ def get_nomad_snapshots(
         + "Meta is not empty and "
         + f'Meta.owner == "{owner}"'
     )
-    jobs = Nomad.jobs.get_jobs(
-        namespace=namespace,
-        filter_=job_filter,
-    )
+    jobs = Nomad.jobs.get_jobs(namespace=namespace, filter_=job_filter)
 
     # Retrieve info for those jobs
     # user_jobs = []
     snapshots = []
     for j in jobs:
         # Get job to retrieve the metadata
-        job_info = Nomad.job.get_job(
-            id_=j["ID"],
-            namespace=namespace,
-        )
+        job_info = Nomad.job.get_job(id_=j["ID"], namespace=namespace)
 
         # Generate snapshot info template
         tmp = {
@@ -347,20 +306,12 @@ def get_nomad_snapshots(
         }
 
         # Get allocation to retrieve the task status
-        allocs = Nomad.job.get_allocations(
-            namespace=namespace,
-            id_=j["ID"],
-        )
+        allocs = Nomad.job.get_allocations(namespace=namespace, id_=j["ID"])
 
         # Reorder allocations based on recency
         dates = [a["CreateTime"] for a in allocs]
-        allocs = [
-            x
-            for _, x in sorted(
-                zip(dates, allocs),
-                key=lambda pair: pair[0],
-            )
-        ][::-1]  # more recent first
+        allocs = [x for _, x in sorted(zip(dates, allocs), key=lambda pair: pair[0])]
+        allocs = allocs[::-1]  # more recent first
 
         # Retrieve tasks
         tasks = (

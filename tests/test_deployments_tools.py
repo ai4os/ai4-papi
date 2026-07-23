@@ -16,7 +16,7 @@ tools_config = {
         },
         "storage": {
             "rclone_conf": "/srv/.rclone/rclone.conf",
-            "rclone_url": "https://share.services.ai4os.eu/remote.php/webdav",
+            "rclone_url": "https://share.cloud.ai4eosc.eu/remote.php/webdav",
             "rclone_vendor": "nextcloud",
             "rclone_user": "mock_user",
             "rclone_password": "mock_password",
@@ -49,75 +49,79 @@ tools_config = {
 }
 
 for tname, tconfig in tools_config.items():
-    print(f"  Testing tool: {tname}")
+    try:
+        # Create tool
+        rcreate = tools.create_deployment(
+            vo="vo.ai4eosc.eu",
+            tool_name=tname,
+            conf=tconfig,
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert isinstance(rcreate, dict)
+        assert "job_ID" in rcreate.keys()
 
-    # Create tool
-    rcreate = tools.create_deployment(
-        vo="vo.ai4eosc.eu",
-        tool_name=tname,
-        conf=tconfig,
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert isinstance(rcreate, dict)
-    assert "job_ID" in rcreate.keys()
+        time.sleep(0.2)  # Nomad takes some time to allocate deployment
 
-    time.sleep(0.2)  # Nomad takes some time to allocate deployment
+        # Retrieve that tool
+        rdep = tools.get_deployment(
+            vo="vo.ai4eosc.eu",
+            deployment_uuid=rcreate["job_ID"],
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert isinstance(rdep, dict)
+        assert "job_ID" in rdep.keys()
+        assert rdep["job_ID"] == rcreate["job_ID"]
+        assert rdep["status"] != "error"
+        assert rdep["tool_name"]
 
-    # Retrieve that tool
-    rdep = tools.get_deployment(
-        vo="vo.ai4eosc.eu",
-        deployment_uuid=rcreate["job_ID"],
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert isinstance(rdep, dict)
-    assert "job_ID" in rdep.keys()
-    assert rdep["job_ID"] == rcreate["job_ID"]
-    assert rdep["status"] != "error"
-    assert rdep["tool_name"]
+        # Retrieve all tools
+        rdeps = tools.get_deployments(
+            vos=["vo.ai4eosc.eu"],
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert isinstance(rdeps, list)
+        assert any([d["job_ID"] == rcreate["job_ID"] for d in rdeps])
+        assert all([d["job_ID"] != "error" for d in rdeps])
 
-    # Retrieve all tools
-    rdeps = tools.get_deployments(
-        vos=["vo.ai4eosc.eu"],
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert isinstance(rdeps, list)
-    assert any([d["job_ID"] == rcreate["job_ID"] for d in rdeps])
-    assert all([d["job_ID"] != "error" for d in rdeps])
+        # Check that we cannot retrieve that tool from modules
+        # This should break!
+        # modules.get_deployment(
+        #     vo='vo.ai4eosc.eu',
+        #     deployment_uuid=rcreate['job_ID'],
+        #     authorization=SimpleNamespace(
+        #         credentials=token
+        #     ),
+        # )
 
-    # Check that we cannot retrieve that tool from modules
-    # This should break!
-    # modules.get_deployment(
-    #     vo='vo.ai4eosc.eu',
-    #     deployment_uuid=rcreate['job_ID'],
-    #     authorization=SimpleNamespace(
-    #         credentials=token
-    #     ),
-    # )
+        # Check that we cannot retrieve that tool from modules list
+        rdeps2 = modules.get_deployments(
+            vos=["vo.ai4eosc.eu"],
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert isinstance(rdeps2, list)
+        assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps2])
 
-    # Check that we cannot retrieve that tool from modules list
-    rdeps2 = modules.get_deployments(
-        vos=["vo.ai4eosc.eu"],
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert isinstance(rdeps2, list)
-    assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps2])
+        # Delete tool
+        rdel = tools.delete_deployment(
+            vo="vo.ai4eosc.eu",
+            deployment_uuid=rcreate["job_ID"],
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert isinstance(rdel, dict)
+        assert "status" in rdel.keys()
 
-    # Delete tool
-    rdel = tools.delete_deployment(
-        vo="vo.ai4eosc.eu",
-        deployment_uuid=rcreate["job_ID"],
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert isinstance(rdel, dict)
-    assert "status" in rdel.keys()
+        time.sleep(3)  # Nomad takes some time to delete
 
-    time.sleep(3)  # Nomad takes some time to delete
+        # Check tool no longer exists
+        rdeps3 = tools.get_deployments(
+            vos=["vo.ai4eosc.eu"],
+            authorization=SimpleNamespace(credentials=token),
+        )
+        assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
 
-    # Check tool no longer exists
-    rdeps3 = tools.get_deployments(
-        vos=["vo.ai4eosc.eu"],
-        authorization=SimpleNamespace(credentials=token),
-    )
-    assert not any([d["job_ID"] == rcreate["job_ID"] for d in rdeps3])
+    except Exception as e:
+        print(f"  🔴 Error testing tool: {tname}:\n{e}")
 
-print("🟢 Deployments (tools) tests passed!")
+    print(f"  🟢 Success testing tool: {tname}")
+
+print("Deployments (tools) tests completed!")

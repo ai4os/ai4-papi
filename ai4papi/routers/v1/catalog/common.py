@@ -25,20 +25,20 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 import configparser
 import importlib
 import json
-import os
 import re
-from typing import Tuple, Union
+from typing import Annotated
 import warnings
 import yaml
 
 import ai4_metadata
+import ai4_metadata.exceptions
 from cachetools import cached, TTLCache
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer
 import requests
 
-from ai4papi import utils
+from ai4papi import schemas, utils
 import ai4papi.conf as papiconf
 
 
@@ -47,12 +47,7 @@ session = requests.Session()
 security = HTTPBearer()
 
 # Jenkins token is mandatory in production
-JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
-if not JENKINS_TOKEN:
-    if papiconf.IS_DEV:  # Not enforced for developers
-        print('"JENKINS_TOKEN" envar is not defined')
-    else:
-        raise Exception('You need to define the variable "JENKINS_TOKEN".')
+JENKINS_TOKEN = papiconf.load_env("JENKINS_TOKEN")
 
 # Check conversions supported in ai4-metadata
 supported_profiles = [i.name for i in ai4_metadata.mapping.SupportedOutputProfiles]
@@ -127,10 +122,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_filtered_list(
         self,
-        tags: Union[Tuple, None] = Query(default=None),
-        tags_any: Union[Tuple, None] = Query(default=None),
-        not_tags: Union[Tuple, None] = Query(default=None),
-        not_tags_any: Union[Tuple, None] = Query(default=None),
+        tags: schemas.TagList = None,
+        tags_any: schemas.TagList = None,
+        not_tags: schemas.TagList = None,
+        not_tags_any: schemas.TagList = None,
     ):
         """
         Retrieve a list of all items.
@@ -147,10 +142,10 @@ class Catalog:
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_summary(
         self,
-        tags: Union[Tuple, None] = Query(default=None),
-        tags_any: Union[Tuple, None] = Query(default=None),
-        not_tags: Union[Tuple, None] = Query(default=None),
-        not_tags_any: Union[Tuple, None] = Query(default=None),
+        tags: schemas.TagList = None,
+        tags_any: schemas.TagList = None,
+        not_tags: schemas.TagList = None,
+        not_tags_any: schemas.TagList = None,
     ):
         """
         Retrieve a list of all items' basic metadata.
@@ -173,21 +168,11 @@ class Catalog:
             summary.append(meta)
         return summary
 
-    def get_tags(
-        self,
-    ):
-        """
-        Retrieve a list of all the existing tags.
-        Now deprecated, kept to avoid breaking backward-compatibility.
-        Returns an empty list.
-        """
-        return []
-
     def get_metadata(
         self,
         item_name: str,
-        profile: str = Query(default="", enum=[""] + supported_profiles),
-        request: Request = None,
+        profile: Annotated[str, Query(enum=[""] + supported_profiles)] = "",
+        request: Request = None,  # ty: ignore
     ):
         """
         Get the item's full metadata.
@@ -287,7 +272,7 @@ class Catalog:
         if item_name not in items.keys():
             raise HTTPException(
                 status_code=404,
-                detail=f"Item {item_name} not in catalog: {list(items.keys())}",
+                detail=f"Item {item_name} not in the catalog: https://github.com/{self.repo}",
             )
 
         # Retrieve metadata from default branch
@@ -301,14 +286,22 @@ class Catalog:
         # Try to retrieve the metadata from Github
         r = session.get(metadata_url)
         if not r.ok:
-            error = (
-                "The metadata of this module could not be retrieved because the "
-                "module is lacking a metadata file (`ai4-metadata.yml`)."
-            )
+            if r.status_code == 429:
+                error = (
+                    "The metadata of this module could not be retrieved because of "
+                    "rate limiting from the GitHub API."
+                )
+            else:
+                error = (
+                    "The metadata of this module could not be retrieved because the "
+                    "module is lacking a metadata file (`ai4-metadata.yml`)."
+                )
         else:
             # Try to load the YML file
             try:
                 metadata = yaml.safe_load(r.text)
+                if not isinstance(metadata, dict):
+                    raise ValueError("Metadata is not a dictionary")
             except Exception:
                 metadata = None
                 error = (
@@ -381,6 +374,8 @@ class Catalog:
             }
 
         else:
+            assert isinstance(metadata, dict)
+
             # Replace some fields with the info gathered from Github
             pattern = r"github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$"
             match = re.search(pattern, items[item_name]["url"])
@@ -427,7 +422,7 @@ class Catalog:
 
     def refresh_catalog(
         self,
-        item_name: str = None,
+        item_name: str | None = None,
         authorization=Depends(security),
     ):
         """
@@ -471,12 +466,15 @@ class Catalog:
 
     def get_config(
         self,
+        item_name: str,
+        vo: str,
     ):
         """
         Returns the default configuration (dict) for creating a deployment
         for a specific item. It is prefilled with the appropriate
         docker image and the available docker tags.
         """
+        _ = (item_name, vo)  # dummy reference to mark them as "used"
         return {}
 
 

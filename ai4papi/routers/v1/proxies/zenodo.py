@@ -10,7 +10,6 @@ the Zenodo token).
 import os
 import re
 import requests
-from typing import Union
 
 
 from cachetools import cached, TTLCache
@@ -22,7 +21,7 @@ from ai4papi import auth
 
 router = APIRouter(
     prefix="/zenodo",
-    tags=["Zenodo datasets"],
+    tags=["Proxies (Zenodo)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
@@ -41,7 +40,7 @@ if zenodo_token:
 @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
 def _zenodo_proxy(
     api_route: str,
-    params: Union[frozenset, None] = None,
+    params: frozenset | None = None,
 ):
     """
     We use this hidden function to allow for caching responses.
@@ -93,7 +92,7 @@ def _zenodo_proxy(
 @router.post("")
 def zenodo_proxy(
     api_route: str,
-    params: Union[dict, None] = None,
+    params: dict | None = None,
     authorization=Depends(security),
 ):
     """

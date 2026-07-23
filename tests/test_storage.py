@@ -6,7 +6,7 @@ from conf import token
 
 r = storage.storage_ls(
     vo="vo.ai4eosc.eu",
-    storage_name="share.services.ai4os.eu",
+    storage_name="share.cloud.ai4eosc.eu",
     subpath="ai4os-storage",
     authorization=SimpleNamespace(credentials=token),
 )

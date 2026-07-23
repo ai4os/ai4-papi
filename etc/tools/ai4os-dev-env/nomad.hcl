@@ -65,11 +65,19 @@ job "tool-devenv-${JOB_UUID}" {
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
+  # We also add an anti affinity to GPU nodes to make this preference even stronger
   affinity {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
     weight    = 100
+  }
+
+  affinity {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -100
   }
 
   # Avoid rescheduling the job if the job fails the first time
@@ -166,7 +174,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
         privileged = true
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
@@ -202,7 +210,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/docker-zenodo:latest"
+        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-zenodo:latest"
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
@@ -230,7 +238,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image = "registry.services.ai4os.eu/ai4os/docker-mail:client"
+        image = "registry.cloud.ai4eosc.eu/ai4os/docker-mail:client"
       }
 
       env {

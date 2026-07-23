@@ -9,7 +9,8 @@ Notes:
 
 from datetime import datetime
 import re
-import types
+import urllib3
+
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException
@@ -18,14 +19,12 @@ from nomad.api import exceptions
 import requests
 
 import ai4papi.conf as papiconf
-import ai4papi.nomad.patches as nomad_patches
+
+# Disable warning from python-nomad
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 Nomad = nomad.Nomad()
-# TODO: Remove monkey-patches when the code is merged to python-nomad Pypi package
-Nomad.job.deregister_job = types.MethodType(nomad_patches.deregister_job, Nomad.job)
-Nomad.job.get_allocations = types.MethodType(nomad_patches.get_allocations, Nomad.job)
-Nomad.job.get_evaluations = types.MethodType(nomad_patches.get_allocations, Nomad.job)
 
 # Persistent requests session for faster requests
 session = requests.Session()
@@ -53,7 +52,7 @@ def get_deployment(
     deployment_uuid: str,
     namespace: str,
     owner: str,
-    full_info: True,
+    full_info: bool = True,
 ):
     """
     Retrieve the info of a specific deployment.
@@ -163,7 +162,10 @@ def get_deployment(
         service = re.search(
             "deep-start --(.*)$",
             info["docker_command"],
-        ).group(1)
+        )
+        if not service:
+            raise ValueError(f"[{deployment_uuid}] Failed to parse Docker command.")
+        service = service.group(1)
 
         info["main_endpoint"] = service2endpoint[service]
 
@@ -314,7 +316,6 @@ def get_deployment(
         info["error_msg"] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
-        # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
         info["status"] = "queued"
 
         # Fill info with _requested_ resources instead
@@ -416,16 +417,20 @@ def delete_deployment(
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=1 * 60 * 60))
-def get_gpu_models(vo):
+def get_gpu_models(vo: str | None = None):
     """
-    Retrieve available GPU models in the cluster, filtering nodes by VO.
+    Retrieve available GPU models in the cluster, optionally filtering nodes by VO.
+    If vo is None, do not filter by VO.
     """
     gpu_models = set()
     nodes = Nomad.nodes.get_nodes(resources=True)
     for node in nodes:
-        # Discard nodes that don't belong to the requested VO
+        # Discard nodes that don't belong to the requested VO, if vo is specified
         meta = Nomad.node.get_node(node["ID"])["Meta"]
-        if papiconf.MAIN_CONF["nomad"]["namespaces"][vo] not in meta["namespace"]:
+        if (vo is not None) and (
+            papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+            not in meta.get("namespace", "")
+        ):
             continue
 
         # Discard GPU models of nodes that are not eligible

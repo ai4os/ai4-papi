@@ -1,4 +1,4 @@
-import tempfile
+import io
 import time
 from types import SimpleNamespace
 
@@ -9,16 +9,15 @@ from conf import token
 
 
 # Create a job
-batch_file = tempfile.SpooledTemporaryFile()
-batch_file.write(b"""
+content = b"""
 echo "Test started"
 date > /storage/test-batch.txt
 sleep 6000
-""")
-batch_file.seek(0)
+"""
+binary_buffer = io.BytesIO(content)
 rcreate = batch.create_deployment(
     vo="vo.ai4eosc.eu",
-    user_cmd=UploadFile(file=batch_file),
+    user_cmd=UploadFile(file=binary_buffer),
     conf="""
     {
         "general": {
@@ -26,7 +25,7 @@ rcreate = batch.create_deployment(
         },
         "storage": {
             "rclone_conf": "/srv/.rclone/rclone.conf",
-            "rclone_url": "https://share.services.ai4os.eu/remote.php/dav/files/EGI_Checkin-0000000000000000000000000000000000",
+            "rclone_url": "https://share.cloud.ai4eosc.eu/remote.php/dav/files/EGI_Checkin-0000000000000000000000000000000000",
             "rclone_vendor": "nextcloud",
             "rclone_user": "EGI_Checkin-0000000000000000000000000000000000",
             "rclone_password": "0000000000000000000000000000"

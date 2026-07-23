@@ -66,11 +66,19 @@ job "tool-nvflare-${JOB_UUID}" {
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
+  # We also add an anti affinity to GPU nodes to make this preference even stronger
   affinity {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
     weight    = 100
+  }
+
+  affinity {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -100
   }
 
   # Avoid rescheduling the job on **other** nodes during a network cut
@@ -166,13 +174,13 @@ job "tool-nvflare-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image      = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
+        image      = "registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
         force_pull = true
         ports      = ["dashboard"]
       }
 
       env {
-        NVFL_CREDENTIAL="${NVFL_USERNAME}:${NVFL_PASSWORD}"
+        NVFL_CREDENTIAL="${NVFL_USERNAME}:${NVFL_PASSWORD}:${NVFL_ORGANIZATION}"
         NVFL_SERVER1="${NVFL_SERVER1}"
         NVFL_HA_MODE="False"
         NVFL_OVERSEER=""
@@ -212,7 +220,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -L \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_USERNAME}'", "password": "'${NVFL_PASSWORD}'"}' \
-              ${nvfl_dashboard_url}/api/v1/login \
+              ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/login \
           )
           status=$(jq -r ".status" <<<"$resp")
           if [ "$status" != "ok" ]; then
@@ -233,7 +241,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -H 'Authorization: Bearer '$access_token \
               -H 'Content-type: application/json' \
               -d '{"pin":"'$PIN'"}' \
-              ${nvfl_dashboard_url}/api/v1/servers/1/blob \
+              ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/servers/1/blob \
           )
           filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
           if [ ! -f $filename ]; then
@@ -275,7 +283,7 @@ job "tool-nvflare-${JOB_UUID}" {
           --ServerApp.password=`python3 -c "from jupyter_server.auth import passwd; print(passwd('${NVFL_PASSWORD}'))"` \
           --port=8888 \
           --ip=0.0.0.0 \
-          --notebook-dir=/tf \
+          --notebook-dir=/workspace \
           --no-browser \
           --allow-root
         EOF
@@ -286,7 +294,7 @@ job "tool-nvflare-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image      = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
+        image      = "registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
         command    = "/bin/bash"
         args       = [ "-c", "/workspace/entrypoint.sh"]
         force_pull = true

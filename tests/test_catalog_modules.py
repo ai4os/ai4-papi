@@ -33,10 +33,6 @@ modules_sum = Modules.get_summary(
 assert isinstance(modules_sum, list)
 assert isinstance(modules_sum[0], dict)
 
-# Get catalog tags
-modules_tags = Modules.get_tags()
-assert isinstance(modules_tags, list)  # empty list; deprecated method
-
 # Explore an individual module
 module_name = modules_list[0]
 

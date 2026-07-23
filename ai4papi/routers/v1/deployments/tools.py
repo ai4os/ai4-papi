@@ -7,15 +7,14 @@ import secrets
 import subprocess
 import types
 from types import SimpleNamespace
-from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, quotas, utils
+from ai4papi import auth, quotas, schemas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad as nomad
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
@@ -23,7 +22,7 @@ from ai4papi.routers.v1 import deployments as ai4_deployments
 
 router = APIRouter(
     prefix="/tools",
-    tags=["Tools deployments"],
+    tags=["Deployments (tools)"],
     responses={404: {"description": "Not found"}},
 )
 security = HTTPBearer()
@@ -31,8 +30,8 @@ security = HTTPBearer()
 
 @router.get("")
 def get_deployments(
-    vos: Union[Tuple, None] = Query(default=None),
-    full_info: bool = Query(default=False),
+    vos: schemas.VoList = None,
+    full_info: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -49,16 +48,19 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
-    for vo in vos:
+    for vo in user_vos:
         # Retrieve all jobs in namespace
         jobs = nomad.get_deployments(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -79,15 +81,11 @@ def get_deployments(
                 )
             except HTTPException:  # not a tool
                 continue
-            except Exception as e:  # unexpected error
-                raise (e)
 
             user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -96,7 +94,7 @@ def get_deployments(
 def get_deployment(
     vo: str,
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -172,7 +170,7 @@ def get_deployment(
 def create_deployment(
     vo: str,
     tool_name: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -217,8 +215,7 @@ def create_deployment(
             detail="Your VO doesn't allow to deploy this tool.",
         )
 
-    # Load tool configuration
-    nomad_conf = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
+    nomad_template = deepcopy(papiconf.TOOLS[tool_name]["nomad"])
     user_conf = deepcopy(papiconf.TOOLS[tool_name]["user"]["values"])
     # TODO: given that some parts of the configuration are dynamically generated
     # (eg. model_id in ai4life/vllm) we should read "user_conf" from the catalog
@@ -267,7 +264,7 @@ def create_deployment(
     job_uuid = str(uuid.uuid1())
 
     # Jobs from tutorial users should have low priority (ie. can be displaced if needed)
-    if vo == "training.egi.eu":
+    if vo == "tutorials":
         priority = 25
     else:
         priority = 50
@@ -293,7 +290,7 @@ def create_deployment(
             )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -331,7 +328,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -395,7 +392,7 @@ def create_deployment(
         )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -440,7 +437,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -482,7 +479,7 @@ def create_deployment(
             user_conf["general"]["title"][:45],
         )  # make title foldername-friendly
 
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -511,7 +508,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Deploy an NVFlare Federated server and Dashboard
     elif tool_name == "ai4os-nvflare":
@@ -523,7 +520,7 @@ def create_deployment(
             )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -539,9 +536,10 @@ def create_deployment(
                 "RAM": user_conf["hardware"]["ram"],
                 "DISK": user_conf["hardware"]["disk"],
                 "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
-                "NVFL_VERSION": "2.5-Stifo",
+                "NVFL_VERSION": "2.8.1",
                 "NVFL_USERNAME": user_conf["nvflare"]["username"],
                 "NVFL_PASSWORD": user_conf["nvflare"]["password"],
+                "NVFL_ORGANIZATION": user_conf["nvflare"]["organization"],
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
                 "NVFL_SHORTNAME": job_uuid[:16],
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
@@ -552,7 +550,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
     # Deploy a OpenWebUI+vllm tool
     elif tool_name == "ai4os-llm":
@@ -600,6 +598,16 @@ def create_deployment(
                 f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
             )
 
+            # Show error message if user does not have T4 GPU available in their VO
+            models = nomad.get_gpu_models(vo)
+            if "Tesla T4" not in models:
+                raise HTTPException(
+                    status_code=405,
+                    detail="The deployment of this tool currently requires NVIDIA T4 GPUs,"
+                    "which are not currently not available in your Virtual Organization."
+                    f"Available GPU models: {models}.",
+                )
+
             # Configure VLLM args
             model_id = user_conf["llm"]["vllm_model_id"]
             vllm_args += ["--model", model_id]
@@ -616,7 +624,7 @@ def create_deployment(
                 )
 
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -638,7 +646,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         # Define what to exclude
         if user_conf["llm"]["type"] == "vllm":
@@ -663,7 +671,7 @@ def create_deployment(
     # Deploy AI4Life tool
     elif tool_name == "ai4os-ai4life-loader":
         # Replace the Nomad job template
-        nomad_conf = nomad_conf.safe_substitute(
+        nomad_conf_str = nomad_template.safe_substitute(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -693,7 +701,7 @@ def create_deployment(
         )
 
         # Convert template to Nomad conf
-        nomad_conf = nomad.load_job_conf(nomad_conf)
+        nomad_conf = nomad.load_job_conf(nomad_conf_str)
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -706,6 +714,9 @@ def create_deployment(
             # If gpu_type not provided, remove constraint to GPU model
             if not user_conf["hardware"]["gpu_type"]:
                 usertask["Resources"]["Devices"][0]["Constraints"] = None
+
+    # Add affinity from greener datacenter
+    nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

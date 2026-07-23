@@ -2,3 +2,5 @@ name,gpu_memory_MB,gpu_compute_capability
 Tesla V100-PCIE-32GB,32000,7.0
 Tesla T4,16000,7.5
 NVIDIA A100-PCIE-40GB,40000,8.0
+Tesla V100-SXM2-16GB,16000,7.0
+NVIDIA H100,80000,9.0

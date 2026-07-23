@@ -16,9 +16,11 @@ assert r, "User stats dict is empty"
 
 # Retrieve cluster stats
 _ = stats.deployments.get_cluster_stats_bg()
-r = stats.deployments.get_cluster_stats(
-    vo="vo.ai4eosc.eu",
-)
+r = stats.deployments.get_cluster_stats(vo="vo.ai4eosc.eu")
+assert r, "Cluster stats dict is empty"
+# We also test imagine because Tubitak does not have WattNet stats so we have to be
+# sure nothing breaks there
+r = stats.deployments.get_cluster_stats(vo="vo.imagine-ai.eu")
 assert r, "Cluster stats dict is empty"
 
 print("🟢 Stats tests passed!")

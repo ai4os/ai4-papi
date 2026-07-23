@@ -115,11 +115,19 @@ job "tool-cvat-${JOB_UUID}" {
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
+  # We also add an anti affinity to GPU nodes to make this preference even stronger
   affinity {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
-    weight    = 50
+    weight    = 100
+  }
+
+  affinity {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -100
   }
 
   # Avoid rescheduling the job if the job fails the first time
@@ -264,7 +272,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image      = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
         privileged = true
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/share:/mnt/share:rshared",
@@ -292,7 +300,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
@@ -353,7 +361,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image   = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        image   = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
         mount {
           type = "bind"
           target = "/srv/.rclone/rclone.conf"
@@ -376,7 +384,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
@@ -445,7 +453,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image   = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        image   = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
         mount {
           type = "bind"
           target = "/srv/.rclone/rclone.conf"
@@ -468,7 +476,7 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         [ai4eosc-share]
         type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
+        url = https://share.cloud.ai4eosc.eu/remote.php/dav
         vendor = nextcloud
         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
@@ -525,7 +533,7 @@ job "tool-cvat-${JOB_UUID}" {
         CVAT_BACKUP_REQUEST_TIMEOUT_HOURS = 1
       }
       config {
-        image = "registry.services.ai4os.eu/ai4os/ai4os-cvat-backups:0.1"
+        image = "registry.cloud.ai4eosc.eu/ai4os/ai4os-cvat-backups:0.1"
         force_pull = "${NOMAD_META_force_pull_img_cvat_backups}"
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/backups-periodic:/cvat-backups"

@@ -1,5 +1,5 @@
 """
-Proxy to manage AI4LLM requests.
+Manage Dashboard chatbot requests to the AI4OS LLM Assistante.
 """
 
 import os
@@ -17,8 +17,8 @@ from ai4papi import auth
 
 
 router = APIRouter(
-    prefix="/ai4_llm",
-    tags=["AI4LLM proxy"],
+    prefix="/chat",
+    tags=["AI4OS LLM (chat)"],
     responses={404: {"description": "AI4LLM not found"}},
 )
 
@@ -28,7 +28,7 @@ security = HTTPBearer()
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 if LLM_API_KEY:
     client = OpenAI(
-        base_url="https://llm.dev.ai4eosc.eu/api",
+        base_url="https://chat.cloud.ai4eosc.eu/api",
         api_key=LLM_API_KEY,
     )
 else:
@@ -45,7 +45,7 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] = []
 
 
-@router.post("/chat")
+@router.post("")
 def get_chat_response(
     request: ChatRequest,
     vo: str,
@@ -55,10 +55,13 @@ def get_chat_response(
     Handle chat response, manage errors during completion creation
     """
 
+    # We temporarily disable this endpoint because we no longer use the OpenwebUI chat
+    # endpoint. We are reimplementing this with LiteLLM + Milvus database.
+    raise HTTPException(status_code=503, detail="Endpoint temporarily disabled")
+
     # Retrieve authenticated user info
-    # We allow anyone with an account, for the time being (group: demo)
     auth_info = auth.get_user_info(token=authorization.credentials)
-    auth.check_authorization(auth_info, requested_vo="demo")
+    auth.check_authorization(auth_info, access_level="ap-a")
 
     try:
         completion = client.chat.completions.create(

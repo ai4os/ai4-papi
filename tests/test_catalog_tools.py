@@ -33,10 +33,6 @@ tools_sum = Tools.get_summary(
 assert isinstance(tools_sum, list)
 assert isinstance(tools_sum[0], dict)
 
-# Get catalog tags
-tools_tags = Tools.get_tags()
-assert isinstance(tools_tags, list)  # empty list; deprecated method
-
 # Explore individual tools
 # Contrary than for modules, we do this for all tools because tool configurations are
 # particular for each tool
