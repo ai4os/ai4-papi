@@ -180,7 +180,7 @@ job "tool-nvflare-${JOB_UUID}" {
       }
 
       env {
-        NVFL_CREDENTIAL="${NVFL_USERNAME}:${NVFL_PASSWORD}"
+        NVFL_CREDENTIAL="${NVFL_USERNAME}:${NVFL_PASSWORD}:${NVFL_ORGANIZATION}"
         NVFL_SERVER1="${NVFL_SERVER1}"
         NVFL_HA_MODE="False"
         NVFL_OVERSEER=""
@@ -220,7 +220,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -L \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_USERNAME}'", "password": "'${NVFL_PASSWORD}'"}' \
-              ${nvfl_dashboard_url}/api/v1/login \
+              ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/login \
           )
           status=$(jq -r ".status" <<<"$resp")
           if [ "$status" != "ok" ]; then
@@ -241,7 +241,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -H 'Authorization: Bearer '$access_token \
               -H 'Content-type: application/json' \
               -d '{"pin":"'$PIN'"}' \
-              ${nvfl_dashboard_url}/api/v1/servers/1/blob \
+              ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/servers/1/blob \
           )
           filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
           if [ ! -f $filename ]; then
