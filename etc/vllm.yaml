@@ -2,75 +2,168 @@
 # In non-quantized models, we have to specify "--dtype float16" because the default
 # bfloat16 is only supported in GPUs with compute capability +8.0 (NVIDIA T4 has 7.5).
 
-# Models are sorted in rough performance order
+# Context len depends on the model size.
+# For a tesla T4 16GB, to be on the safe side, use:
+# * 32768 for <2B models
+# * 16384 for 2B-<4B models
+# * 8192 for 4B models (or larger quantized models)
+
+# Non-quantized +4B model (at float16) won't deploy in a T4.
+# This typically corresponds to 9GB of models weights
 
 models:
-  Qwen/Qwen2.5-7B-Instruct-AWQ:
-    name: 'Qwen2.5-7B-Instruct-AWQ'
-    description: 'A 7B parameter instruction-tuned model from the Qwen 2.5 series, optimized for dialogue and general-purpose tasks.'
-    family: 'Qwen'
-    license: 'Apache 2.0'
-    context: '128K'
-    needs_HF_token: False
-    args: ['--quantization', 'awq']
 
-  Qwen/Qwen2.5-Coder-7B-Instruct-AWQ:
-    name: 'Qwen2.5-Coder-7B-Instruct-AWQ'
-    description: 'A 7B parameter model specialized in code generation and understanding, instruction-tuned for programming-related tasks.'
-    family: 'Qwen'
-    license: 'Apache 2.0'
-    context: '131K'
-    needs_HF_token: False
-    args: ['--quantization', 'awq']
+  # ====================================================================================
 
-  Qwen/Qwen2.5-Math-1.5B-Instruct:
-    name: 'Qwen2.5-Math-1.5B-Instruct'
-    description: 'A 1.5B parameter model focused on mathematical reasoning and problem-solving, optimized for math-related queries.'
+  Qwen/Qwen3.5-0.8B:
+    name: 'Qwen3.5-0.8B'
+    description: 'A 0.8B parameter instruction-tuned model from the Qwen 3.5 series, optimized for dialogue and general-purpose tasks.'
     family: 'Qwen'
     license: 'Apache 2.0'
-    context: '32.7K'
+    context: '32K'
     needs_HF_token: False
-    args: ['--dtype', 'float16']
+    args: ['--max-model-len', '32768', '--dtype', 'float16']
+
+  Qwen/Qwen3.5-2B:
+    name: 'Qwen3.5-2B'
+    description: 'A 2B parameter instruction-tuned model from the Qwen 3.5 series, optimized for dialogue and general-purpose tasks.'
+    family: 'Qwen'
+    license: 'Apache 2.0'
+    context: '16K'
+    needs_HF_token: False
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  # ====================================================================================
+
+  microsoft/Phi-4-mini-instruct:
+    name: 'Phi-4-mini-instruct'
+    description: 'A 4B parameter instruction-tuned model from the Phi 4 series, optimized for dialogue and general-purpose tasks.'
+    family: 'Microsoft'
+    license: 'MIT'
+    context: '8K'
+    needs_HF_token: False
+    args: ['--max-model-len', '8192', '--dtype', 'float16']
+
+  microsoft/Phi-4-mini-reasoning:
+    name: 'Phi-4-mini-reasoning'
+    description: 'A 4B parameter instruction-tuned model from the Phi 4 series, optimized for maths.'
+    family: 'Microsoft'
+    license: 'MIT'
+    context: '8K'
+    needs_HF_token: False
+    args: ['--max-model-len', '8192', '--dtype', 'float16']
+
+  # ====================================================================================
+
+  mistralai/Ministral-3-3B-Instruct-2512:
+    name: 'Ministral-3-3B-Instruct-2512'
+    description: 'A 3B parameter instruction-tuned model from the Ministral series, optimized for dialogue and general-purpose tasks.'
+    family: 'Mistral'
+    license: 'Apache 2.0'
+    context: '16K'
+    needs_HF_token: False
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  mistralai/Ministral-3-3B-Reasoning-2512:
+    name: 'Ministral-3-3B-Reasoning-2512'
+    description: 'A 3B parameter instruction-tuned model from the Ministral series, optimized for maths and coding.'
+    family: 'Mistral'
+    license: 'Apache 2.0'
+    context: '16K'
+    needs_HF_token: False
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  # ====================================================================================
+
+  LiquidAI/LFM2.5-1.2B-Instruct:
+    name: 'LFM2.5-1.2B-Instruct'
+    description: 'A 1B parameter instruction-tuned model from the LFM 2.5 series, optimized for dialogue and general-purpose tasks.'
+    family: 'LiquidAI'
+    license: 'LFM 1.0'
+    context: '32K'
+    needs_HF_token: False
+    args: ['--max-model-len', '32768', '--dtype', 'float16']
+
+  LiquidAI/LFM2.5-1.2B-Thinking:
+    name: 'LFM2.5-1.2B-Thinking'
+    description: 'A 1B parameter instruction-tuned model from the LFM 2.5 series, optimized for thinking tasks.'
+    family: 'LiquidAI'
+    license: 'LFM 1.0'
+    context: '32K'
+    needs_HF_token: False
+    args: ['--max-model-len', '32768', '--dtype', 'float16']
+
+  LiquidAI/LFM2.5-VL-450M:
+    name: 'LFM2.5-VL-450M'
+    description: 'A 0.4B parameter instruction-tuned model from the LFM 2.5 series, optimized for computer vision tasks.'
+    family: 'LiquidAI'
+    license: 'LFM 1.0'
+    context: '32K'
+    needs_HF_token: False
+    args: ['--max-model-len', '32768', '--dtype', 'float16']
+
+  LiquidAI/LFM2.5-VL-1.6B:
+    name: 'LFM2.5-VL-1.6B'
+    description: 'A 1.6B parameter instruction-tuned model from the LFM 2.5 series, optimized for computer vision tasks.'
+    family: 'LiquidAI'
+    license: 'LFM 1.0'
+    context: '32K'
+    needs_HF_token: False
+    args: ['--max-model-len', '32768', '--dtype', 'float16']
+
+  # ====================================================================================
+
+  ibm-granite/granite-4.1-3b:
+    name: 'granite-4.1-3b'
+    description: 'A 3B parameter instruction-tuned model from the Granite 4.1 series, optimized for dialogue and general-purpose tasks.'
+    family: 'IBM'
+    license: 'Apache 2.0'
+    context: '16K'
+    needs_HF_token: False
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  ibm-granite/granite-vision-4.1-4b:
+    name: 'granite-vision-4.1-4b'
+    description: 'A 4B parameter instruction-tuned model from the Granite 4.1 series, optimized for computer vision tasks.'
+    family: 'IBM'
+    license: 'Apache 2.0'
+    context: '8K'
+    needs_HF_token: False
+    args: ['--max-model-len', '8192', '--dtype', 'float16']
+
+  # ====================================================================================
+
+  meta-llama/Llama-3.2-3B:
+    name: 'Llama-3.2-3B'
+    description: 'A 3B parameter model from Meta’s Llama 3.2 series, designed for general NLP tasks with improved efficiency.'
+    family: 'meta-llama'
+    license: 'Llama 3.2'
+    context: '16K'
+    needs_HF_token: True
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  meta-llama/Llama-3.2-3B-Instruct:
+    name: 'Llama-3.2-3B-Instruct'
+    description: 'An instruction-tuned variant of Llama-3.2-3B, optimized for chatbot-like interactions and structured responses.'
+    family: 'meta-llama'
+    license: 'Llama 3.2'
+    context: '16K'
+    needs_HF_token: True
+    args: ['--max-model-len', '16384', '--dtype', 'float16']
+
+  # ====================================================================================
 
   deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B:
     name: 'DeepSeek-R1-Distill-Qwen-1.5B'
     description: 'A distilled version of DeepSeek-R1, based on Qwen architecture, optimized for efficient reasoning and inference tasks.'
     family: 'deepseek-ai'
     license: 'Apache 2.0'
-    context: '131K'
+    context: '32K'
     needs_HF_token: False
     args:
-      [
-        '--dtype',
-        'float16',
+      [ '--max-model-len', '32768',
+        '--dtype', 'float16',
         '--enable-reasoning',
         '--reasoning-parser',
         'deepseek_r1',
       ]
-
-  meta-llama/Llama-3.2-3B:
-    name: 'Llama-3.2-3B'
-    description: 'A 3B parameter model from Meta’s Llama 3.2 series, designed for general NLP tasks with improved efficiency.'
-    family: 'meta-llama'
-    license: 'Custom Meta AI License'
-    context: '128K'
-    needs_HF_token: True
-    args: ['--dtype', 'float16']
-
-  meta-llama/Llama-3.2-3B-Instruct:
-    name: 'Llama-3.2-3B-Instruct'
-    description: 'An instruction-tuned variant of Llama-3.2-3B, optimized for chatbot-like interactions and structured responses.'
-    family: 'meta-llama'
-    license: 'Custom Meta AI License'
-    context: '131K'
-    needs_HF_token: True
-    args: ['--dtype', 'float16']
-
-  # TODO: Add this small vision model in the future. It does not work with the current Transformers library.
-  # ERROR 02-12 04:48:33 engine.py:389] ValueError: The checkpoint you are trying to load has model type `qwen2_5_vl` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.
-
-  # Qwen/Qwen2.5-VL-3B-Instruct:
-  #   needs_HF_token: False
-  #   args: [
-  #     "--dtype", "float16",
-  #   ]

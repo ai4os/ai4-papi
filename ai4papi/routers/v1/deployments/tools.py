@@ -610,8 +610,8 @@ def create_deployment(
 
             # Configure VLLM args
             model_id = user_conf["llm"]["vllm_model_id"]
-            vllm_args += ["--model", model_id]
             vllm_args += papiconf.VLLM["models"][model_id]["args"]
+            vllm_args += [model_id]
 
             # Check if HF token is needed
             if (
@@ -663,6 +663,12 @@ def create_deployment(
 
         services = nomad_conf["TaskGroups"][0]["Services"]
         services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
+
+        if user_conf["llm"]["type"] == "vllm":
+            # If vLLM is launched standalone, then we have to make it a main task
+            # Otherwise the job would SIGTERM once the vLLM health check is completed
+            task = [t for t in tasks if t["Name"] == "vllm"][0]
+            task["Lifecycle"]["Sidecar"] = False
 
         # Rename first task as main task
         t = tasks[0]
