@@ -31,11 +31,6 @@ nvflare:
     value: ''
     description: Admin password for both the Dashboard and the Jupyter server instance.
 
-  organization:
-    name: NVFlare organization
-    value: 'AI4EOSC'
-    description: Name of the organization the admin user belongs to.
-
   app_location:
     name: NVFlare project docker image download link
     value: 'registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-client:2.8.1'
