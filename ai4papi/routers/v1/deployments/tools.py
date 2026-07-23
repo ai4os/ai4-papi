@@ -539,7 +539,7 @@ def create_deployment(
                 "NVFL_VERSION": "2.8.1",
                 "NVFL_USERNAME": user_conf["nvflare"]["username"],
                 "NVFL_PASSWORD": user_conf["nvflare"]["password"],
-                "NVFL_ORGANIZATION": user_conf["nvflare"]["organization"],
+                "NVFL_ORGANIZATION": vo,
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
                 "NVFL_SHORTNAME": job_uuid[:16],
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
