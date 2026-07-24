@@ -210,62 +210,87 @@ job "tool-nvflare-${JOB_UUID}" {
         PIN='123456'
         sleep_time=10
         retries=10
-        fl_server_dir=''
+        fl_startup_dir=''
         nvfl_dashboard_url="https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}"
+        # If a startup kit was already provisioned by a previous run (e.g. this
+        # task is restarting after a reboot), reuse it instead of re-downloading.
+        # Re-provisioning would wipe the server workspace under ./server (FL job
+        # data, snapshots, audit logs), so only download+extract when no kit is
+        # present yet.
+        fl_startup_dir=$(dirname "$(find server -type f -name start.sh 2>/dev/null | head -1)")
+        if [ -n "$fl_startup_dir" ] && [ -f "$fl_startup_dir/start.sh" ]; then
+          echo "existing startup kit found at $fl_startup_dir, skipping provisioning"
+          retries=0
+        fi
         while [[ $retries > 0 ]]; do
-          # 1) login to the dashboard
+          # 1) login to the dashboard (-sS: no progress meter, still show errors)
           resp=$( \
             curl \
+              -sS \
               -X POST \
               -L \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_USERNAME}'", "password": "'${NVFL_PASSWORD}'"}' \
               ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/login \
           )
-          status=$(jq -r ".status" <<<"$resp")
+          # the dashboard may not be up yet, in which case the response is not
+          # JSON. Parse quietly (2>/dev/null) and use "// empty" so a non-object
+          # response just yields an empty status and triggers a clean retry
+          # instead of a jq "Cannot index ..." error on stderr.
+          status=$(jq -r ".status // empty" 2>/dev/null <<<"$resp")
           if [ "$status" != "ok" ]; then
-            echo -e "resp: $resp"
+            echo "dashboard not ready yet (login status: '$status')"
             retries=$((retries-1))
             echo "retrying in ${sleep_time}s ..."
             sleep ${sleep_time}
             continue
           fi
           access_token=$(jq -r ".access_token" <<<"$resp")
-          # 2) download server startup kit (primary)
-          resp=$(\
-            curl \
-              -X POST \
-              -L \
-              -O \
-              -J \
-              -H 'Authorization: Bearer '$access_token \
-              -H 'Content-type: application/json' \
-              -d '{"pin":"'$PIN'"}' \
-              ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/servers/1/blob \
-          )
-          filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
-          if [ ! -f $filename ]; then
-            echo "file not found: $filename"
+          # 2) download server startup kit (primary) to a fixed local file.
+          #    Note: do NOT use "curl -O -J" here - that writes the body to a
+          #    file and leaves nothing on stdout, so the filename cannot be
+          #    captured. Save to a known name instead.
+          curl \
+            -X POST \
+            -L \
+            -H 'Authorization: Bearer '$access_token \
+            -H 'Content-type: application/json' \
+            -d '{"pin":"'$PIN'"}' \
+            -o server.zip \
+            ${nvfl_dashboard_url}/nvflare-dashboard/api/v1/servers/1/blob
+          # validate we actually got a zip (a non-2xx / JSON error response is
+          # not a valid archive) before trying to extract it
+          if ! unzip -Z1 server.zip >/dev/null 2>&1; then
+            echo "downloaded file is not a valid zip"
             retries=$((retries-1))
             echo "retrying in ${sleep_time}s ..."
             sleep ${sleep_time}
             continue
           fi
-          # 3) unzip server startup kit
-          echo "filename: $filename"
-          unzip -P $PIN $filename
-          fl_server_dir=$(echo -n "$filename" | sed -En 's/^(.+)\.zip$/\1/p')
-          if [ ! -d $fl_server_dir ]; then
-            echo "directory not found: $fl_servet_dir"
+          # 3) unzip the startup kit into a dedicated ./server dir and locate the
+          #    startup dir inside it. This branch runs only when no usable kit
+          #    was found above, so clearing a leftover partial ./server from a
+          #    failed attempt is safe - it cannot hold FL job data (the server
+          #    never started). The kit layout varies across NVFLARE versions
+          #    (older kits wrap everything in a <server-fqdn>/ dir, 2.8.x puts
+          #    startup/ at the top level), so we find start.sh instead of
+          #    assuming a fixed path.
+          rm -rf server
+          unzip -o -P $PIN server.zip -d server
+          fl_startup_dir=$(dirname "$(find server -type f -name start.sh | head -1)")
+          if [ -z "$fl_startup_dir" ] || [ ! -f "$fl_startup_dir/start.sh" ]; then
+            echo "start.sh not found in the startup kit"
+            retries=$((retries-1))
             echo "retrying in ${sleep_time}s ..."
             sleep ${sleep_time}
             continue
           fi
+          echo "fl_startup_dir: $fl_startup_dir"
           retries=0
         done
-        if [ -d $fl_server_dir ]; then
+        if [ -n "$fl_startup_dir" ] && [ -f "$fl_startup_dir/start.sh" ]; then
           # 4) start the FL server
-          cd $fl_server_dir/startup
+          cd "$fl_startup_dir"
           ./start.sh
         else
           echo "failed to start the FL server"
