@@ -201,6 +201,7 @@ job "tool-llm-${JOB_UUID}" {
         data = <<-EOF
         #!/bin/bash
 
+        export PYTHONUNBUFFERED=1
         pip install requests
 
         python -c '
