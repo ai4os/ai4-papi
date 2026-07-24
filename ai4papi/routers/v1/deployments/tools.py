@@ -542,7 +542,7 @@ def create_deployment(
                 # NVFlare requires the org name to match ^[A-Za-z0-9_]+$,
                 # so replace any disallowed character (e.g. dots in
                 # "vo.ai4eosc.eu") with an underscore
-                "NVFL_ORGANIZATION": re.sub(r"[^A-Za-z0-9_]", "_", vo),
+                "NVFL_ORGANIZATION": re.sub(r"\W", "_", vo),
                 "NVFL_SERVER1": "%s-server.${meta.domain}-%s" % (job_uuid, base_domain),
                 "NVFL_SHORTNAME": job_uuid[:16],
                 "NVFL_APP_LOCATION": user_conf["nvflare"]["app_location"],
