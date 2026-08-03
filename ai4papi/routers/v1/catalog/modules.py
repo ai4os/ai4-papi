@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException
 
-from ai4papi import quotas, nomad, utils
+from ai4papi import nomad_utils, quotas, utils
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
 
@@ -79,7 +79,7 @@ class ModulesCatalog(Catalog):
 
         # Fill with available GPU models in the cluster
         # Additionally filter out models that do not meet user requirements
-        nomad_models = nomad.get_gpu_models(vo)
+        nomad_models = nomad_utils.get_gpu_models(vo)
         models = []
         for m in nomad_models:
             if m not in gpu_specs.keys():

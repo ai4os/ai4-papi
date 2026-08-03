@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from harborapi import HarborClient
 
-from ai4papi import auth, nomad, schemas
+from ai4papi import auth, nomad_utils, schemas
 import ai4papi.conf as papiconf
 
 
@@ -37,7 +37,7 @@ else:
     client = None
 
 # Use the Nomad cluster inited in nomad utils
-Nomad = nomad.Nomad
+Nomad = nomad_utils.Nomad
 
 # Define limits for snapshots size
 INDIVIDUAL_LIMIT_GB = 10
@@ -118,7 +118,7 @@ def create_snapshot(
     nomad_template = deepcopy(papiconf.SNAPSHOTS["nomad"])
 
     # Get target job info
-    job_info = nomad.get_deployment(
+    job_info = nomad_utils.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info["id"],
@@ -157,10 +157,10 @@ def create_snapshot(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf_str)
+    nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
     # Submit job
-    _ = nomad.create_deployment(nomad_conf)
+    _ = nomad_utils.create_deployment(nomad_conf)
 
     return {
         "status": "success",

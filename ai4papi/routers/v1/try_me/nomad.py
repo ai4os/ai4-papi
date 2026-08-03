@@ -14,7 +14,7 @@ from ai4papi import auth
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
-import ai4papi.nomad as nomad
+import ai4papi.nomad_utils as nomad_utils
 
 
 router = APIRouter(
@@ -56,7 +56,7 @@ def get_deployments(
     auth.check_authorization(auth_info, access_level="ap-a")
 
     # Retrieve all jobs in namespace
-    jobs = nomad.get_deployments(
+    jobs = nomad_utils.get_deployments(
         namespace=NAMESPACE,
         owner=auth_info["id"],
         prefix="try",
@@ -102,7 +102,7 @@ def get_deployment(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, access_level="ap-a")
 
-    job = nomad.get_deployment(
+    job = nomad_utils.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=NAMESPACE,
         owner=auth_info["id"],
@@ -183,7 +183,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf_str)
+    nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing
@@ -212,7 +212,7 @@ def create_deployment(
             )
 
     # Check that the user hasn't too many "try-me" jobs currently running
-    jobs = nomad.get_deployments(
+    jobs = nomad_utils.get_deployments(
         namespace=NAMESPACE,
         owner=auth_info["id"],
         prefix="try",
@@ -227,7 +227,7 @@ def create_deployment(
         )
 
     # Submit job
-    r = nomad.create_deployment(nomad_conf)
+    r = nomad_utils.create_deployment(nomad_conf)
 
     return r
 
@@ -251,7 +251,7 @@ def delete_deployment(
     auth.check_authorization(auth_info, access_level="ap-a")
 
     # Delete deployment
-    r = nomad.delete_deployment(
+    r = nomad_utils.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=NAMESPACE,
         owner=auth_info["id"],

@@ -10,7 +10,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, schemas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad as nomad
+import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
@@ -61,7 +61,7 @@ def get_deployments(
     user_jobs = []
     for vo in user_vos:
         # Retrieve all jobs in namespace
-        jobs = nomad.get_deployments(
+        jobs = nomad_utils.get_deployments(
             namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
             owner=auth_info["id"],
             prefix="module",
@@ -119,7 +119,7 @@ def get_deployment(
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
-    job = nomad.get_deployment(
+    job = nomad_utils.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info["id"],
@@ -282,7 +282,7 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf_str)
+    nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
     # Add affinity from greener datacenter
     nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
@@ -376,7 +376,7 @@ def create_deployment(
     services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
 
     # Submit job
-    r = nomad.create_deployment(nomad_conf)
+    r = nomad_utils.create_deployment(nomad_conf)
 
     return r
 
@@ -401,7 +401,7 @@ def delete_deployment(
     auth.check_authorization(auth_info, vo)
 
     # Delete deployment
-    r = nomad.delete_deployment(
+    r = nomad_utils.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
         owner=auth_info["id"],

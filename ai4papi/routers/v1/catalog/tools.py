@@ -4,8 +4,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
 import natsort
 
-from ai4papi import quotas, utils
-import ai4papi.nomad as nomad_common
+from ai4papi import quotas, utils, nomad_utils
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
 
@@ -81,7 +80,7 @@ class ToolsCatalog(Catalog):
 
         if item_name in ["ai4os-dev-env", "ai4os-ai4life-loader"]:
             # Fill with available GPU models in the cluster
-            models = nomad_common.get_gpu_models(vo)
+            models = nomad_utils.get_gpu_models(vo)
             if models:
                 conf["hardware"]["gpu_type"]["options"] += models
 
