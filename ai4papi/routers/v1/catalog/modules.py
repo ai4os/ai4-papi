@@ -7,9 +7,6 @@ import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
 
 
-gpu_specs = utils.gpu_specs()
-
-
 class ModulesCatalog(Catalog):
     def __init__(self):
         super().__init__(repo="ai4os-hub/modules-catalog", item_type="module")
@@ -81,6 +78,7 @@ class ModulesCatalog(Catalog):
         # Additionally filter out models that do not meet user requirements
         nomad_models = nomad_utils.get_gpu_models(vo)
         models = []
+        gpu_specs = utils.gpu_specs()
         for m in nomad_models:
             if m not in gpu_specs.keys():
                 print(f"Nomad model not found in PAPI GPU specs table: {m}")
