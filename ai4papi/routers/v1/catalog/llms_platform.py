@@ -10,17 +10,21 @@ from .common import Catalog
 LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
 LITELLM_API_KEY = papiconf.load_env("LITELLM_API_KEY")
 
+
 class LiteLLMSession(requests.Session):
     """
     Session that automatically raises a FastAPI HTTPException for failed LiteLLM
     responses.
     """
+
     def request(self, *args, **kwargs):
         response = super().request(*args, **kwargs)
         if not response.ok:
             from fastapi import HTTPException
+
             raise HTTPException(status_code=response.status_code, detail=response.text)
         return response
+
 
 session = LiteLLMSession()
 session.headers.update(
@@ -40,20 +44,20 @@ class PlatformLLMsCatalog(Catalog):
         """
         response = session.get(f"{LITELLM_URL}/health/latest")
         return response.json().get("latest_health_checks", {})
-    
+
     def get_items(self):
         """
         Retrieves all the models configured in LiteLLM.
         """
         response = session.get(f"{LITELLM_URL}/models")
         models_data = response.json().get("data", [])
-        
+
         items = {}
         for model in models_data:
             model_id = model.get("id")
             if model_id:
                 items[model_id] = model
-                
+
         return items
 
     def get_summary(
@@ -68,7 +72,7 @@ class PlatformLLMsCatalog(Catalog):
         """
         all_models = self.get_items()
         health_checks = self._get_models_status()
-        
+
         status_by_model = {
             s["model_name"]: str(s.get("status", "unknown")).lower()
             for s in health_checks.values()
@@ -78,21 +82,25 @@ class PlatformLLMsCatalog(Catalog):
         summary = []
         for m_id, m_info in all_models.items():
             # Remove "all-proxy-models", "default" and "embedding" models
-            if m_id == "all-proxy-models" or "embedding" in m_id.lower() or "default" in m_id.lower():
+            if (
+                m_id == "all-proxy-models"
+                or "embedding" in m_id.lower()
+                or "default" in m_id.lower()
+            ):
                 continue
-                
+
             meta = m_info.copy()
             meta["id"] = m_id
-            
+
             # Add health status
             raw_status = status_by_model.get(m_id, "unknown")
             if raw_status not in ["healthy", "unhealthy"]:
                 raw_status = "unknown"
-                
+
             meta["status"] = raw_status
-            
+
             summary.append(meta)
-            
+
         return summary
 
 

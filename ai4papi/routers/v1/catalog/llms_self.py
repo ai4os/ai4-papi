@@ -33,7 +33,7 @@ class SelfLLMsCatalog(Catalog):
             meta = m_info.copy()
             meta["id"] = m_id
             summary.append(meta)
-            
+
         return summary
 
 
