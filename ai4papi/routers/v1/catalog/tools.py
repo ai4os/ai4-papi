@@ -6,6 +6,7 @@ import natsort
 
 from ai4papi import quotas, utils, nomad_utils
 import ai4papi.conf as papiconf
+from ai4papi.routers.v1.catalog import llms_platform
 from .common import Catalog, retrieve_docker_tags, fmt_map
 
 
@@ -85,9 +86,14 @@ class ToolsCatalog(Catalog):
                 conf["hardware"]["gpu_type"]["options"] += models
 
         if item_name == "ai4os-llm":
-            models = list(papiconf.VLLM["models"].keys())
-            conf["llm"]["vllm_model_id"]["options"] = models
+            self_deployed_models = list(papiconf.VLLM["models"].keys())
+            platform_wide_models = list(llms_platform.PlatformLLMs.get_items().keys())
+            
+            models = self_deployed_models + platform_wide_models
+            
+            conf["llm"]["vllm_model_id"]["options"] = sorted(models, key=str.casefold)
             conf["llm"]["vllm_model_id"]["value"] = models[0]
+            
 
         return conf
 
