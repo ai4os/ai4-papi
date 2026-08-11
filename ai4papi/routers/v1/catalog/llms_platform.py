@@ -80,7 +80,7 @@ class PlatformLLMsCatalog(Catalog):
             model_id = model.get("id")
             if model_id:
                 raw_status = status_by_model.get(model_id, "unknown")
-                
+
                 if raw_status == "healthy":
                     items[model_id] = model
 
