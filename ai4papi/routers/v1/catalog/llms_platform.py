@@ -45,7 +45,7 @@ class PlatformLLMsCatalog(Catalog):
         response = session.get(f"{LITELLM_URL}/health/latest")
         return response.json().get("latest_health_checks", {})
 
-    def get_items(self):
+    def _get_all_items(self):
         """
         Retrieves all the models configured in LiteLLM.
         """
@@ -60,6 +60,32 @@ class PlatformLLMsCatalog(Catalog):
 
         return items
 
+    def get_items(self):
+        """
+        Retrieves all the models configured in LiteLLM that are healthy.
+        """
+        response = session.get(f"{LITELLM_URL}/models")
+        models_data = response.json().get("data", [])
+
+        health_checks = self._get_models_status()
+
+        status_by_model = {
+            s["model_name"]: str(s.get("status", "unknown")).lower()
+            for s in health_checks.values()
+            if "model_name" in s
+        }
+
+        items = {}
+        for model in models_data:
+            model_id = model.get("id")
+            if model_id:
+                raw_status = status_by_model.get(model_id, "unknown")
+                
+                if raw_status == "healthy":
+                    items[model_id] = model
+
+        return items
+
     def get_summary(
         self,
         tags: schemas.TagList = None,
@@ -70,7 +96,7 @@ class PlatformLLMsCatalog(Catalog):
         """
         Returns a summary of the available platform LLMs.
         """
-        all_models = self.get_items()
+        all_models = self._get_all_items()
         health_checks = self._get_models_status()
 
         status_by_model = {
