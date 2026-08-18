@@ -88,7 +88,6 @@ class ToolsCatalog(Catalog):
             models = list(papiconf.VLLM["models"].keys())
             conf["llm"]["vllm_model_id"]["options"] = models
             conf["llm"]["vllm_model_id"]["value"] = models[0]
-            
 
         return conf
 
