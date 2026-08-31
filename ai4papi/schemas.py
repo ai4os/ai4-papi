@@ -35,6 +35,7 @@ class NodeInfo(ResourceStats):
     type: str
     status: str
     tags: str
+    cpu_model: str
 
 
 class DatacenterStats(BaseModel):
@@ -48,7 +49,6 @@ class DatacenterStats(BaseModel):
 
     # Optional fields (added dynamically)
     footprints: Optional[Dict[str, Any]] = None  # fromwattnet.GreenDirector
-    affinity: Optional[float] = None  # Added in get_cluster_stats()
 
 
 class ClusterStats(BaseModel):

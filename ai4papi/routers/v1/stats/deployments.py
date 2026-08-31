@@ -13,7 +13,8 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, wattnet, schemas
+from ai4papi import auth, schemas
+from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
 
@@ -29,8 +30,6 @@ main_dir = Path(__file__).resolve().parent
 
 cluster_stats = None
 cluster_stats_updated_at = None
-
-green_director = wattnet.GreenDirector(datacenters=papiconf.datacenters)
 
 
 @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
@@ -233,11 +232,6 @@ def get_cluster_stats(
                 stats.cluster.gpu_models[model_name].gpu_total += g_stats.gpu_total
                 stats.cluster.gpu_models[model_name].gpu_used += g_stats.gpu_used
 
-    # Compute green affinities
-    affinities = green_director.rank(stats.datacenters.keys())
-    for dc_name, affinity in affinities.items():
-        stats.datacenters[dc_name].affinity = affinity
-
     # Add update time
     stats.updated_at = (
         datetime.fromtimestamp(cluster_stats_updated_at).isoformat() + "Z"  # ty: ignore[invalid-argument-type]
@@ -333,6 +327,7 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
             type=node["Meta"].get("type", ""),
             status=status,
             tags=node["Meta"].get("tags", ""),
+            cpu_model=node["Attributes"].get("cpu.modelname", ""),
             cpu_total=int(node["Attributes"]["cpu.numcores"]),
             ram_total=int(node["Attributes"]["memory.totalbytes"]) / 2**20,
             disk_total=int(node["Attributes"]["unique.storage.bytestotal"]) / 2**20,

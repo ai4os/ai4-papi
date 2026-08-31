@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, schemas, utils
+from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
+from ai4papi.routers.v1.stats import deployments as ai4_stats
 
 
 router = APIRouter(
@@ -284,8 +286,12 @@ def create_deployment(
     # Convert template to Nomad conf
     nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
-    # Add affinity from greener datacenter
-    nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
+    # Add affinity for greener nodes
+    nomad_conf = green_director.add_green_affinities(
+        nomad_conf=nomad_conf,
+        stats=ai4_stats.get_cluster_stats(vo),
+        workload_type="cpu" if user_conf["hardware"]["gpu_num"] == 0 else "gpu",
+    )
 
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
     usertask = [t for t in tasks if t["Name"] == "main"][0]

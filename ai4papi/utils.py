@@ -220,3 +220,47 @@ def gpu_specs():
                     models[name][k] = float(v)
 
     return models
+
+
+@cached(cache=TTLCache(maxsize=1024, ttl=10000 * 60 * 60))
+def cpu_specs():
+    """
+    The key os the cpu_models dict is not only the modelname but the tuple
+    (modelname, datacenter) because due to virtualization, the Hypervisor can assign
+    the same modelname to different processor in different datacenters.
+    """
+
+    # Check if datacenter info file is available
+    pth = papiconf.main_path.parent / "var" / "cpu_models.csv"
+    if not pth.is_file():
+        return {}
+
+    # Add some defaults in case a datacenter has not provided values
+    defaults = {"norm_factor": 30, "tdp_per_core": 10}
+
+    # Load datacenter info
+    models: dict[str, dict[str, str | int | float]] = {}
+    with open(pth, "r") as f:
+        reader = csv.DictReader(f, delimiter=",")
+        if not reader.fieldnames:
+            raise ValueError("CSV is missing fieldnames")
+        dc_keys = list(reader.fieldnames)
+        dc_keys.remove("name")
+        dc_keys.remove("cloud")
+        dc_keys.remove("notes")
+        for row in reader:
+            for k, v in row.items():
+                if k == "name":
+                    name = v
+                elif k == "cloud":
+                    name = (name, v)
+                    models[name] = dict.fromkeys(dc_keys, 0)
+                elif k == "notes":
+                    continue
+                else:
+                    if not v:
+                        print(f"CPU model {name} is missing specifications: {k}.")
+                        v = defaults.get(k, "")
+                    models[name][k] = float(v)
+
+    return models
