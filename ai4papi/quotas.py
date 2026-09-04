@@ -56,7 +56,12 @@ def check_userwise(
     # Aggregate user resources
     user = {"gpu_num": 0}
     for d in deployments:
-        user["gpu_num"] += d["resources"]["gpu_num"]
+        gpu_num = d["resources"].get("gpu_num", None)
+        if gpu_num is None:
+            # Use this print to see why some jobs are not retrieving gpu_num
+            print(f"Failed to retrieve gpu_num for deployment: {d['job_ID']}")
+            gpu_num = 0
+        user["gpu_num"] += gpu_num
 
     # Check if aggregate is within the limits
     threshold = {"gpu_num": 2}
