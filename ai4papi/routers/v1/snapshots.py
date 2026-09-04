@@ -5,15 +5,20 @@ The strategy for saving in Harbor is:
 * 1 user = 1 Docker image
 * 1 snapshot = 1 Docker label (in that image)
   --> labels follow the naming "{NOMAD_UUID_{TIMESTAMP}"
+
+We use async functions since HarborAPI is natively an async client (non-async
+functionalities do not work very well)
 """
 
 from copy import deepcopy
+import asyncio
 import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
-from harborapi import HarborClient
+from harborapi import HarborAsyncClient
+from starlette.concurrency import run_in_threadpool
 
 from ai4papi import auth, nomad_utils, schemas
 import ai4papi.conf as papiconf
@@ -26,16 +31,6 @@ router = APIRouter(
 )
 security = HTTPBearer()
 
-# Init the Harbor client
-if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
-    client = HarborClient(
-        url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
-        username=papiconf.HARBOR_USER,
-        secret=papiconf.HARBOR_PASS,
-    )
-else:
-    client = None
-
 # Use the Nomad cluster inited in nomad utils
 Nomad = nomad_utils.Nomad
 
@@ -44,8 +39,18 @@ INDIVIDUAL_LIMIT_GB = 10
 TOTAL_LIMIT_GB = 15
 
 
+def get_harbor_client() -> HarborAsyncClient | None:
+    if papiconf.HARBOR_USER and papiconf.HARBOR_PASS:
+        return HarborAsyncClient(
+            url="https://registry.cloud.ai4eosc.eu/api/v2.0/",
+            username=papiconf.HARBOR_USER,
+            secret=papiconf.HARBOR_PASS,
+        )
+    return None
+
+
 @router.get("")
-def get_snapshots(
+async def get_snapshots(
     vos: schemas.VoList = None,
     authorization=Depends(security),
 ):
@@ -71,19 +76,29 @@ def get_snapshots(
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
-    snapshots = []
+    tasks = []
     for vo in user_vos:
         # Retrieve the completed snapshots from Harbor
-        snapshots += get_harbor_snapshots(owner=auth_info["id"], vo=vo)
+        tasks.append(get_harbor_snapshots(owner=auth_info["id"], vo=vo))
 
         # Retrieve pending/failed snapshots from Nomad
-        snapshots += get_nomad_snapshots(owner=auth_info["id"], vo=vo)
+        # Run blocking Nomad calls in threadpool so they don't block asyncio (since non async function)
+        tasks.append(
+            run_in_threadpool(
+                get_nomad_snapshots,
+                owner=auth_info["id"],
+                vo=vo,
+            )
+        )
+    # We use the gather pattern so that both tasks run in parallel
+    results = await asyncio.gather(*tasks)
+    snapshots = [s for sublist in results for s in sublist]
 
     return snapshots
 
 
 @router.post("")
-def create_snapshot(
+async def create_snapshot(
     vo: str,
     deployment_uuid: str,
     authorization=Depends(security),
@@ -103,7 +118,7 @@ def create_snapshot(
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
     # Check the user is within our limits
-    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
+    snapshots = await get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     total_size = sum([s["size"] for s in snapshots])
     if total_size > (TOTAL_LIMIT_GB * 10**9):
         raise HTTPException(
@@ -169,7 +184,7 @@ def create_snapshot(
 
 
 @router.delete("")
-def delete_snapshot(
+async def delete_snapshot(
     vo: str,
     snapshot_uuid: str,
     authorization=Depends(security),
@@ -186,10 +201,11 @@ def delete_snapshot(
     auth.check_authorization(auth_info, vo)
 
     # Check is the snapshot is in the "completed" list (Harbor)
-    snapshots = get_harbor_snapshots(owner=auth_info["id"], vo=vo)
+    client = get_harbor_client()
+    snapshots = await get_harbor_snapshots(owner=auth_info["id"], vo=vo)
     snapshot_ids = [s["snapshot_ID"] for s in snapshots]
     if client and (snapshot_uuid in snapshot_ids):
-        _ = client.delete_artifact(
+        _ = await client.delete_artifact(
             project_name="user-snapshots",
             repository_name=auth_info["id"].replace("@", "_at_"),
             reference=snapshot_uuid,
@@ -215,7 +231,7 @@ def delete_snapshot(
     )
 
 
-def get_harbor_snapshots(
+async def get_harbor_snapshots(
     owner: str,
     vo: str,
 ):
@@ -227,16 +243,17 @@ def get_harbor_snapshots(
     * **vo**: Virtual Organization the snapshot belongs to
     """
     # Check if the user exists in Harbor (ie. Docker image exists)
+    client = get_harbor_client()
     if not client:
         return []
-    repos = client.get_repositories(project_name="user-snapshots")
+    repos = await client.get_repositories(project_name="user-snapshots")
     users = [r.name.split("/")[1] for r in repos]  # ty: ignore[not-iterable]
     user_str = owner.replace("@", "_at_")
     if user_str not in users:
         return []
 
     # Retrieve the snapshots
-    artifacts = client.get_artifacts(
+    artifacts = await client.get_artifacts(
         project_name="user-snapshots",
         repository_name=user_str,
     )

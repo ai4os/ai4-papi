@@ -139,7 +139,7 @@ def get_deployment(
 
 
 @router.post("")
-def create_deployment(
+async def create_deployment(
     vo: str,
     conf: dict | None = None,
     authorization=Depends(security),
@@ -322,7 +322,7 @@ def create_deployment(
             )
 
         # Check the snapshot indeed exists
-        user_snapshots = v1.snapshots.get_harbor_snapshots(
+        user_snapshots = await v1.snapshots.get_harbor_snapshots(
             owner=auth_info["id"],
             vo=vo,
         )
