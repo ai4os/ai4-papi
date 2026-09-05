@@ -77,22 +77,25 @@ async def get_snapshots(
         )
 
     tasks = []
-    for vo in user_vos:
-        # Retrieve the completed snapshots from Harbor
-        tasks.append(get_harbor_snapshots(owner=auth_info["id"], vo=vo))
-
-        # Retrieve pending/failed snapshots from Nomad
-        # Run blocking Nomad calls in threadpool so they don't block asyncio (since non async function)
-        tasks.append(
-            run_in_threadpool(
-                get_nomad_snapshots,
-                owner=auth_info["id"],
-                vo=vo,
+    async with asyncio.TaskGroup() as tg:
+        for vo in user_vos:
+            # Retrieve the completed snapshots from Harbor
+            tasks.append(
+                tg.create_task(get_harbor_snapshots(owner=auth_info["id"], vo=vo))
             )
-        )
-    # We use the gather pattern so that both tasks run in parallel
-    results = await asyncio.gather(*tasks)
-    snapshots = [s for sublist in results for s in sublist]
+
+            # Retrieve pending/failed snapshots from Nomad
+            # Run blocking Nomad calls in threadpool so they don't block asyncio (since non async function)
+            tasks.append(
+                tg.create_task(
+                    run_in_threadpool(
+                        get_nomad_snapshots,
+                        owner=auth_info["id"],
+                        vo=vo,
+                    )
+                )
+            )
+    snapshots = [s for t in tasks for s in t.result()]
 
     return snapshots
 
