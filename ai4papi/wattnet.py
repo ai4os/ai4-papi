@@ -284,7 +284,8 @@ class GreenDirector:
         scores = dict(zip(scores.keys(), scaled_values))
 
         for nid, affinity in scores.items():
-            # Nomad does not allows affinity weight equal to zero
+            # Nomad Nomad requires non-zero int affinities
+            affinity = int(affinity)
             if affinity == 0:
                 continue
 
@@ -293,7 +294,7 @@ class GreenDirector:
                     "LTarget": "${node.unique.id}",
                     "Operand": "=",
                     "RTarget": nid,
-                    "Weight": int(affinity),
+                    "Weight": affinity,
                 }
             )
 
