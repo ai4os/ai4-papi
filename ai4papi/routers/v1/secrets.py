@@ -9,7 +9,6 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth
 
-
 router = APIRouter(
     prefix="/secrets",
     tags=["Secrets"],

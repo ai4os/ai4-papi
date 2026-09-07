@@ -10,19 +10,18 @@ We use async functions since HarborAPI is natively an async client (non-async
 functionalities do not work very well)
 """
 
-from copy import deepcopy
 import asyncio
 import datetime
 import uuid
+from copy import deepcopy
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from harborapi import HarborAsyncClient
 from starlette.concurrency import run_in_threadpool
 
-from ai4papi import auth, nomad_utils, schemas
 import ai4papi.conf as papiconf
-
+from ai4papi import auth, nomad_utils, schemas
 
 router = APIRouter(
     prefix="/snapshots",

@@ -3,18 +3,18 @@ Utilities for the integration with WattNet.
 API reference: https://api.wattnet.eu/v1/docs
 """
 
-from collections.abc import Iterable
 import datetime
 import json
-import requests
 import os
 import statistics
 import warnings
+from collections.abc import Iterable
 
-from cachetools import cached, TTLCache
-from ai4papi import utils
+import requests
+from cachetools import TTLCache, cached
+
 import ai4papi.conf as papiconf
-
+from ai4papi import utils
 
 session = requests.Session()
 

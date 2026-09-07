@@ -2,9 +2,10 @@ from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException
 
-from ai4papi import nomad_utils, quotas, utils
 import ai4papi.conf as papiconf
-from .common import Catalog, retrieve_docker_tags, fmt_map
+from ai4papi import nomad_utils, quotas, utils
+
+from .common import Catalog, fmt_map, retrieve_docker_tags
 
 
 class ModulesCatalog(Catalog):

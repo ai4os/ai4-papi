@@ -6,13 +6,12 @@ with LiteLLM API. The request to our API is authenticated with
 a Bearer token. The internal call to LiteLLM uses the LiteLLM admin API token.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import HTTPBearer
 import requests
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPBearer
 
-from ai4papi import auth
 import ai4papi.conf as papiconf
-
+from ai4papi import auth
 
 router = APIRouter(
     prefix="/api_keys",
