@@ -23,10 +23,11 @@ router = APIRouter(
 security = HTTPBearer()
 
 # LiteLLM API configuration
-LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
-LITELLM_API_KEY = papiconf.load_env("LITELLM_API_KEY")
+LITELLM_URL = papiconf.LITELLM_URL
+LITELLM_API_KEY = papiconf.LITELLM_API_KEY
 
 
+# TODO Update this router to use the LiteLLMClient instead of direct HTTP calls to LiteLLM.
 class LiteLLMSession(requests.Session):
     """
     Session that automatically raises a FastAPI HTTPException for failed LiteLLM
@@ -146,13 +147,29 @@ def create_api_key(
     current_levels = list(auth_info["groups"].keys())
     team_id = auth.get_highest_level(current_levels)
 
-    # Keys alias are created with pattern "<user_id>_<keyname>" as they must be globally unique.
+    # keys created after MCP creation: every private PAPI MCP stores the ID of
+    # its access group in metadata. Add those groups directly to the new key so it
+    # gets the same MCP grants as the user's older keys.
+    r = session.get(f"{LITELLM_URL}/v1/mcp/server")
+    mcp_access_group_ids = sorted(
+        {
+            (server.get("mcp_info") or {}).get("access_group_id")
+            for server in r.json()
+            if (server.get("mcp_info") or {}).get("owner") == user_id
+            and (server.get("mcp_info") or {}).get("access_group_id")
+        }
+    )
+
+    # The key still belongs to the user's highest authorization-level team (for
+    # example ``ap-d``). ``access_group_ids`` is a separate, user-specific grant:
+    # it avoids asking that shared team to allow a private MCP for all its members.
     data = {
         "user_id": user_id,
         "key_alias": f"{user_id}_{key_name}",
         "key_type": "llm_api",
         "team_id": team_id,
         "duration": duration,
+        "access_group_ids": mcp_access_group_ids,
     }
     r = session.post(f"{LITELLM_URL}/key/generate", json=data)
     return r.json()["key"]

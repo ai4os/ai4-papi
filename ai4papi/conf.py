@@ -44,6 +44,13 @@ def load_env(varname: str):
 HARBOR_USER = "robot$user-snapshots+snapshot-api"
 HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 
+# External MCP and LiteLLM services.
+LITELLM_URL = load_env("LITELLM_URL")
+LITELLM_API_KEY = load_env("LITELLM_API_KEY")
+LITELLM_TIMEOUT = float(load_env("LITELLM_TIMEOUT") or 15)
+MCP_REGISTRY_URL = load_env("MCP_REGISTRY_URL")
+MCP_REGISTRY_TIMEOUT = float(load_env("MCP_REGISTRY_TIMEOUT") or 30)
+
 # Paths
 main_path = Path(__file__).parent.absolute()
 paths = {
