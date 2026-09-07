@@ -233,7 +233,7 @@ async def create_deployment(
 
     # Check IDE password length
     if (
-        user_conf["general"]["service"] in ["jupyter", "vscode"]
+        user_conf["general"]["service"] in ["jupyter", "vscode", "opencode"]
         and len(user_conf["general"]["jupyter_password"]) < 9
     ):
         raise HTTPException(

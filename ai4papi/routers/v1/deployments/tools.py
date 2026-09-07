@@ -6,7 +6,6 @@ import re
 import secrets
 import subprocess
 import types
-from types import SimpleNamespace
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +18,7 @@ import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers.v1.catalog.tools import Tools as Tools_catalog
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
+from ai4papi.routers.v1.llm import keys as litellm
 from ai4papi.routers.v1.stats import deployments as ai4_stats
 
 
@@ -201,6 +201,7 @@ def create_deployment(
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, vo)
+    auth_arg = types.SimpleNamespace(credentials=authorization.credentials)
 
     # Check tool_ID
     if tool_name not in Tools_catalog.get_items().keys():
@@ -245,17 +246,9 @@ def create_deployment(
 
     # Check if requested hardware is within the user total quota (summing modules and
     # tools)
-    tools_deps = get_deployments(
-        vos=[vo],
-        authorization=types.SimpleNamespace(
-            credentials=authorization.credentials  # token
-        ),
-    )
+    tools_deps = get_deployments(vos=[vo], authorization=auth_arg)
     modules_deps = ai4_deployments.modules.get_deployments(
-        vos=[vo],
-        authorization=types.SimpleNamespace(
-            credentials=authorization.credentials  # token
-        ),
+        vos=[vo], authorization=auth_arg
     )
     quotas.check_userwise(
         conf=user_conf,
@@ -274,15 +267,51 @@ def create_deployment(
     base_domain = papiconf.MAIN_CONF["lb"]["domain"][vo]
 
     if tool_name == "ai4os-dev-env":
+        # Retrieve LiteLLM API keys
+        llm_key_name = "ai4os-dev_env"
+        llm_key_path = f"/services/litellm/{llm_key_name}"
+        litellm_keys = litellm.get_api_keys(authorization=auth_arg)
+        in_litellm = any([k["id"] == llm_key_name for k in litellm_keys])
+
         # Retrieve MLflow credentials
         user_secrets = ai4secrets.get_secrets(
-            vo=vo,
-            subpath="/services",
-            authorization=types.SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
+            vo=vo, subpath="/services", authorization=auth_arg
         )
         mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
+        saved_litellm_credentials = user_secrets.get(llm_key_path, {})
+
+        # Make sure Vault key is in sync with LiteLLM key
+        if in_litellm and saved_litellm_credentials:
+            # Exists both in LiteLLM and Vault
+            openai_api_key = saved_litellm_credentials["api_key"]
+        else:
+            # Exists in Vault but not in LiteLLM
+            if saved_litellm_credentials:
+                _ = ai4secrets.delete_secret(
+                    vo=vo, secret_path=llm_key_path, authorization=auth_arg
+                )
+            # Exists in LiteLLM but not in Vault
+            elif in_litellm:
+                _ = litellm.delete_api_key(
+                    key_name=llm_key_name, authorization=auth_arg
+                )
+            # Create new fresh API key and save in Vault
+            openai_api_key = litellm.create_api_key(
+                key_name=llm_key_name, authorization=auth_arg
+            )
+            litellm_keys = litellm.get_api_keys(authorization=auth_arg)
+            key_info = next(
+                (item for item in litellm_keys if item.get("id") == llm_key_name), None
+            )
+            _ = ai4secrets.create_secret(
+                vo=vo,
+                secret_path=llm_key_path,
+                secret_data={
+                    "api_key": openai_api_key,
+                    "created_at": key_info["created_at"],
+                },
+                authorization=auth_arg,
+            )
 
         # Check IDE password length
         if len(user_conf["general"]["jupyter_password"]) < 9:
@@ -323,6 +352,7 @@ def create_deployment(
                 "MLFLOW_USERNAME": mlflow_credentials.get("username", ""),
                 "MLFLOW_PASSWORD": mlflow_credentials.get("password", ""),
                 "MLFLOW_URI": papiconf.MAIN_CONF["mlflow"][vo],
+                "AI4EOSC_LLM_KEY": openai_api_key,
                 "MAILING_TOKEN": os.getenv("MAILING_TOKEN", default=""),
                 "PROJECT_NAME": papiconf.MAIN_CONF["nomad"]["namespaces"][vo].upper(),
                 "TODAY": str(datetime.date.today()),
@@ -382,9 +412,7 @@ def create_deployment(
             vo=vo,
             secret_path=f"deployments/{job_uuid}/federated/default",
             secret_data={"token": secrets.token_hex()},
-            authorization=SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
+            authorization=auth_arg,
         )
 
         # Create a Vault token so that the deployment can access the Federated secret
@@ -595,9 +623,7 @@ def create_deployment(
                 vo=vo,
                 secret_path=f"deployments/{job_uuid}/llm/vllm",
                 secret_data={"token": api_token},
-                authorization=SimpleNamespace(
-                    credentials=authorization.credentials,
-                ),
+                authorization=auth_arg,
             )
             api_endpoint = (
                 f"https://vllm-{job_uuid}" + ".${meta.domain}" + f"-{base_domain}/v1"
@@ -759,6 +785,7 @@ def delete_deployment(
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, vo)
+    auth_arg = types.SimpleNamespace(credentials=authorization.credentials)
 
     # Delete deployment
     r = nomad_utils.delete_deployment(
@@ -769,19 +796,9 @@ def delete_deployment(
 
     # Remove Vault secrets belonging to that deployment
     user_secrets = ai4secrets.get_secrets(
-        vo=vo,
-        subpath=f"/deployments/{deployment_uuid}",
-        authorization=SimpleNamespace(
-            credentials=authorization.credentials,
-        ),
+        vo=vo, subpath=f"/deployments/{deployment_uuid}", authorization=auth_arg
     )
     for path in user_secrets.keys():
-        _ = ai4secrets.delete_secret(
-            vo=vo,
-            secret_path=path,
-            authorization=SimpleNamespace(
-                credentials=authorization.credentials,
-            ),
-        )
+        _ = ai4secrets.delete_secret(vo=vo, secret_path=path, authorization=auth_arg)
 
     return r

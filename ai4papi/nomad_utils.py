@@ -157,6 +157,7 @@ def get_deployment(
         "deepaas": "api",
         "jupyter": "ide",
         "vscode": "ide",
+        "opencode": "ide",
     }
     try:  # deep-start compatible service
         service = re.search(

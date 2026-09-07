@@ -292,6 +292,7 @@ job "tool-devenv-${JOB_UUID}" {
         MLFLOW_TRACKING_URI         = "${MLFLOW_URI}"
         MLFLOW_TRACKING_USERNAME    = "${MLFLOW_USERNAME}"
         MLFLOW_TRACKING_PASSWORD    = "${MLFLOW_PASSWORD}"
+        AI4EOSC_LLM_KEY             = "${AI4EOSC_LLM_KEY}"
       }
 
       resources {
