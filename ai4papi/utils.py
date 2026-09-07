@@ -3,18 +3,17 @@ Miscellaneous utils
 """
 
 import csv
-from datetime import datetime
 import json
-from pathlib import Path
 import os
 import re
+from datetime import datetime
+from pathlib import Path
 
-from cachetools import cached, TTLCache, LRUCache
-from fastapi import HTTPException
 import requests
+from cachetools import LRUCache, TTLCache, cached
+from fastapi import HTTPException
 
 import ai4papi.conf as papiconf
-
 
 # Persistent requests session for faster requests
 session = requests.Session()

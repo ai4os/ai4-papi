@@ -2,10 +2,9 @@ import asyncio
 import time
 from types import SimpleNamespace
 
-from ai4papi.routers.v1.deployments import modules
-from ai4papi.routers.v1.deployments import tools
 from conf import token
 
+from ai4papi.routers.v1.deployments import modules, tools
 
 # Create module
 rcreate = asyncio.run(
