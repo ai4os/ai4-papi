@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.4.0](https://github.com/ai4os/ai4-papi/compare/v1.3.0...v1.4.0) (2026-09-07)
+
+
+### Features
+
+* add affinity for greener datacenters ([3c8f52d](https://github.com/ai4os/ai4-papi/commit/3c8f52dbfd5113be0ae3a4707b0ab0e8fa941046))
+* add green score ([#140](https://github.com/ai4os/ai4-papi/issues/140)) ([fa7fb94](https://github.com/ai4os/ai4-papi/commit/fa7fb948000db583e234d07f1b3e0a050a249700))
+* add KMD4EOSC dashboard to CORS ([146c451](https://github.com/ai4os/ai4-papi/commit/146c4516e5e1b300732364017581e6c84f9b1250))
+* add warning when deploying LLM tools without T4 GPUs ([f178a23](https://github.com/ai4os/ai4-papi/commit/f178a2387b3ab87dc6b3d88809983a618655d5aa))
+* compute green affinity per node, instead of per datacenter, using the node's processor efficiency ([#152](https://github.com/ai4os/ai4-papi/issues/152)) ([6c7715c](https://github.com/ai4os/ai4-papi/commit/6c7715cfedb85b6583bed1a6af2f239937dbd5e5))
+* disable temporarily the LLM chat ([949e4dc](https://github.com/ai4os/ai4-papi/commit/949e4dc6968760d4496269b80e45f87a52264fe0))
+* implement new eunode roles ([#134](https://github.com/ai4os/ai4-papi/issues/134)) ([1f6b472](https://github.com/ai4os/ai4-papi/commit/1f6b472ad5fa6d876def878712adeec890567235))
+* improve access level check ([df52843](https://github.com/ai4os/ai4-papi/commit/df528432156e7a7ede3b083b7d3bfa0d510eaa54))
+* move footprint to stats ([#139](https://github.com/ai4os/ai4-papi/issues/139)) ([86f5a39](https://github.com/ai4os/ai4-papi/commit/86f5a399e362b895c39c104ba26b5ec9f5601114))
+* **nvflare:** upgrade to NVFlare v2.8.1 - add organization field and fix dashboard API paths ([#148](https://github.com/ai4os/ai4-papi/issues/148)) ([4e39640](https://github.com/ai4os/ai4-papi/commit/4e39640a9d99f3a13471674bcc2f9619731e71d3))
+* start injecting LiteLLM API key in the DevEnv ([db3fa49](https://github.com/ai4os/ai4-papi/commit/db3fa4917a43e0e028d192c16bf626ca9e513964))
+* **stats:** allow retrieving all nodes ([d1d7b2c](https://github.com/ai4os/ai4-papi/commit/d1d7b2c085002fae5f453491bf5099c97c6c7c58))
+* **stats:** use WattPrint for energy quality ([#131](https://github.com/ai4os/ai4-papi/issues/131)) ([29eae82](https://github.com/ai4os/ai4-papi/commit/29eae822f6e417ad901490242fff105806100496))
+* support kmd4eosc ([#133](https://github.com/ai4os/ai4-papi/issues/133)) ([551f5a2](https://github.com/ai4os/ai4-papi/commit/551f5a2eac4e770630f49415697c2a0a118b3543))
+* support litellm API key creation ([#135](https://github.com/ai4os/ai4-papi/issues/135)) ([ec0bbbb](https://github.com/ai4os/ai4-papi/commit/ec0bbbbfeb81b15e0884e49b59f778fd949cc475))
+* update LLM catalog ([#120](https://github.com/ai4os/ai4-papi/issues/120)) ([d8fc58e](https://github.com/ai4os/ai4-papi/commit/d8fc58e07813b386ef825f3e7ed04a9401cf985e))
+* update LLM catalog flags ([b10e2dc](https://github.com/ai4os/ai4-papi/commit/b10e2dce44d85aa5566a63724542c624434fac50))
+* update PUE values ([#132](https://github.com/ai4os/ai4-papi/issues/132)) ([2577c21](https://github.com/ai4os/ai4-papi/commit/2577c21d3e5664d17309e807ab219eb93c2089ae))
+
+
+### Bug Fixes
+
+* adapt to wattprint changes ([0e33091](https://github.com/ai4os/ai4-papi/commit/0e330917bbabc8590877993fbe74d0762b2670ec))
+* add anti-affinity to GPU nodes ([1600be9](https://github.com/ai4os/ai4-papi/commit/1600be9c42629fde1a0b1683b0097d3ae0e4fd6a))
+* bump `python-nomad` and remove patches ([13f1918](https://github.com/ai4os/ai4-papi/commit/13f19184092ff33558d81d63bb9abd13a7be132c))
+* **catalog:** dev-env should also be able to select gpu model ([ecef596](https://github.com/ai4os/ai4-papi/commit/ecef5963b5267ff9f3c79b82c8eaa34c22e87b8e))
+* fix `gpu_num` retrieval ([19e9c17](https://github.com/ai4os/ai4-papi/commit/19e9c17db1f1e91d59c8abcc2961c616a5d6d3cb))
+* fix incorrect import ([51a62b2](https://github.com/ai4os/ai4-papi/commit/51a62b280b6ecfab116cad0dce2a0a3e39a99a23))
+* fix module name conflict with `nomad` package ([e80a2b7](https://github.com/ai4os/ai4-papi/commit/e80a2b743e3a3e44d3fc6f2970e9e8775256f424))
+* fix nomad job status ([6a33569](https://github.com/ai4os/ai4-papi/commit/6a3356977c25dbc5780346cdadefdafbb93a873c))
+* green affinity zero check ([a096cf4](https://github.com/ai4os/ai4-papi/commit/a096cf41c1b3460bd9d2df481a98412dd0c5a42d))
+* **llm:** api keys display ([#142](https://github.com/ai4os/ai4-papi/issues/142)) ([bb8c9b3](https://github.com/ai4os/ai4-papi/commit/bb8c9b3957250da9a4e8744d763de854a7b01501))
+* **nvflare:** robust server startup-kit provisioning for 2.8.1 ([#151](https://github.com/ai4os/ai4-papi/issues/151)) ([686c361](https://github.com/ai4os/ai4-papi/commit/686c361e8ebc0c6145d7084b5fe28c4cb19f4a77))
+* **nvflare:** sanitize VO for use as organization name ([#150](https://github.com/ai4os/ai4-papi/issues/150)) ([88db731](https://github.com/ai4os/ai4-papi/commit/88db7318f0074707433254d8b8a3f7b37b8fc4ef))
+* profile bug ([#141](https://github.com/ai4os/ai4-papi/issues/141)) ([11174e8](https://github.com/ai4os/ai4-papi/commit/11174e83901665f925ce103cc3d3b8daa491fa5d))
+* start using async for snapshots ([b0333b2](https://github.com/ai4os/ai4-papi/commit/b0333b2f10ac69ca3b33aab7ec6b8190102295fa))
+* **stats:** do not silence errors in background task ([62a3e12](https://github.com/ai4os/ai4-papi/commit/62a3e12bebca99f443031237204c6309f9913be7))
+* update for new Harbor domain ([5559f9c](https://github.com/ai4os/ai4-papi/commit/5559f9c2f56e0a4af409010cd6972b059fdfef2d))
+* update to new Nextcloud domain ([5bd9aed](https://github.com/ai4os/ai4-papi/commit/5bd9aedba2bdd1cc33469662d7b2737b487d09c4))
+
+
+### Documentation
+
+* add citation.cff ([eaa3808](https://github.com/ai4os/ai4-papi/commit/eaa38085372a5a2e9fdc4e9c3c612d09fb28f6b9))
+* remove missing logo ([29e400a](https://github.com/ai4os/ai4-papi/commit/29e400ac96527363d34aca48abe96d14b0ce682f))
+* update instructions for `oidc-gen` ([ade8c4f](https://github.com/ai4os/ai4-papi/commit/ade8c4f3dc06a13216da9c68167faf2207b3a58d))
+* update paper DOI ([0b7a735](https://github.com/ai4os/ai4-papi/commit/0b7a735dabf30773b759505647be13912ad0987a))
+* update README ([3d8b0e7](https://github.com/ai4os/ai4-papi/commit/3d8b0e7cb38246b38262a9b3870ef6265bda93e1))
+
 ## [1.3.0](https://github.com/ai4os/ai4-papi/compare/v1.2.0...v1.3.0) (2025-08-13)
 
 
