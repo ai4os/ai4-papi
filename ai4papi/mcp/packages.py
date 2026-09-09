@@ -28,7 +28,7 @@ def select_npm_mcp_package(
                 selected.setdefault("version", registry_server.get("version"))
                 return selected
 
-    #TODO Support SSE transport 
+    # TODO Support SSE transport
     raise MCPPackageNotDeployableError(
         f'The MCP server "{registry_server["name"]}" has no supported npm '
         "package. Self-deployment supports npm packages using Streamable HTTP "
@@ -99,7 +99,7 @@ def _resolve_registry_arguments(
 def build_npm_mcp_command(package: dict[str, Any]) -> tuple[list[str], dict[str, str]]:
     """Build the pinned direct npx command and package environment."""
 
-    identifier = package.get("identifier") #Example: "@ai4papi/stdio-mcp"
+    identifier = package.get("identifier")  # Example: "@ai4papi/stdio-mcp"
     if not isinstance(identifier, str) or not re.fullmatch(
         r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*",
         identifier,

@@ -31,10 +31,10 @@ def build_litellm_mcp_server_name(registry_name: str, owner: str) -> str:
 def build_litellm_mcp_access_group_name(owner: str) -> str:
     """
     Build the stable name of a user's single private MCP access group.
-    
-    Each user has one private group that PAPI manages for them. 
+
+    Each user has one private group that PAPI manages for them.
     It is used to grant access to their own MCP servers.
-    
+
     """
 
     owner_digest = hashlib.sha256(owner.encode()).hexdigest()[:12]
@@ -140,7 +140,7 @@ class LiteLLMClient:
     def list_mcp_access_groups(self) -> list[dict[str, Any]]:
         """
         Return all unified access groups visible to PAPI's admin key.
-        Each user has its own private group. 
+        Each user has its own private group.
         All user MCPs are attached to that group.
         """
         response = self.session.get(
@@ -184,7 +184,7 @@ class LiteLLMClient:
                 "access_mcp_server_ids": server_ids,
                 # This list is the complete set of the owner's current keys. Using
                 # replacement semantics also removes assignments to deleted keys.
-                # Keys are needed in the request as user autenticates against the access group through their key, 
+                # Keys are needed in the request as user autenticates against the access group through their key,
                 # not through their user ID.
                 "assigned_key_ids": sorted(set(key_ids)),
                 "assigned_team_ids": [],
@@ -196,7 +196,6 @@ class LiteLLMClient:
             )
             response.raise_for_status()
             return response.json()
-
 
         # If user has no existing group, create a new one with the MCP and all their keys.
         payload = {
@@ -233,8 +232,8 @@ class LiteLLMClient:
         remaining_server_ids = sorted(
             set(access_group.get("access_mcp_server_ids") or []) - {server_id}
         )
-        
-        #Update users access group with the remaining server ids. 
+
+        # Update users access group with the remaining server ids.
         response = self.session.put(
             f"{self.base_url}/v1/access_group/{access_group['access_group_id']}",
             json={"access_mcp_server_ids": remaining_server_ids},
@@ -247,7 +246,7 @@ class LiteLLMClient:
         """
         Get the details of an existing MCP access group by its ID.
         """
-                
+
         response = self.session.get(
             f"{self.base_url}/v1/access_group/{access_group_id}",
             timeout=self.timeout,
@@ -332,7 +331,7 @@ class LiteLLMClient:
         # LiteLLM permissions can grant a server ID directly or match a named MCP
         # group stored on the server. Unified access groups instead appear as
         # top-level ``access_group_ids`` on keys and teams.
-        allowed_server_ids: set[str] = set() # Directly named MCP servers
+        allowed_server_ids: set[str] = set()  # Directly named MCP servers
         allowed_named_mcp_groups: set[str] = set()
         access_group_ids: set[str] = set()
         for record in permission_records:

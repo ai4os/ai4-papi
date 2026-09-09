@@ -61,19 +61,19 @@ def build_stdio_gateway_command(
     Build a shell bootstrap that exposes one stdio package over HTTP.
     """
 
-    # In order tu support STDIO, which i think is more common than Streamable HTTP 
+    # In order tu support STDIO, which i think is more common than Streamable HTTP
     # or SSE (maybe not), we need to use a gateway package that will expose the stdio package over HTTP.
-    
+
     # For the moment i suggest using Supergateway.
 
     if (package.get("transport") or {}).get("type") != "stdio":
         raise MCPPackageNotDeployableError(
             "The selected npm package does not declare stdio transport."
         )
-        
+
     # Gateway package comes from PAPI configuration. It is not currently exposed to the user, so value should be safe.
     # However, validation does not hurt.
-    
+
     if not isinstance(gateway_package, str) or not re.fullmatch(
         r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*"
         r"@[0-9A-Za-z][0-9A-Za-z._+-]*",
@@ -216,4 +216,3 @@ def resolve_streamable_http_package_transport(
         )
 
     return port, parsed.path or "/"
-

@@ -62,7 +62,7 @@ class MCPNomadClient:
 
         command_arguments, package_environment = build_npm_mcp_command(package)
         package_transport = (package.get("transport") or {}).get("type")
-        
+
         if package_transport == "streamable-http":
             package_port, endpoint_path = resolve_streamable_http_package_transport(
                 package,
@@ -70,8 +70,8 @@ class MCPNomadClient:
             )
             main_command = "npx"
             main_arguments = command_arguments
-            
-        #stdio is supported through an aditional adapter.
+
+        # stdio is supported through an aditional adapter.
         elif package_transport == "stdio":
             package_port = STDIO_GATEWAY_PORT
             endpoint_path = STDIO_GATEWAY_PATH
@@ -85,8 +85,8 @@ class MCPNomadClient:
             raise MCPPackageNotDeployableError(
                 "The selected npm package must use Streamable HTTP or stdio."
             )
-            
-        # Basic auth is added through Traefik labels. 
+
+        # Basic auth is added through Traefik labels.
         # Then, litellm authenticates using static headers
         basic_auth = create_mcp_basic_auth()
         job_id = f"mcp-{uuid.uuid4()}"
@@ -107,7 +107,6 @@ class MCPNomadClient:
             }
         )
         job = self.nomad.jobs.parse(raw_job)
-
 
         job["Meta"].update(
             {

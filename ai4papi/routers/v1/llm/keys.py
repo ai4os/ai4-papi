@@ -151,8 +151,8 @@ def create_api_key(
     # Every user has at most one PAPI-managed MCP access group. A key created
     # after the user's first MCP points to that same stable group, so future MCPs
     # become available by updating the group rather than updating every key.
-    
-    # Because of this, we need to add the user's private MCP access group to the key's 
+
+    # Because of this, we need to add the user's private MCP access group to the key's
     # access groups.
     r = session.get(f"{LITELLM_URL}/v1/access_group")
     expected_group_name = build_litellm_mcp_access_group_name(user_id)
