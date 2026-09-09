@@ -1,3 +1,4 @@
+import asyncio
 import io
 import time
 from types import SimpleNamespace
@@ -15,10 +16,11 @@ date > /storage/test-batch.txt
 sleep 6000
 """
 binary_buffer = io.BytesIO(content)
-rcreate = batch.create_deployment(
-    vo="vo.ai4eosc.eu",
-    user_cmd=UploadFile(file=binary_buffer),
-    conf="""
+rcreate = asyncio.run(
+    batch.create_deployment(
+        vo="vo.ai4eosc.eu",
+        user_cmd=UploadFile(file=binary_buffer),
+        conf="""
     {
         "general": {
             "docker_image": "ai4oshub/ai4os-demo-app"
@@ -32,7 +34,8 @@ rcreate = batch.create_deployment(
         }
     }
     """,
-    authorization=SimpleNamespace(credentials=token),
+        authorization=SimpleNamespace(credentials=token),
+    )
 )
 assert isinstance(rcreate, dict)
 assert "job_ID" in rcreate.keys()

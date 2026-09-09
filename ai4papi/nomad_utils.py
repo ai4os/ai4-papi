@@ -157,6 +157,7 @@ def get_deployment(
         "deepaas": "api",
         "jupyter": "ide",
         "vscode": "ide",
+        "opencode": "ide",
     }
     try:  # deep-start compatible service
         service = re.search(
@@ -310,14 +311,21 @@ def get_deployment(
             info["status"] = a["ClientStatus"]
 
     elif evals:
-        # Something happened, job didn't deploy (eg. job needs port that's currently being used)
+        # If no allocs something happened, job didn't deploy. e.g.
+        # - constraints filtered all resources
+        # - job needs port that's currently being used
+        if j["Status"] == "pending":
+            info["status"] = "queued"
+        else:
+            info["status"] = "error"
         # We have to return `placement failures message`.
-        info["status"] = "error"
         info["error_msg"] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
-        info["status"] = "queued"
+        # If no allocs and no evals, something probably went wrong
+        info["status"] = "error"
 
+    if info["status"] == "queued":
         # Fill info with _requested_ resources instead
         res = usertask["Resources"]
         gpu = (

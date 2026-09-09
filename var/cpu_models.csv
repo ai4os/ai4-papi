@@ -1,0 +1,7 @@
+name,cloud,norm_factor,tdp_per_core,notes
+AMD EPYC-Genoa Processor,psnc,51.3,6.5625,Actual model: AMD EPYC 9334
+Intel Xeon Processor (Icelake),ifca,30.2,7.8125,Actual model: Intel(R) Xeon(R) Platinum 8358 CPU @ 2.60GHz
+"Intel Xeon Processor (Skylake, IBRS)",tubitak,23.1,16.875,Actual model: Intel(R) Xeon(R) CPU E5-2690
+Intel(R) Xeon(R) Gold 6230 CPU @ 2.10GHz,ifca,32.7,6.25,
+Intel(R) Xeon(R) Gold 5220R CPU @ 2.20GHz,ifca,35.0,6.25,
+AMD EPYC-Rome Processor,psnc,28.0,4.84375,Actual model: AMD EPYC 7452

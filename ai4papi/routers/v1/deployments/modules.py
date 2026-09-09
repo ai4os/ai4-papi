@@ -9,11 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, schemas, utils
+from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
+from ai4papi.routers.v1.stats import deployments as ai4_stats
 
 
 router = APIRouter(
@@ -137,7 +139,7 @@ def get_deployment(
 
 
 @router.post("")
-def create_deployment(
+async def create_deployment(
     vo: str,
     conf: dict | None = None,
     authorization=Depends(security),
@@ -231,7 +233,7 @@ def create_deployment(
 
     # Check IDE password length
     if (
-        user_conf["general"]["service"] in ["jupyter", "vscode"]
+        user_conf["general"]["service"] in ["jupyter", "vscode", "opencode"]
         and len(user_conf["general"]["jupyter_password"]) < 9
     ):
         raise HTTPException(
@@ -284,8 +286,12 @@ def create_deployment(
     # Convert template to Nomad conf
     nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
-    # Add affinity from greener datacenter
-    nomad_conf = ai4_deployments.common.add_green_affinities(nomad_conf, vo)
+    # Add affinity for greener nodes
+    nomad_conf = green_director.add_green_affinities(
+        nomad_conf=nomad_conf,
+        stats=ai4_stats.get_cluster_stats(vo),
+        workload_type="cpu" if user_conf["hardware"]["gpu_num"] == 0 else "gpu",
+    )
 
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
     usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -316,7 +322,7 @@ def create_deployment(
             )
 
         # Check the snapshot indeed exists
-        user_snapshots = v1.snapshots.get_harbor_snapshots(
+        user_snapshots = await v1.snapshots.get_harbor_snapshots(
             owner=auth_info["id"],
             vo=vo,
         )
