@@ -47,9 +47,16 @@ HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 # External MCP and LiteLLM services.
 LITELLM_URL = load_env("LITELLM_URL")
 LITELLM_API_KEY = load_env("LITELLM_API_KEY")
-LITELLM_TIMEOUT = float(load_env("LITELLM_TIMEOUT") or 15)
+LITELLM_TIMEOUT = float(load_env("LITELLM_TIMEOUT") or 90)
 MCP_REGISTRY_URL = load_env("MCP_REGISTRY_URL")
-MCP_REGISTRY_TIMEOUT = float(load_env("MCP_REGISTRY_TIMEOUT") or 30)
+MCP_REGISTRY_TIMEOUT = float(load_env("MCP_REGISTRY_TIMEOUT") or 90)
+MCP_NOMAD_DEFAULT_VO = load_env("MCP_NOMAD_DEFAULT_VO") or "vo.ai4eosc.eu"
+MCP_NOMAD_STARTUP_TIMEOUT = float(load_env("MCP_NOMAD_STARTUP_TIMEOUT") or 180)
+MCP_NOMAD_POLL_INTERVAL = float(load_env("MCP_NOMAD_POLL_INTERVAL") or 2)
+MCP_NOMAD_NODE_IMAGE = load_env("MCP_NOMAD_NODE_IMAGE") or "node:22-alpine"
+MCP_NOMAD_SUPERGATEWAY_PACKAGE = (
+    load_env("MCP_NOMAD_SUPERGATEWAY_PACKAGE") or "supergateway@3.4.3"
+)
 
 # Paths
 main_path = Path(__file__).parent.absolute()
@@ -158,6 +165,19 @@ TRY_ME = {
 nmd = load_nomad_job(paths["conf"] / "snapshots" / "nomad.hcl")
 SNAPSHOTS = {
     "nomad": nmd,
+}
+
+# Self-deployed MCP servers
+nmd = load_nomad_job(paths["conf"] / "mcp" / "nomad.hcl")
+yml = load_yaml_conf(paths["conf"] / "mcp" / "user.yaml")
+MCP = {
+    "nomad": nmd,
+    "user": {
+        "full": yml[0],
+        "values": yml[1],
+    },
+    "register": (paths["conf"] / "mcp" / "register.py").read_text(encoding="utf-8"),
+    "deregister": (paths["conf"] / "mcp" / "deregister.py").read_text(encoding="utf-8"),
 }
 
 # Load datacenter info file

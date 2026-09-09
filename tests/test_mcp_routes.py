@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 import requests
@@ -8,122 +8,322 @@ from fastapi import HTTPException
 from ai4papi.routers.v1.llm import mcp
 
 
-def test_list_mcps_returns_servers_accessible_to_user(monkeypatch):
-    # Simulate the identity obtained from the caller's OIDC token. The router must
-    # pass the Keycloak subject to the LiteLLM permission resolver.
+def _authenticate_user(monkeypatch):
+    """Make a route call represent one authorized ai4eosc user."""
+
     monkeypatch.setattr(
         mcp.auth,
         "get_user_info",
         lambda token: {"id": "user-id", "groups": {"ap-u": ["vo.ai4eosc.eu"]}},
     )
-    monkeypatch.setattr(mcp.auth, "check_authorization", lambda auth_info: None)
+    monkeypatch.setattr(
+        mcp.auth,
+        "check_authorization",
+        lambda auth_info, vo=None: None,
+    )
 
-    # The client has already combined ownership, public and team-based visibility;
-    # this router test checks that PAPI returns that filtered result unchanged.
+
+def test_list_mcps_combines_litellm_servers_and_nomad_deployments(monkeypatch):
+    _authenticate_user(monkeypatch)
+
+    # LiteLLM has already applied owner, public, key and team grants. This test
+    # uses an owned remote registration and one self-deployed registration.
     litellm = Mock()
     litellm.list_user_accessible_mcp_servers.return_value = [
-        {"server_id": "owned"},
-        {"server_id": "public"},
-        {"server_id": "team"},
+        {
+            "server_id": "remote-id",
+            "url": "https://weather.example/mcp",
+            "transport": "http",
+            "mcp_info": {
+                "owner": "user-id",
+                "registry_name": "com.example/weather",
+                "registry_version": "1.0.0",
+                "deployment_type": "remote",
+            },
+        },
+        {
+            "server_id": "deployed-id",
+            "url": "https://mcp-job.node.example/mcp",
+            "transport": "http",
+            "static_headers": {"Authorization": "Basic secret"},
+            "mcp_info": {
+                "owner": "user-id",
+                "registry_name": "com.example/local",
+                "registry_version": "2.0.0",
+                "deployment_type": "self_deployed",
+                "nomad_job_id": "mcp-job",
+                "nomad_namespace": "ai4eosc",
+            },
+        },
     ]
+
+    # Nomad is queried only for the job referenced by the LiteLLM registration.
+    nomad = Mock()
+    nomad.get_mcp_deployment.return_value = {
+        "job_id": "mcp-job",
+        "namespace": "ai4eosc",
+        "status": "running",
+        "healthy": True,
+        "endpoint": "https://mcp-job.node.example/mcp",
+    }
 
     result = mcp.list_mcps(
         authorization=SimpleNamespace(credentials="token"),
         litellm=litellm,
+        nomad=nomad,
     )
 
-    # The result may legitimately contain MCPs not owned by the caller when they
-    # are public or shared through one of the caller's teams.
-    assert result == [
-        {"server_id": "owned"},
-        {"server_id": "public"},
-        {"server_id": "team"},
-    ]
+    # Remote MCPs have no deployment. Self-deployed MCPs contain both sides of the
+    # lifecycle, but their Basic credential is never exposed by PAPI's list route.
+    assert result[0]["deployment"] is None
+    assert result[1]["deployment"]["status"] == "running"
+    assert result[1]["registration"]["static_headers"] == {"Authorization": "***"}
 
-    # Never ask for the unfiltered admin catalogue from this user-facing route.
+    # The route does not enumerate Nomad jobs. LiteLLM remains the source of truth,
+    # and the remote MCP causes no Nomad request at all.
     litellm.list_user_accessible_mcp_servers.assert_called_once_with("user-id")
+    assert nomad.method_calls == [call.get_mcp_deployment("mcp-job", "ai4eosc")]
 
 
 def test_create_remote_mcp_creates_private_access_group(monkeypatch):
-    # Authenticate the owner who is requesting the MCP registration.
-    monkeypatch.setattr(
-        mcp.auth,
-        "get_user_info",
-        lambda token: {"id": "user-id", "groups": {"ap-u": ["vo.ai4eosc.eu"]}},
-    )
-    monkeypatch.setattr(mcp.auth, "check_authorization", lambda auth_info: None)
+    _authenticate_user(monkeypatch)
 
-    # Registry case: the requested entry exposes a ready-to-use Streamable HTTP
-    # endpoint, so this first implementation can register it without Nomad.
+    # Registry case: a provider-hosted endpoint exists, so PAPI prefers it and does
+    # not consume Nomad resources even if the entry were hybrid.
     registry = Mock()
     registry.get_server.return_value = {
         "name": "com.example/weather",
         "version": "1.0.0",
         "remotes": [{"type": "streamable-http", "url": "https://weather.example/mcp"}],
     }
+    nomad = Mock()
 
-    # LiteLLM first creates the private server, then returns the owner's existing
-    # key identifiers so PAPI can attach the new access group directly to them.
+    # LiteLLM creates the private server and adds it to the one stable access group
+    # shared by all MCPs and keys belonging to this user.
     litellm = Mock()
     litellm.create_remote_mcp_server.return_value = {
         "server_id": "server-id",
         "mcp_info": {"owner": "user-id"},
     }
     litellm.list_user_mcp_key_ids.return_value = ["hashed-key"]
-
-    # The created group contains the server and becomes the auditable link used by
-    # existing keys, future keys and eventual deletion.
-    litellm.create_mcp_access_group.return_value = {
+    litellm.add_mcp_server_to_user_access_group.return_value = {
         "access_group_id": "group-id",
-        "access_group_name": "papi_mcp_group",
+        "access_group_name": "papi_user_mcp_group",
     }
     litellm.update_mcp_server_metadata.return_value = {
         "server_id": "server-id",
         "mcp_info": {
             "owner": "user-id",
             "access_group_id": "group-id",
-            "access_group_name": "papi_mcp_group",
+            "access_group_name": "papi_user_mcp_group",
         },
     }
 
-    result = mcp.create_remote_mcp(
+    result = mcp.create_mcp(
         mcp.MCPCreateRequest(name="com.example/weather"),
         authorization=SimpleNamespace(credentials="token"),
         registry=registry,
         litellm=litellm,
+        nomad=nomad,
     )
 
-    # The final registration returned by PAPI must contain the persisted group ID.
+    assert result["deployment_type"] == "remote"
+    assert result["deployment"] is None
     assert result["registration"]["mcp_info"]["access_group_id"] == "group-id"
 
-    # Critical privacy check: the router passes only the owner's keys. The client
-    # payload separately guarantees assigned_team_ids=[] for shared teams like ap-d.
-    litellm.create_mcp_access_group.assert_called_once_with(
+    # Critical privacy case: the router passes only the owner's keys. No shared VO
+    # team receives this group, so another member of ap-d cannot inherit the MCP.
+    litellm.add_mcp_server_to_user_access_group.assert_called_once_with(
         owner="user-id",
         server_id="server-id",
         key_ids=["hashed-key"],
     )
+    nomad.create_mcp_deployment.assert_not_called()
 
-    # Store the relation in mcp_info so a key created later can discover this group.
-    litellm.update_mcp_server_metadata.assert_called_once_with(
-        "server-id",
-        {
-            "owner": "user-id",
-            "access_group_id": "group-id",
-            "access_group_name": "papi_mcp_group",
+
+def test_create_self_deployed_mcp_submits_self_registering_nomad_job(monkeypatch):
+    _authenticate_user(monkeypatch)
+
+    # Package-only Registry case: this npm process serves Streamable HTTP itself,
+    # so Nomad can run it directly without a stdio adapter or Supergateway.
+    package = {
+        "registryType": "npm",
+        "identifier": "@example/weather-mcp",
+        "version": "2.0.0",
+        "transport": {
+            "type": "streamable-http",
+            "url": "http://localhost:3001/mcp",
         },
+    }
+    registry = Mock()
+    registry.get_server.return_value = {
+        "name": "com.example/weather",
+        "version": "2.0.0",
+        "packages": [package],
+    }
+
+    # PAPI receives only the submitted job state. Registration and readiness are
+    # handled later by lifecycle tasks inside the Nomad allocation.
+    nomad = Mock()
+    nomad.create_mcp_deployment.return_value = {
+        "job_id": "mcp-job",
+        "namespace": "ai4eosc",
+        "status": "submitted",
+        "endpoint": None,
+    }
+
+    # This client must remain untouched: the job's poststart task owns LiteLLM
+    # registration, metadata and access-group synchronization.
+    litellm = Mock()
+
+    result = mcp.create_mcp(
+        mcp.MCPCreateRequest(
+            name="com.example/weather",
+            vo="vo.ai4eosc.eu",
+            conf={"hardware": {"cpu_num": 2, "ram": 2048, "disk": 4096}},
+        ),
+        authorization=SimpleNamespace(credentials="token"),
+        registry=registry,
+        litellm=litellm,
+        nomad=nomad,
     )
 
-
-def test_create_remote_mcp_rolls_back_group_and_server(monkeypatch):
-    # Use a valid authenticated owner and remote registry entry so execution reaches
-    # the multi-step LiteLLM creation flow.
-    monkeypatch.setattr(
-        mcp.auth,
-        "get_user_info",
-        lambda token: {"id": "user-id", "groups": {"ap-u": ["vo.ai4eosc.eu"]}},
+    assert result["deployment_type"] == "self_deployed"
+    assert result["deployment"]["status"] == "submitted"
+    assert result["endpoint"] is None
+    assert result["registration"] is None
+    nomad.create_mcp_deployment.assert_called_once_with(
+        registry_server=registry.get_server.return_value,
+        package=package,
+        owner="user-id",
+        namespace="ai4eosc",
+        base_domain="deployments.cloud.ai4eosc.eu",
+        litellm_url=mcp.papiconf.LITELLM_URL,
+        litellm_api_key=mcp.papiconf.LITELLM_API_KEY,
+        resources={"cpu_num": 2, "ram": 2048, "disk": 4096},
     )
-    monkeypatch.setattr(mcp.auth, "check_authorization", lambda auth_info: None)
+    litellm.create_remote_mcp_server.assert_not_called()
+    litellm.add_mcp_server_to_user_access_group.assert_not_called()
+    litellm.update_mcp_server_metadata.assert_not_called()
+
+
+def test_create_self_deployed_mcp_accepts_stdio_and_submits_nomad(monkeypatch):
+    _authenticate_user(monkeypatch)
+    registry = Mock()
+    registry.get_server.return_value = {
+        "name": "com.example/stdio-only",
+        "version": "1.0.0",
+        "packages": [
+            {
+                "registryType": "npm",
+                "identifier": "@example/stdio-only",
+                "version": "1.0.0",
+                "transport": {"type": "stdio"},
+            }
+        ],
+    }
+    nomad = Mock()
+    nomad.create_mcp_deployment.return_value = {
+        "job_id": "mcp-stdio-job",
+        "namespace": "ai4eosc",
+        "status": "submitted",
+        "endpoint": None,
+    }
+
+    # The route treats stdio as deployable. MCPNomadClient is responsible for
+    # placing Supergateway in front and exposing a uniform Streamable HTTP URL.
+    result = mcp.create_mcp(
+        mcp.MCPCreateRequest(name="com.example/stdio-only"),
+        authorization=SimpleNamespace(credentials="token"),
+        registry=registry,
+        litellm=Mock(),
+        nomad=nomad,
+    )
+
+    assert result["deployment_type"] == "self_deployed"
+    assert result["deployment"]["job_id"] == "mcp-stdio-job"
+    assert (
+        nomad.create_mcp_deployment.call_args.kwargs["package"]["transport"]["type"]
+        == "stdio"
+    )
+    assert nomad.create_mcp_deployment.call_args.kwargs["resources"] == {
+        "cpu_num": 1,
+        "ram": 1024,
+        "disk": 2048,
+    }
+
+
+def test_create_self_deployed_mcp_rejects_resources_outside_mcp_limits(monkeypatch):
+    _authenticate_user(monkeypatch)
+    registry = Mock()
+    registry.get_server.return_value = {
+        "name": "com.example/stdio-only",
+        "version": "1.0.0",
+        "packages": [
+            {
+                "registryType": "npm",
+                "identifier": "@example/stdio-only",
+                "version": "1.0.0",
+                "transport": {"type": "stdio"},
+            }
+        ],
+    }
+    nomad = Mock()
+
+    # Resource validation follows the catalog-module flow and happens before the
+    # job submission, so an excessive request cannot consume cluster resources.
+    with pytest.raises(HTTPException) as exc:
+        mcp.create_mcp(
+            mcp.MCPCreateRequest(
+                name="com.example/stdio-only",
+                conf={"hardware": {"cpu_num": 11}},
+            ),
+            authorization=SimpleNamespace(credentials="token"),
+            registry=registry,
+            litellm=Mock(),
+            nomad=nomad,
+        )
+
+    assert exc.value.status_code == 400
+    assert "cpu_num" in exc.value.detail
+    nomad.create_mcp_deployment.assert_not_called()
+
+
+def test_create_self_deployed_mcp_still_rejects_sse_package(monkeypatch):
+    _authenticate_user(monkeypatch)
+    registry = Mock()
+    registry.get_server.return_value = {
+        "name": "com.example/sse-only",
+        "version": "1.0.0",
+        "packages": [
+            {
+                "registryType": "npm",
+                "identifier": "@example/sse-only",
+                "version": "1.0.0",
+                "transport": {"type": "sse"},
+            }
+        ],
+    }
+    nomad = Mock()
+
+    # SSE remains outside this increment: only native Streamable HTTP and stdio
+    # adapted to Streamable HTTP can currently be submitted to Nomad.
+    with pytest.raises(HTTPException) as exc:
+        mcp.create_mcp(
+            mcp.MCPCreateRequest(name="com.example/sse-only"),
+            authorization=SimpleNamespace(credentials="token"),
+            registry=registry,
+            litellm=Mock(),
+            nomad=nomad,
+        )
+
+    assert exc.value.status_code == 422
+    assert "SSE is not supported yet" in exc.value.detail
+    nomad.create_mcp_deployment.assert_not_called()
+
+
+def test_create_remote_mcp_rolls_back_grant_and_server(monkeypatch):
+    _authenticate_user(monkeypatch)
     registry = Mock()
     registry.get_server.return_value = {
         "name": "com.example/weather",
@@ -136,97 +336,120 @@ def test_create_remote_mcp_rolls_back_group_and_server(monkeypatch):
         "mcp_info": {"owner": "user-id"},
     }
     litellm.list_user_mcp_key_ids.return_value = ["hashed-key"]
-    litellm.create_mcp_access_group.return_value = {
+    litellm.add_mcp_server_to_user_access_group.return_value = {
         "access_group_id": "group-id",
-        "access_group_name": "papi_mcp_group",
+        "access_group_name": "papi_user_mcp_group",
     }
 
-    # Failure case: LiteLLM creates both resources but rejects the final metadata
-    # update. Leaving either resource behind would produce an incomplete policy.
+    # Failure case: the stable group was updated but the final metadata link fails.
+    # Rollback removes only this MCP grant and preserves the user's group.
     response = requests.Response()
     response.status_code = 500
     response._content = b"metadata update failed"
     litellm.update_mcp_server_metadata.side_effect = requests.HTTPError(
         response=response
     )
+    nomad = Mock()
 
     with pytest.raises(HTTPException) as exc:
-        mcp.create_remote_mcp(
+        mcp.create_mcp(
             mcp.MCPCreateRequest(name="com.example/weather"),
             authorization=SimpleNamespace(credentials="token"),
             registry=registry,
             litellm=litellm,
+            nomad=nomad,
         )
 
-    # Preserve LiteLLM's error status for the PAPI caller.
     assert exc.value.status_code == 500
-
-    # Compensation must revoke the group first and then remove the orphaned server,
-    # allowing a later retry to start without conflicting resources.
-    litellm.delete_mcp_access_group.assert_called_once_with(
-        "group-id",
-        ignore_not_found=True,
+    litellm.remove_mcp_server_from_user_access_group.assert_called_once_with(
+        owner="user-id",
+        server_id="server-id",
     )
     litellm.delete_mcp_server.assert_called_once_with("server-id")
+    nomad.delete_mcp_deployment.assert_not_called()
 
 
-def test_delete_mcp_checks_owner(monkeypatch):
-    # The authenticated caller is different from the owner stored in mcp_info.
-    monkeypatch.setattr(
-        mcp.auth,
-        "get_user_info",
-        lambda token: {"id": "user-id", "groups": {"ap-u": ["vo.ai4eosc.eu"]}},
-    )
-    monkeypatch.setattr(mcp.auth, "check_authorization", lambda auth_info: None)
+def test_delete_mcp_checks_owner_before_touching_either_backend(monkeypatch):
+    _authenticate_user(monkeypatch)
     litellm = Mock()
     litellm.get_mcp_server.return_value = {
         "server_id": "server-id",
         "mcp_info": {"owner": "another-user"},
     }
+    nomad = Mock()
 
-    # Even though PAPI uses an administrative LiteLLM key internally, the router
-    # must enforce ownership before issuing any destructive operation.
+    # The internal LiteLLM key is administrative, so PAPI itself must enforce the
+    # Keycloak owner before any destructive call to LiteLLM or Nomad.
     with pytest.raises(HTTPException) as exc:
         mcp.delete_mcp(
             "server-id",
             authorization=SimpleNamespace(credentials="token"),
             litellm=litellm,
+            nomad=nomad,
         )
 
     assert exc.value.status_code == 403
-
-    # Negative authorization case: another user's MCP must remain untouched.
-    litellm.delete_mcp_access_group.assert_not_called()
+    nomad.delete_mcp_deployment.assert_not_called()
+    litellm.remove_mcp_server_from_user_access_group.assert_not_called()
     litellm.delete_mcp_server.assert_not_called()
 
 
-def test_delete_mcp_deletes_owned_server_and_private_access_group(monkeypatch):
-    # Positive authorization case: mcp_info.owner matches the authenticated subject
-    # and also contains the private group created during registration.
-    monkeypatch.setattr(
-        mcp.auth,
-        "get_user_info",
-        lambda token: {"id": "user-id", "groups": {"ap-u": ["vo.ai4eosc.eu"]}},
-    )
-    monkeypatch.setattr(mcp.auth, "check_authorization", lambda auth_info: None)
+def test_delete_remote_mcp_only_updates_stable_group_and_server(monkeypatch):
+    _authenticate_user(monkeypatch)
     litellm = Mock()
     litellm.get_mcp_server.return_value = {
         "server_id": "server-id",
-        "mcp_info": {"owner": "user-id", "access_group_id": "group-id"},
+        "mcp_info": {"owner": "user-id", "deployment_type": "remote"},
     }
+    nomad = Mock()
 
     mcp.delete_mcp(
         "server-id",
         authorization=SimpleNamespace(credentials="token"),
         litellm=litellm,
+        nomad=nomad,
     )
 
-    # Delete the access group so LiteLLM removes its reference from all owner keys.
-    # A missing group is accepted to make a partially completed delete retryable.
-    litellm.delete_mcp_access_group.assert_called_once_with(
-        "group-id",
+    # No migration or per-server-group cleanup exists. Remote deletion only
+    # removes this ID from the user's reusable group and deletes the server.
+    litellm.remove_mcp_server_from_user_access_group.assert_called_once_with(
+        owner="user-id", server_id="server-id"
+    )
+    litellm.delete_mcp_server.assert_called_once_with("server-id")
+    nomad.delete_mcp_deployment.assert_not_called()
+
+
+def test_delete_self_deployed_mcp_stops_job_and_deregisters_litellm(monkeypatch):
+    _authenticate_user(monkeypatch)
+    litellm = Mock()
+    litellm.get_mcp_server.return_value = {
+        "server_id": "server-id",
+        "mcp_info": {
+            "owner": "user-id",
+            "deployment_type": "self_deployed",
+            "nomad_job_id": "mcp-job",
+            "nomad_namespace": "ai4eosc",
+            "access_group_id": "group-id",
+        },
+    }
+    nomad = Mock()
+
+    mcp.delete_mcp(
+        "server-id",
+        authorization=SimpleNamespace(credentials="token"),
+        litellm=litellm,
+        nomad=nomad,
+    )
+
+    # Stop Nomad first, then synchronously revoke the stable-group grant and remove
+    # the registration. The job's poststop task remains an idempotent fallback.
+    nomad.delete_mcp_deployment.assert_called_once_with(
+        job_id="mcp-job",
+        namespace="ai4eosc",
+        owner="user-id",
         ignore_not_found=True,
     )
-
-    # Once access is revoked, remove the actual MCP server registration.
+    litellm.remove_mcp_server_from_user_access_group.assert_called_once_with(
+        owner="user-id", server_id="server-id"
+    )
     litellm.delete_mcp_server.assert_called_once_with("server-id")

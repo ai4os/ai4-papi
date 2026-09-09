@@ -11,6 +11,7 @@ from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import auth
+from ai4papi.litellm_client import build_litellm_mcp_access_group_name
 import ai4papi.conf as papiconf
 
 
@@ -147,22 +148,29 @@ def create_api_key(
     current_levels = list(auth_info["groups"].keys())
     team_id = auth.get_highest_level(current_levels)
 
-    # keys created after MCP creation: every private PAPI MCP stores the ID of
-    # its access group in metadata. Add those groups directly to the new key so it
-    # gets the same MCP grants as the user's older keys.
-    r = session.get(f"{LITELLM_URL}/v1/mcp/server")
-    mcp_access_group_ids = sorted(
-        {
-            (server.get("mcp_info") or {}).get("access_group_id")
-            for server in r.json()
-            if (server.get("mcp_info") or {}).get("owner") == user_id
-            and (server.get("mcp_info") or {}).get("access_group_id")
-        }
+    # Every user has at most one PAPI-managed MCP access group. A key created
+    # after the user's first MCP points to that same stable group, so future MCPs
+    # become available by updating the group rather than updating every key.
+    
+    # Because of this, we need to add the user's private MCP access group to the key's 
+    # access groups.
+    r = session.get(f"{LITELLM_URL}/v1/access_group")
+    expected_group_name = build_litellm_mcp_access_group_name(user_id)
+    access_group = next(
+        (
+            group
+            for group in r.json()
+            if group.get("access_group_name") == expected_group_name
+        ),
+        None,
+    )
+    mcp_access_group_ids = (
+        [access_group["access_group_id"]] if access_group is not None else []
     )
 
     # The key still belongs to the user's highest authorization-level team (for
-    # example ``ap-d``). ``access_group_ids`` is a separate, user-specific grant:
-    # it avoids asking that shared team to allow a private MCP for all its members.
+    # example ``ap-d``). The one ``access_group_ids`` entry is a separate,
+    # user-specific grant and never broadens the permissions of that shared team.
     data = {
         "user_id": user_id,
         "key_alias": f"{user_id}_{key_name}",

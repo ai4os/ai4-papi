@@ -18,19 +18,27 @@ def build_litellm_mcp_server_name(registry_name: str, owner: str) -> str:
     """Build a globally unique LiteLLM/MCP-compatible server name."""
 
     readable_name = registry_name.rsplit("/", 1)[-1]
-    readable_name = re.sub(r"[^A-Za-z0-9_-]", "_", readable_name).strip("_-")
+    # LiteLLM's MCP manager rejects hyphens even though they are common in
+    # Registry and npm names. Normalize every separator to an underscore before
+    # sending server_name to LiteLLM.
+    readable_name = re.sub(r"[^A-Za-z0-9_]", "_", readable_name).strip("_")
     readable_name = readable_name[:40] or "server"
     digest = hashlib.sha256(f"{owner}:{registry_name}".encode()).hexdigest()[:12]
 
     return f"papi_{readable_name}_{digest}"
 
 
-def build_litellm_mcp_access_group_name(owner: str, server_id: str) -> str:
-    """Build a stable name for the private access group of an MCP server."""
+def build_litellm_mcp_access_group_name(owner: str) -> str:
+    """
+    Build the stable name of a user's single private MCP access group.
+    
+    Each user has one private group that PAPI manages for them. 
+    It is used to grant access to their own MCP servers.
+    
+    """
 
     owner_digest = hashlib.sha256(owner.encode()).hexdigest()[:12]
-    server_fragment = re.sub(r"[^A-Za-z0-9_-]", "_", server_id)[:16]
-    return f"papi_mcp_{owner_digest}_{server_fragment}"
+    return f"papi_user_mcp_{owner_digest}"
 
 
 class LiteLLMClient:
@@ -59,6 +67,17 @@ class LiteLLMClient:
         owner: str,
         endpoint: dict[str, str],
     ) -> dict[str, Any]:
+        """
+        Create a new remote MCP server (not deployed in Nomad).
+
+        Args:
+            registry_server (dict[str, Any]): The registry server information.
+            owner (str): The owner of the MCP server.
+            endpoint (dict[str, str]): The endpoint information.
+
+        Returns:
+            dict[str, Any]: The created MCP server information.
+        """
         server_name = build_litellm_mcp_server_name(registry_server["name"], owner)
         payload = {
             "server_name": server_name,
@@ -86,6 +105,9 @@ class LiteLLMClient:
         return response.json()
 
     def get_mcp_server(self, server_id: str) -> dict[str, Any]:
+        """
+        Get the details of an existing MCP server by its LiteLLM server ID.
+        """
         response = self.session.get(
             f"{self.base_url}/v1/mcp/server/{server_id}",
             timeout=self.timeout,
@@ -115,23 +137,75 @@ class LiteLLMClient:
             key["token"] for key in response.json().get("keys", []) if key.get("token")
         ]
 
-    def create_mcp_access_group(
+    def list_mcp_access_groups(self) -> list[dict[str, Any]]:
+        """
+        Return all unified access groups visible to PAPI's admin key.
+        Each user has its own private group. 
+        All user MCPs are attached to that group.
+        """
+        response = self.session.get(
+            f"{self.base_url}/v1/access_group",
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_user_mcp_access_group(self, owner: str) -> dict[str, Any] | None:
+        """Find the single PAPI-managed MCP access group for a Keycloak user."""
+
+        expected_name = build_litellm_mcp_access_group_name(owner)
+        return next(
+            (
+                group
+                for group in self.list_mcp_access_groups()
+                if group.get("access_group_name") == expected_name
+            ),
+            None,
+        )
+
+    def add_mcp_server_to_user_access_group(
         self,
         *,
         owner: str,
         server_id: str,
         key_ids: list[str],
     ) -> dict[str, Any]:
-        """Create a private MCP grant and assign it to existing user keys."""
+        """Create or update the user's one private group with another MCP."""
 
+        existing = self.get_user_mcp_access_group(owner)
+        if existing is not None:
+            server_ids = sorted(
+                {
+                    *(existing.get("access_mcp_server_ids") or []),
+                    server_id,
+                }
+            )
+            payload = {
+                "access_mcp_server_ids": server_ids,
+                # This list is the complete set of the owner's current keys. Using
+                # replacement semantics also removes assignments to deleted keys.
+                # Keys are needed in the request as user autenticates against the access group through their key, 
+                # not through their user ID.
+                "assigned_key_ids": sorted(set(key_ids)),
+                "assigned_team_ids": [],
+            }
+            response = self.session.put(
+                f"{self.base_url}/v1/access_group/{existing['access_group_id']}",
+                json=payload,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return response.json()
+
+
+        # If user has no existing group, create a new one with the MCP and all their keys.
         payload = {
-            "access_group_name": build_litellm_mcp_access_group_name(owner, server_id),
-            "description": f"Private PAPI access to MCP server {server_id}",
+            "access_group_name": build_litellm_mcp_access_group_name(owner),
+            "description": "Private PAPI MCP access for one Keycloak user",
             "access_mcp_server_ids": [server_id],
-            # Assigning the group directly to keys is intentional. Assigning it to
-            # the user's shared authorization-level team (for example ``ap-d``)
-            # would also expose the private MCP to every other member of that team.
-            "assigned_key_ids": key_ids,
+            # The group is attached directly to all existing keys of its owner.
+            # It is never attached to a shared authorization team such as ``ap-d``.
+            "assigned_key_ids": sorted(set(key_ids)),
             "assigned_team_ids": [],
         }
         response = self.session.post(
@@ -142,27 +216,44 @@ class LiteLLMClient:
         response.raise_for_status()
         return response.json()
 
+    def remove_mcp_server_from_user_access_group(
+        self,
+        *,
+        owner: str,
+        server_id: str,
+    ) -> dict[str, Any] | None:
+        """Remove one MCP from the user's group, keeping the group reusable."""
+
+        access_group = self.get_user_mcp_access_group(owner)
+        if access_group is None:
+            # Deletion is retryable: a previous request or manual cleanup may have
+            # already removed the group without deleting the MCP registration.
+            return None
+
+        remaining_server_ids = sorted(
+            set(access_group.get("access_mcp_server_ids") or []) - {server_id}
+        )
+        
+        #Update users access group with the remaining server ids. 
+        response = self.session.put(
+            f"{self.base_url}/v1/access_group/{access_group['access_group_id']}",
+            json={"access_mcp_server_ids": remaining_server_ids},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
     def get_mcp_access_group(self, access_group_id: str) -> dict[str, Any]:
+        """
+        Get the details of an existing MCP access group by its ID.
+        """
+                
         response = self.session.get(
             f"{self.base_url}/v1/access_group/{access_group_id}",
             timeout=self.timeout,
         )
         response.raise_for_status()
         return response.json()
-
-    def delete_mcp_access_group(
-        self,
-        access_group_id: str,
-        *,
-        ignore_not_found: bool = False,
-    ) -> None:
-        response = self.session.delete(
-            f"{self.base_url}/v1/access_group/{access_group_id}",
-            timeout=self.timeout,
-        )
-        if ignore_not_found and response.status_code == 404:
-            return
-        response.raise_for_status()
 
     def update_mcp_server_metadata(
         self,
@@ -238,11 +329,11 @@ class LiteLLMClient:
             team_response.raise_for_status()
             permission_records.append(team_response.json())
 
-        # Legacy permissions can grant a server ID directly or match a named MCP
+        # LiteLLM permissions can grant a server ID directly or match a named MCP
         # group stored on the server. Unified access groups instead appear as
         # top-level ``access_group_ids`` on keys and teams.
-        allowed_server_ids: set[str] = set()
-        allowed_legacy_mcp_groups: set[str] = set()
+        allowed_server_ids: set[str] = set() # Directly named MCP servers
+        allowed_named_mcp_groups: set[str] = set()
         access_group_ids: set[str] = set()
         for record in permission_records:
             # Unified access-group case: when PAPI creates a private MCP it adds
@@ -251,7 +342,7 @@ class LiteLLMClient:
             access_group_ids.update(record.get("access_group_ids") or [])
 
             object_permission = record.get("object_permission") or {}
-            # Old or externally managed records may contain null or another invalid
+            # Externally managed records may contain null or another invalid
             # representation. Ignore them instead of treating them as permissions.
             if not isinstance(object_permission, dict):
                 continue
@@ -262,7 +353,7 @@ class LiteLLMClient:
 
             # Group-grant case: a key or team grants a group such as "research";
             # every MCP server assigned to that group becomes a candidate.
-            allowed_legacy_mcp_groups.update(
+            allowed_named_mcp_groups.update(
                 object_permission.get("mcp_access_groups") or []
             )
 
@@ -297,7 +388,8 @@ class LiteLLMClient:
             # Visibility case 4 — group permission: the user belongs, through a key
             # or team, to a group also assigned to this MCP. For example, both sides
             # contain "research", so their set intersection is not empty.
-            has_group_access = bool(server_groups & allowed_legacy_mcp_groups)
+            # This groups are not managed by PAPI, but MCPs on that group are still visible to the user.
+            has_group_access = bool(server_groups & allowed_named_mcp_groups)
 
             # A server is listed when at least one independent visibility case holds.
             if is_owned or is_public or has_direct_access or has_group_access:

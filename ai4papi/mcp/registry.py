@@ -37,7 +37,7 @@ class MCPServerInfo(TypedDict):
 
 
 class MCPRemoteEndpoint(TypedDict):
-    transport: Literal["http", "sse"]
+    transport: Literal["http"]
     url: str
 
 
@@ -124,16 +124,9 @@ class MCPRegistryClient:
 
 
 def select_remote_endpoint(server: MCPServerInfo) -> MCPRemoteEndpoint:
-    """Select a remote that can be registered without additional user input."""
+    """Select an unconfigured remote Streamable HTTP endpoint."""
 
-    transport_map = {"streamable-http": "http", "sse": "sse"}
-
-    remotes = sorted(
-        server["remotes"],
-        key=lambda remote: remote.get("type") != "streamable-http",
-    )
-
-    for remote in remotes:
+    for remote in server["remotes"]:
         remote_type = remote.get("type")
         url = remote.get("url")
         has_required_headers = any(
@@ -142,18 +135,18 @@ def select_remote_endpoint(server: MCPServerInfo) -> MCPRemoteEndpoint:
 
         # The remote is usable if it has a supported transport, a valid URL, and does not require additional headers.
         if (
-            remote_type in transport_map
+            remote_type == "streamable-http"
             and isinstance(url, str)
             and "{" not in url
             and "}" not in url
             and not has_required_headers
         ):
             return {
-                "transport": transport_map[remote_type],
+                "transport": "http",
                 "url": url,
             }
 
     raise MCPRegistryError(
         f'The remote MCP server "{server["name"]}" requires configuration '
-        "or has no supported HTTP/SSE endpoint."
+        "or has no supported Streamable HTTP endpoint. SSE is not supported yet."
     )

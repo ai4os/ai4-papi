@@ -67,7 +67,7 @@ ai4papi-run = "ai4papi.cli:run"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["ai4papi"]
+include = ["ai4papi*"]
 
 [tool.ruff]
 line-length = 88

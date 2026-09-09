@@ -3,7 +3,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from ai4papi.mcp_registry import (
+from ai4papi.mcp.registry import (
     MCPRegistryClient,
     MCPRegistryError,
     MCPRegistryTimeoutError,
@@ -145,9 +145,9 @@ def test_get_server_reports_registry_timeout():
         client.get_server("example/server")
 
 
-def test_select_remote_endpoint_prefers_streamable_http():
-    # When both supported transports exist, Streamable HTTP is preferred over the
-    # older SSE transport before registering the endpoint in LiteLLM.
+def test_select_remote_endpoint_accepts_streamable_http_and_ignores_sse():
+    # PAPI currently supports one remote transport. An SSE entry must not be used
+    # even when the Registry returns it before the Streamable HTTP endpoint.
     server = {
         "name": "example/server",
         "remotes": [
@@ -169,8 +169,8 @@ def test_select_remote_endpoint_rejects_required_configuration():
         "name": "example/server",
         "remotes": [
             {
-                "type": "sse",
-                "url": "https://{tenant}.example.test/sse",
+                "type": "streamable-http",
+                "url": "https://{tenant}.example.test/mcp",
                 "headers": [{"name": "X-API-Key", "isRequired": True}],
             }
         ],
@@ -178,4 +178,16 @@ def test_select_remote_endpoint_rejects_required_configuration():
 
     # Rejecting it prevents creation of a LiteLLM server that could never connect.
     with pytest.raises(MCPRegistryError, match="requires configuration"):
+        select_remote_endpoint(server)
+
+
+def test_select_remote_endpoint_rejects_sse_only_server():
+    # SSE support is intentionally deferred. Rejecting it explicitly prevents the
+    # transport from entering LiteLLM through an untested compatibility path.
+    server = {
+        "name": "example/server",
+        "remotes": [{"type": "sse", "url": "https://example.test/sse"}],
+    }
+
+    with pytest.raises(MCPRegistryError, match="SSE is not supported yet"):
         select_remote_endpoint(server)

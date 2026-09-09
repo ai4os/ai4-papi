@@ -26,6 +26,19 @@ def test_mcp_server_name_is_stable_per_owner_and_registry_name():
     assert first.startswith("papi_weather_mcp_")
 
 
+def test_mcp_server_name_replaces_registry_hyphens_for_litellm():
+    # Registry and npm names commonly contain hyphens, while LiteLLM rejects them
+    # in MCP server_name. Only the readable fragment changes; uniqueness still
+    # comes from the digest of the untouched owner and Registry name.
+    server_name = build_litellm_mcp_server_name(
+        "ai.agentutility/mcp-web-probe",
+        "user-1",
+    )
+
+    assert server_name.startswith("papi_mcp_web_probe_")
+    assert "-" not in server_name
+
+
 def test_create_remote_mcp_server_sends_owner_and_registry_metadata():
     # Simulate a successful LiteLLM registration without making a real HTTP call.
     # The injected session also lets the test inspect the exact management payload.
@@ -77,19 +90,20 @@ def test_create_remote_mcp_server_sends_owner_and_registry_metadata():
     assert session.post.call_args.args == ("https://litellm.example/v1/mcp/server",)
 
 
-def test_mcp_access_group_name_is_stable_per_owner_and_server():
-    # Case 1 — a retry for the same owner/server pair reuses the same group name.
-    first = build_litellm_mcp_access_group_name("user-1", "server-1")
-    second = build_litellm_mcp_access_group_name("user-1", "server-1")
+def test_mcp_access_group_name_is_stable_per_owner():
+    # Every operation for the same Keycloak user resolves one stable group name,
+    # independently of how many MCP servers that user creates or removes.
+    first = build_litellm_mcp_access_group_name("user-1")
+    second = build_litellm_mcp_access_group_name("user-1")
 
-    # Case 2 — another user receives a different group even for the same server ID,
-    # preventing two private policies from accidentally sharing a name.
-    another_user = build_litellm_mcp_access_group_name("user-2", "server-1")
+    # Another user receives another group, preventing private MCP sets from being
+    # mixed even when both users register the same Registry entry.
+    another_user = build_litellm_mcp_access_group_name("user-2")
 
     # The prefix makes explicit that this is a PAPI-managed MCP access group.
     assert first == second
     assert first != another_user
-    assert first.startswith("papi_mcp_")
+    assert first.startswith("papi_user_mcp_")
 
 
 def test_list_user_mcp_key_ids_returns_only_valid_key_identifiers():
@@ -129,13 +143,17 @@ def test_list_user_mcp_key_ids_returns_only_valid_key_identifiers():
     )
 
 
-def test_create_mcp_access_group_assigns_server_directly_to_user_keys():
+def test_add_first_mcp_creates_one_access_group_for_user_keys():
     # Simulate LiteLLM returning the ID of the newly created unified access group.
     response = Mock()
     response.raise_for_status.return_value = None
     response.json.return_value = {"access_group_id": "group-id"}
     session = Mock(spec=requests.Session)
     session.headers = {}
+    empty_list_response = Mock()
+    empty_list_response.raise_for_status.return_value = None
+    empty_list_response.json.return_value = []
+    session.get.return_value = empty_list_response
     session.post.return_value = response
     client = LiteLLMClient(
         base_url="https://litellm.example",
@@ -145,7 +163,7 @@ def test_create_mcp_access_group_assigns_server_directly_to_user_keys():
     )
 
     # This represents a user who already has two virtual keys when creating an MCP.
-    result = client.create_mcp_access_group(
+    result = client.add_mcp_server_to_user_access_group(
         owner="user-id",
         server_id="server-id",
         key_ids=["hashed-key-1", "hashed-key-2"],
@@ -161,8 +179,91 @@ def test_create_mcp_access_group_assigns_server_directly_to_user_keys():
     # Critical privacy case: never assign the group to a shared team such as ap-d,
     # because every other member of that team would inherit the private MCP.
     assert payload["assigned_team_ids"] == []
-    assert payload["access_group_name"].startswith("papi_mcp_")
+    assert payload["access_group_name"].startswith("papi_user_mcp_")
     assert session.post.call_args.args == ("https://litellm.example/v1/access_group",)
+
+
+def test_add_another_mcp_updates_existing_user_access_group():
+    # The user already owns one MCP and two keys point to their stable group.
+    list_response = Mock()
+    list_response.raise_for_status.return_value = None
+    list_response.json.return_value = [
+        {
+            "access_group_id": "group-id",
+            "access_group_name": build_litellm_mcp_access_group_name("user-id"),
+            "access_mcp_server_ids": ["server-1"],
+        }
+    ]
+    update_response = Mock()
+    update_response.raise_for_status.return_value = None
+    update_response.json.return_value = {"access_group_id": "group-id"}
+    session = Mock(spec=requests.Session)
+    session.headers = {}
+    session.get.return_value = list_response
+    session.put.return_value = update_response
+    client = LiteLLMClient(
+        base_url="https://litellm.example",
+        api_key="secret",
+        timeout=15,
+        session=session,
+    )
+
+    result = client.add_mcp_server_to_user_access_group(
+        owner="user-id",
+        server_id="server-2",
+        key_ids=["hashed-key-2", "hashed-key-1"],
+    )
+
+    assert result == {"access_group_id": "group-id"}
+    session.post.assert_not_called()
+    session.put.assert_called_once_with(
+        "https://litellm.example/v1/access_group/group-id",
+        json={
+            "access_mcp_server_ids": ["server-1", "server-2"],
+            "assigned_key_ids": ["hashed-key-1", "hashed-key-2"],
+            "assigned_team_ids": [],
+        },
+        timeout=15,
+    )
+
+
+def test_remove_mcp_keeps_user_access_group_and_other_servers():
+    # Deleting one MCP updates the user's shared set; it must not delete the group
+    # or revoke another MCP that is still owned by the same user.
+    list_response = Mock()
+    list_response.raise_for_status.return_value = None
+    list_response.json.return_value = [
+        {
+            "access_group_id": "group-id",
+            "access_group_name": build_litellm_mcp_access_group_name("user-id"),
+            "access_mcp_server_ids": ["server-1", "server-2"],
+        }
+    ]
+    update_response = Mock()
+    update_response.raise_for_status.return_value = None
+    update_response.json.return_value = {"access_group_id": "group-id"}
+    session = Mock(spec=requests.Session)
+    session.headers = {}
+    session.get.return_value = list_response
+    session.put.return_value = update_response
+    client = LiteLLMClient(
+        base_url="https://litellm.example",
+        api_key="secret",
+        timeout=15,
+        session=session,
+    )
+
+    client.remove_mcp_server_from_user_access_group(
+        owner="user-id",
+        server_id="server-1",
+    )
+
+    session.put.assert_called_once_with(
+        "https://litellm.example/v1/access_group/group-id",
+        json={"access_mcp_server_ids": ["server-2"]},
+        timeout=15,
+    )
+    session.delete.assert_not_called()
 
 
 def test_update_mcp_server_metadata_uses_partial_update_endpoint():
@@ -190,31 +291,6 @@ def test_update_mcp_server_metadata_uses_partial_update_endpoint():
     session.put.assert_called_once_with(
         "https://litellm.example/v1/mcp/server",
         json={"server_id": "server-id", "mcp_info": metadata},
-        timeout=15,
-    )
-
-
-def test_delete_mcp_access_group_uses_litellm_management_endpoint():
-    # A 204 represents successful revocation. LiteLLM is responsible for removing
-    # this group ID from every key that referenced it.
-    response = Mock()
-    response.status_code = 204
-    response.raise_for_status.return_value = None
-    session = Mock(spec=requests.Session)
-    session.headers = {}
-    session.delete.return_value = response
-    client = LiteLLMClient(
-        base_url="https://litellm.example",
-        api_key="secret",
-        timeout=15,
-        session=session,
-    )
-
-    client.delete_mcp_access_group("group-id")
-
-    # The group must be deleted by ID before deleting its associated MCP server.
-    session.delete.assert_called_once_with(
-        "https://litellm.example/v1/access_group/group-id",
         timeout=15,
     )
 
@@ -279,7 +355,7 @@ def test_list_user_accessible_mcp_servers_combines_all_grant_sources():
             {"server_id": "direct"},
             # Case 4 — unified access group assigned directly to a user key.
             {"server_id": "unified-group"},
-            # Case 5 — legacy named MCP group inherited from a team.
+            # Case 5 — named MCP group inherited from a team.
             {"server_id": "group", "mcp_access_groups": ["research"]},
             # Negative case — belongs to another user and has no shared grant.
             {"server_id": "foreign", "mcp_info": {"owner": "other-user"}},
@@ -302,7 +378,7 @@ def test_list_user_accessible_mcp_servers_combines_all_grant_sources():
         # Explicit team membership covers grants available through a team even if
         # no current key were using that membership.
         "/user/info": {"teams": [{"team_id": "team-id"}]},
-        # The researchers-like team grants the legacy group named "research".
+        # The researchers-like team grants the MCP group named "research".
         "/team/info": {
             "team_id": "team-id",
             "object_permission": {"mcp_access_groups": ["research"]},
