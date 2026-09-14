@@ -182,11 +182,16 @@ os.environ["ACCOUNTING_PTH"] = tempfile.mkdtemp()
 mimir.MIMIR_USER = mimir.MIMIR_USER or "test"
 mimir.MIMIR_PASSWORD = mimir.MIMIR_PASSWORD or "test"
 
+from ai4papi import conf as papiconf  # noqa: E402
 from ai4papi.accounting import store, sweep  # noqa: E402
 import ai4papi.accounting as accounting  # noqa: E402
 
 _NOW = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 _NS, _UUID, _DC = "ai4eosc", "sweep-test-uuid", "ifca-ai4eosc"
+# fixed, test-owned TUE: independent of whatever var/datacenters.csv says for
+# `_DC` in production, so editing that file never breaks this test.
+_TUE = 2.5
+papiconf.datacenters[_DC] = {**papiconf.datacenters[_DC], "TUE": _TUE}
 
 
 def _fake_query_range(promql, start, end, step_s=30):
@@ -221,10 +226,10 @@ sweep.process_single(_info, _NOW)
 doc = store.read_accum(_NS, _UUID)
 acc = doc["accumulated"]
 assert doc["metrics_available"] is True
-assert doc["tue_factor"] == 2.03
-# ~3h of 100 W -> ~300 Wh raw, x 2.03 TUE (11 or 12 complete 15-min buckets
+assert abs(doc["tue_factor"] - _TUE) < 1e-9
+# ~3h of 100 W -> ~300 Wh raw, x _TUE (11 or 12 complete 15-min buckets
 # depending on where "now" falls in the current bucket)
-assert 270 * 2.03 < acc["energy_wh"] < 305 * 2.03, acc
+assert 270 * _TUE < acc["energy_wh"] < 305 * _TUE, acc
 assert abs(acc["carbon_g"] - acc["energy_wh"] / 1000 * compute.DEFAULT_CARBON) < 1.0
 
 # idempotent: same "now" -> byte-identical document
@@ -263,7 +268,7 @@ assert _pt == {
     "live",
 }, _pt
 _ps = accounting.get_accumulated(_NS, _UUID, live=True)
-assert _ps["power_w"] and _ps["tue_factor"] == 2.03
+assert _ps["power_w"] and abs(_ps["tue_factor"] - _TUE) < 1e-9
 
 # per-user aggregate: sums the owner's deployments, EnergyStats-shaped
 accounting._read_doc.cache_clear()

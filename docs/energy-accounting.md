@@ -25,7 +25,7 @@ Mimir endpoint: `https://mimir.k8s.cloud.ai4eosc.eu/prometheus/api/v1/query_rang
 
 `energy_wh = integrated_Wh * TUE[datacenter]`, where `integrated_Wh` is the raw trapezoidal integral of `CPU + GPU` power.
 
-The TUE (Total Usage Effectiveness, grid to compute ratio) is per datacenter and already covers CPU plus GPU, so it is applied once, before the footprint (which is scope 2, so it must reflect the whole facility draw). It is a single empirical factor per datacenter (default 2.03), consistent with the platform's existing energy accounting. Every energy, power, carbon and water value in an API response is already TUE-normalized; the applied factor is reported as `tue_factor` (per datacenter, or blended `energy_wh / raw` on multi-datacenter and per-user aggregates) so a client that wants the raw meter figure divides by it. The accumulator stores `tue_factor` per document.
+The TUE (Total Usage Effectiveness, grid to compute ratio) is per datacenter and already covers CPU plus GPU, so it is applied once, before the footprint (which is scope 2, so it must reflect the whole facility draw). It is a single empirical factor per datacenter (default 2.73), consistent with the platform's existing energy accounting. Every energy, power, carbon and water value in an API response is already TUE-normalized; the applied factor is reported as `tue_factor` (per datacenter, or blended `energy_wh / raw` on multi-datacenter and per-user aggregates) so a client that wants the raw meter figure divides by it. The accumulator stores `tue_factor` per document.
 
 The TUE is read from the `TUE` column of `var/datacenters.csv`, only populated for the datacenters that have a value (currently `ifca-ai4eosc` and `ifca-imagine`). Blank cells load as `None` and `energy.default_tue_factor` is used as fallback.
 
@@ -114,7 +114,7 @@ One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomi
   "active_allocs": [{"alloc_id": "...", "datacenter": "ifca-imagine"}],
   "window_start": "2026-09-02T12:00:00Z",
   "settled_ts": "2026-09-02T12:00:00Z", "pointer_ts": "2026-09-03T12:45:00Z",
-  "updated_at": "2026-09-03T12:50:00Z", "tue_factor": 2.03,
+  "updated_at": "2026-09-03T12:50:00Z", "tue_factor": 2.73,
   "settled":     {"energy_wh": 41200.0, "carbon_g": 12100.0, "water_l": 480.0},
   "tail":        [{"ts": "2026-09-02T12:00:00Z", "energy_wh": 4.1, "power_w_avg": 24.3, "carbon_g": 1.2, "water_l": 0.05}],
   "accumulated": {"energy_wh": 42873.4, "carbon_g": 12550.2, "water_l": 498.1}
@@ -244,7 +244,7 @@ energy:
   user_series_points: 1000       # downsample target for the merged per-user series in /stats/user
   cluster_series_points: 500     # downsample target for the per-datacenter series in /stats/cluster
   metrics_datacenters: [ifca-ai4eosc, ifca-imagine]
-  default_tue_factor: 2.03       # fallback when a datacenter has no TUE in datacenters.csv
+  default_tue_factor: 2.73       # fallback when a datacenter has no TUE in datacenters.csv
   data_quality: {enabled: true, min_power_w: 0, max_power_w: 1000, spike_factor: 12, spike_window: 11}
 ```
 

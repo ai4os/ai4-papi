@@ -110,7 +110,7 @@ energy:  # per-deployment energy consumption and environmental footprint stats
   # TUE (grid -> compute ratio, already covers CPU+GPU) is read per-datacenter
   # from the `TUE` column of var/datacenters.csv; this is the fallback for
   # datacenters that do not have it yet.
-  default_tue_factor: 2.03
+  default_tue_factor: 2.73
 
   data_quality:  # drop anomalous samples from each source series before integrating
 
