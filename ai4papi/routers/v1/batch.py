@@ -1,21 +1,19 @@
-from copy import deepcopy
 import datetime
 import json
 import os
 import subprocess
 import types
-from typing import Annotated
 import uuid
+from copy import deepcopy
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, module_patches, quotas, schemas, utils
 import ai4papi.conf as papiconf
-import ai4papi.nomad_utils as nomad_utils
+from ai4papi import auth, module_patches, nomad_utils, quotas, schemas, utils
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
-
 
 router = APIRouter(
     prefix="/batch",
