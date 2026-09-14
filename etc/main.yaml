@@ -85,3 +85,37 @@ mlflow:
     vo.ai4life.eu: https://mlflow.cloud.ai4eosc.eu/
     kmd4eosc: https://mlflow.cloud.ai4eosc.eu/
     tutorials: https://mlflow.cloud.ai4eosc.eu/
+
+energy:  # per-deployment energy consumption and environmental footprint stats
+
+  enabled: true
+  sweep_seconds: 900             # background thread cadence
+  series_bucket_seconds: 900     # persisted time-series bucket size (matches Wattnet's 15-min cadence)
+  query_step_seconds: 30         # Mimir scrape interval
+  query_lag_seconds: 120         # ignore the most recent data (ingestion lag)
+  initial_lookback_hours: 24     # window covered on a deployment's first sweep
+  mimir_retention_days: 90       # tune to Mimir's actual retention
+  footprint_revision_hours: 24   # re-compute footprint for buckets newer than this
+  topup_cache_seconds: 25        # live top-up cache (< dashboard poll so the counter moves)
+  topup_lag_seconds: 25          # live top-up query stops this far before "now"
+  deployment_series_points: 1000 # downsample target for the per-deployment series in /deployments/*
+  user_series_points: 1000       # downsample target for the merged per-user series in /stats/user (full_info=true)
+  cluster_series_points: 500     # downsample target for the per-datacenter series in /stats/cluster (full_info=true)
+
+  metrics_datacenters:  # datacenters where power metrics exist
+
+    - ifca-ai4eosc
+    - ifca-imagine
+
+  # TUE (grid -> compute ratio, already covers CPU+GPU) is read per-datacenter
+  # from the `TUE` column of var/datacenters.csv; this is the fallback for
+  # datacenters that do not have it yet.
+  default_tue_factor: 2.73
+
+  data_quality:  # drop anomalous samples from each source series before integrating
+
+    enabled: true
+    min_power_w: 0             # drop samples below this (kills negatives)
+    max_power_w: 1000          # per-source ceiling (one allocation's CPU, or one GPU); 0 = off
+    spike_factor: 12           # drop a sample above spike_factor * rolling median (0 = off)
+    spike_window: 11           # neighbour samples used for the rolling median
