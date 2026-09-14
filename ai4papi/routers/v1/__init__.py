@@ -6,14 +6,13 @@ from . import (
     deployments,
     inference,
     llm,
+    proxies,
     secrets,
+    snapshots,
     stats,
     storage,
     try_me,
-    snapshots,
-    proxies,
 )
-
 
 router = fastapi.APIRouter()
 router.include_router(catalog.router)
