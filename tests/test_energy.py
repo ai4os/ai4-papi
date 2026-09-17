@@ -393,6 +393,323 @@ assert _gdoc["accumulated"]["energy_wh"] > 0, _gdoc
 print("🟢 energy: sweep pipeline checks passed!")
 
 
+# --- on-demand sweep: read API does not wait for the background thread -------
+
+_OND_UUID = "sweep-on-demand-uuid"
+mimir.query_range = _fake_query_range
+mimir.query_range_chunked = _fake_query_range
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-o"]},
+    [compute.AllocWindow("alloc-o", _NOW.timestamp() - 3 * 3600, None)],
+    [{"alloc_id": "alloc-o", "datacenter": _DC}],
+    False,
+)
+
+
+def _fake_get_job(id_, namespace):
+    if id_ != _OND_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _OND_UUID,
+        "Name": f"module-{_OND_UUID}",
+        "SubmitTime": int((_NOW.timestamp() - 3 * 3600) * 1e9),
+        "Meta": {"owner": "ondemand@egi.eu"},
+    }
+
+
+_orig_get_job = sweep.Nomad.job.get_job
+sweep.Nomad.job.get_job = _fake_get_job
+
+# never swept: no doc yet, the read API must trigger one sweep pass itself
+assert store.read_accum(_NS, _OND_UUID) is None
+accounting._read_doc.cache_clear()
+_ond_stats = accounting.get_accumulated(_NS, _OND_UUID, live=False)
+assert _ond_stats is not None and _ond_stats["energy_wh"] > 0, _ond_stats
+assert store.read_accum(_NS, _OND_UUID) is not None
+
+# already swept once (on-demand or not): no further Nomad call needed
+def _boom(id_, namespace):
+    raise AssertionError("ensure_swept should not touch Nomad once a doc exists")
+
+
+sweep.Nomad.job.get_job = _boom
+accounting._read_doc.cache_clear()
+assert accounting.get_accumulated(_NS, _OND_UUID, live=False) is not None
+
+# job unknown to Nomad: on-demand sweep finds nothing, degrades to `None`, no crash
+sweep.Nomad.job.get_job = _fake_get_job
+accounting._read_doc.cache_clear()
+assert accounting.get_accumulated(_NS, "sweep-unknown-uuid", live=False) is None
+accounting._read_doc.cache_clear()
+assert accounting.get_series(_NS, "sweep-unknown-uuid") is None
+
+sweep.Nomad.job.get_job = _orig_get_job
+
+print("🟢 energy: on-demand sweep checks passed!")
+
+
+# --- live-only fallback: deployment younger than one bucket, no doc at all ---
+# `ensure_swept` correctly leaves such a deployment with no doc (nothing has
+# settled into a full 15-min bucket yet); the read API must instead fall back
+# to a pure live Mimir number -- but ONLY once Mimir actually has a sample for
+# it, never a fabricated `0`.
+
+# anchored just after the start of the current 15-min bucket (not "N minutes
+# before now") so `floor(submit, bucket_s) == floor(now, bucket_s)` regardless
+# of where in the bucket the suite happens to run -- "now - 3 minutes" would
+# occasionally land in the *previous* bucket when run near a :00/:15/:30/:45
+# boundary, making `process_single` see a full elapsed bucket to integrate and
+# spuriously write a real doc, which is exactly the "too young" case this
+# section means to test.
+_live_submit = sweep._floor(_NOW.timestamp(), 900) + 60
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-live"]},
+    [compute.AllocWindow("alloc-live", _live_submit, None)],
+    [{"alloc_id": "alloc-live", "datacenter": _DC}],
+    False,
+)
+
+# Mimir has real (fake) samples for this young deployment -> populated, not null
+_LIVE_UUID = "sweep-live-only-uuid"
+
+
+def _fake_get_job_live(id_, namespace):
+    if id_ != _LIVE_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _LIVE_UUID,
+        "Name": f"module-{_LIVE_UUID}",
+        "SubmitTime": int(_live_submit * 1e9),
+        "Meta": {"owner": "live@egi.eu"},
+    }
+
+
+mimir.query_range = _fake_query_range
+mimir.query_range_chunked = _fake_query_range
+sweep.Nomad.job.get_job = _fake_get_job_live
+
+assert store.read_accum(_NS, _LIVE_UUID) is None
+accounting._read_doc.cache_clear()
+_live_stats = accounting.get_accumulated(_NS, _LIVE_UUID, live=True)
+assert _live_stats is not None and _live_stats["energy_wh"] > 0, _live_stats
+assert _live_stats["power_w"] is not None
+# `since` is pinned to the exact submit time (not clamped/started late), so
+# `complete` must be `True` even though nothing is persisted yet
+assert _live_stats["complete"] is True, _live_stats
+# too young for a bucket: `process_single` still writes nothing, on purpose
+assert store.read_accum(_NS, _LIVE_UUID) is None
+
+accounting._read_doc.cache_clear()
+_live_series = accounting.get_series(_NS, _LIVE_UUID)
+assert _live_series is not None and _live_series["accumulated"]["energy_wh"] > 0
+
+# `power_w` must reflect the actual last Mimir sample even when it is stale
+# (older than the `2 * query_step_seconds` freshness cushion `topup` itself
+# enforces) -- there is nothing persisted here for a stale reading to mislead.
+_STALE_UUID = "sweep-live-only-stale-uuid"
+_stale_submit = (_NOW - datetime.timedelta(minutes=10)).timestamp()
+
+
+def _fake_get_job_stale(id_, namespace):
+    if id_ != _STALE_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _STALE_UUID,
+        "Name": f"module-{_STALE_UUID}",
+        "SubmitTime": int(_stale_submit * 1e9),
+        "Meta": {"owner": "live@egi.eu"},
+    }
+
+
+def _fake_query_range_stale(promql, start, end, step_s=30):
+    # no sample within the last 5 minutes -- well past the 60s cushion
+    stale_end = end.timestamp() - 300
+    t, out = start.timestamp(), []
+    while t <= stale_end:
+        out.append([t, "100000000" if "scaph" in promql else "0"])
+        t += step_s
+    return [{"metric": {}, "values": out}]
+
+
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-stale"]},
+    [compute.AllocWindow("alloc-stale", _stale_submit, None)],
+    [{"alloc_id": "alloc-stale", "datacenter": _DC}],
+    False,
+)
+mimir.query_range = _fake_query_range_stale
+mimir.query_range_chunked = _fake_query_range_stale
+sweep.Nomad.job.get_job = _fake_get_job_stale
+sweep._live_only_doc_cache.clear()
+sweep._live_cache.clear()
+
+# exercise `live_only_doc` / `topup` directly (not through `get_accumulated`'s
+# `ensure_swept`): whether `process_single` would also consider this
+# deployment "too young" depends on where in the current 15-min bucket the
+# suite happens to run, which is irrelevant to what this checks.
+_stale_doc = sweep.live_only_doc(_NS, _STALE_UUID)
+assert _stale_doc is not None, _stale_doc
+_stale_topup = sweep.topup(_stale_doc)
+assert _stale_topup is not None and _stale_topup["power_w"] is not None, _stale_topup
+assert _stale_topup["power_w"] > 0, _stale_topup
+
+# Mimir has NOTHING for this alloc yet -> must stay `null`, not a fabricated `0`
+sweep._live_cache.clear()  # fresh top-up cache: don't reuse the populated result
+
+_EMPTY_UUID = "sweep-live-only-empty-uuid"
+
+
+def _fake_get_job_empty(id_, namespace):
+    if id_ != _EMPTY_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _EMPTY_UUID,
+        "Name": f"module-{_EMPTY_UUID}",
+        "SubmitTime": int(_live_submit * 1e9),
+        "Meta": {"owner": "live@egi.eu"},
+    }
+
+
+def _fake_query_range_empty(promql, start, end, step_s=30):
+    return []
+
+
+mimir.query_range = _fake_query_range_empty
+mimir.query_range_chunked = _fake_query_range_empty
+sweep.Nomad.job.get_job = _fake_get_job_empty
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-empty"]},
+    [compute.AllocWindow("alloc-empty", _live_submit, None)],
+    [{"alloc_id": "alloc-empty", "datacenter": _DC}],
+    False,
+)
+
+accounting._read_doc.cache_clear()
+assert accounting.get_accumulated(_NS, _EMPTY_UUID, live=True) is None
+accounting._read_doc.cache_clear()
+assert accounting.get_series(_NS, _EMPTY_UUID) is None
+assert store.read_accum(_NS, _EMPTY_UUID) is None
+
+sweep.Nomad.job.get_job = _orig_get_job
+mimir.query_range = _fake_query_range
+mimir.query_range_chunked = _fake_query_range
+
+print("🟢 energy: live-only fallback checks passed!")
+
+
+# --- an inconclusive stub must not permanently block the live-only fallback --
+# `process_single` persists a bare stub (no "accumulated" key, no
+# `metrics_available` verdict) the first time it sees a job with no allocation
+# resolved at all yet (eg. queued, alloc not placed by Nomad). That stub must
+# not stop later reads from trying `live_only_doc` once Mimir has real data.
+
+_STUB_UUID = "sweep-inconclusive-stub-uuid"
+_stub_submit = (_NOW - datetime.timedelta(minutes=1)).timestamp()
+
+
+def _fake_get_job_stub(id_, namespace):
+    if id_ != _STUB_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _STUB_UUID,
+        "Name": f"module-{_STUB_UUID}",
+        "SubmitTime": int(_stub_submit * 1e9),
+        "Meta": {"owner": "stub@egi.eu"},
+    }
+
+
+sweep.Nomad.job.get_job = _fake_get_job_stub
+
+# first on-demand attempt: no allocation resolved at all yet
+compute.resolve_alloc_ids = lambda job_id, ns: ({}, [], [], False)
+mimir.query_range = _fake_query_range
+mimir.query_range_chunked = _fake_query_range
+
+assert store.read_accum(_NS, _STUB_UUID) is None
+accounting._read_doc.cache_clear()
+assert accounting.get_accumulated(_NS, _STUB_UUID, live=True) is None
+_stub_doc = store.read_accum(_NS, _STUB_UUID)
+assert _stub_doc is not None and "accumulated" not in _stub_doc, _stub_doc
+assert _stub_doc.get("metrics_available") is not False  # inconclusive, not a verdict
+
+# the allocation is now placed and Mimir has real samples: must populate, not
+# stay `null` because of the stub written above
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-stub"]},
+    [compute.AllocWindow("alloc-stub", _stub_submit, None)],
+    [{"alloc_id": "alloc-stub", "datacenter": _DC}],
+    False,
+)
+sweep._live_cache.clear()
+sweep._live_only_doc_cache.clear()  # `live_only_doc` itself is cached now too
+accounting._read_doc.cache_clear()
+_stub_stats = accounting.get_accumulated(_NS, _STUB_UUID, live=True)
+assert _stub_stats is not None and _stub_stats["energy_wh"] > 0, _stub_stats
+
+sweep.Nomad.job.get_job = _orig_get_job
+
+print("🟢 energy: inconclusive-stub fallback checks passed!")
+
+
+# --- on-demand bulk sweep: list / per-user reads catch up too ----------------
+
+_BULK_UUID = "sweep-bulk-uuid"
+_BULK_OWNER = "bulk@egi.eu"
+mimir.query_range = _fake_query_range
+mimir.query_range_chunked = _fake_query_range
+compute.resolve_alloc_ids = lambda job_id, ns: (
+    {_DC: ["alloc-b"]},
+    [compute.AllocWindow("alloc-b", _NOW.timestamp() - 3 * 3600, None)],
+    [{"alloc_id": "alloc-b", "datacenter": _DC}],
+    False,
+)
+
+
+def _fake_get_jobs(namespace, filter_=None):
+    return [{"ID": _BULK_UUID, "Name": f"module-{_BULK_UUID}"}]
+
+
+def _fake_get_job_bulk(id_, namespace):
+    if id_ != _BULK_UUID:
+        raise KeyError(id_)
+    return {
+        "ID": _BULK_UUID,
+        "Name": f"module-{_BULK_UUID}",
+        "SubmitTime": int((_NOW.timestamp() - 3 * 3600) * 1e9),
+        "Meta": {"owner": _BULK_OWNER},
+    }
+
+
+_orig_get_jobs = sweep.Nomad.jobs.get_jobs
+_orig_get_job = sweep.Nomad.job.get_job
+sweep.Nomad.jobs.get_jobs = _fake_get_jobs
+sweep.Nomad.job.get_job = _fake_get_job_bulk
+
+# never swept: the bulk/list read must sweep it on demand before serving
+assert store.read_accum(_NS, _BULK_UUID) is None
+_bulk = accounting.get_accumulated_bulk(_NS, _BULK_OWNER, live=False)
+assert _BULK_UUID in _bulk and _bulk[_BULK_UUID]["energy_wh"] > 0, _bulk
+assert store.read_accum(_NS, _BULK_UUID) is not None
+
+_ue = accounting.get_user_energy(_NS, _BULK_OWNER, series=False)
+assert _ue is not None and _ue["deployments"] == 1, _ue
+
+# already swept: the listing is still cheap (Nomad.jobs.get_jobs), but no
+# per-job fetch / re-sweep for a uuid that already has a doc
+def _boom_get_job(id_, namespace):
+    raise AssertionError("ensure_swept_bulk should not re-fetch a swept job")
+
+
+sweep.Nomad.job.get_job = _boom_get_job
+_bulk2 = accounting.get_accumulated_bulk(_NS, _BULK_OWNER, live=False)
+assert _BULK_UUID in _bulk2
+
+sweep.Nomad.jobs.get_jobs = _orig_get_jobs
+sweep.Nomad.job.get_job = _orig_get_job
+
+print("🟢 energy: on-demand bulk sweep checks passed!")
+
+
 # --- cluster energy: instantaneous power + accumulator + series --------------
 
 _CNS = sweep.CLUSTER_NS

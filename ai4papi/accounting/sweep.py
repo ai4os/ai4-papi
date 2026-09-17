@@ -151,6 +151,19 @@ def run_sweep() -> None:
         LOG.exception("cluster energy sweep failed")
 
 
+def _info_from_job(j: dict, ns: str) -> dict:
+    """`info` dict `process_single` expects, from a raw Nomad job."""
+    meta = j.get("Meta") or {}
+    return {
+        "uuid": j["ID"],
+        "job_name": j["Name"],
+        "namespace": ns,
+        "owner": meta.get("owner", ""),
+        "submit_time": (j["SubmitTime"] / 1e9) if j.get("SubmitTime") else None,
+        "status": "running",
+    }
+
+
 def _sweep_namespace(ns: str, now: datetime.datetime) -> None:
     try:
         jobs = Nomad.jobs.get_jobs(namespace=ns, filter_='Status != "dead"')
@@ -169,17 +182,8 @@ def _sweep_namespace(ns: str, now: datetime.datetime) -> None:
         except Exception:
             LOG.exception("could not fetch job %s", stub["ID"])
             continue
-        meta = j.get("Meta") or {}
-        info = {
-            "uuid": j["ID"],
-            "job_name": j["Name"],
-            "namespace": ns,
-            "owner": meta.get("owner", ""),
-            "submit_time": (j["SubmitTime"] / 1e9) if j.get("SubmitTime") else None,
-            "status": "running",
-        }
         try:
-            process_single(info, now)
+            process_single(_info_from_job(j, ns), now)
         except Exception:
             LOG.exception("energy sweep failed for deployment %s", stub["ID"])
 
@@ -199,6 +203,159 @@ def _sweep_namespace(ns: str, now: datetime.datetime) -> None:
             process_single(info, now, closing=True)
         except Exception:
             LOG.exception("energy close failed for deployment %s", uuid)
+
+
+def ensure_swept(ns: str, uuid: str) -> dict | None:
+    """
+    On-demand equivalent of one sweep pass for a single deployment, called from
+    the read path when no accumulator doc exists yet: a deployment that already
+    has real samples in Mimir does not have to wait up to `sweep_seconds` for
+    the background thread to reach it before the API can report anything.
+
+    A no-op (returns the existing doc untouched, no Nomad/Mimir call) once the
+    background sweep has processed this deployment at least once, so it never
+    duplicates the periodic sweep's work. `None` if the job cannot be found (not
+    a deployment, or already gone).
+    """
+    if not enabled():
+        return None
+    doc = store.read_accum(ns, uuid)
+    if doc is not None:
+        return doc
+    try:
+        j = Nomad.job.get_job(id_=uuid, namespace=ns)
+    except Exception:
+        return None
+    try:
+        process_single(_info_from_job(j, ns), _now())
+    except Exception:
+        LOG.warning("on-demand energy sweep failed for %s/%s", ns, uuid, exc_info=True)
+        return None
+    return store.read_accum(ns, uuid)
+
+
+_bulk_sweep_cache: TTLCache = TTLCache(
+    maxsize=2048, ttl=papiconf.MAIN_CONF["energy"].get("topup_cache_seconds", 25)
+)
+
+
+@cached(_bulk_sweep_cache)
+def ensure_swept_bulk(ns: str, owner: str) -> list[dict]:
+    """
+    On-demand equivalent of one sweep pass, restricted to one owner's active
+    deployments in `ns`: the bulk counterpart of `ensure_swept`, used by the
+    list (`get_accumulated_bulk`) and per-user (`get_user_energy`) read paths so
+    a just-deployed job shows up there too, not only on its own detail endpoint.
+
+    Lists the owner's active jobs (cheap, no per-job fetch) and only runs
+    `process_single` for the ones with no accumulator doc yet; a no-op once the
+    background sweep (or a prior on-demand call) has reached all of them.
+    Cached for `topup_cache_seconds`: without it, every list/`/stats/user` read
+    would list Nomad on every single request, forever, not just during the
+    bootstrap window -- a few seconds of staleness for a listing that itself
+    only matters for brand-new deployments is a good trade.
+
+    Returns the filtered job stubs (`[{"ID": ..., "Name": ...}, ...]`) so the
+    caller can also try `live_only_doc` for whichever of them still have no doc
+    afterwards (a deployment too young for even one completed bucket), without
+    listing Nomad a second time. `[]` when disabled or the listing itself fails.
+    """
+    if not enabled():
+        return []
+    try:
+        jobs = Nomad.jobs.get_jobs(
+            namespace=ns,
+            filter_=f'Meta.owner == "{owner}" and Status != "dead"',
+        )
+    except Exception:
+        LOG.warning("could not list jobs for on-demand sweep (%s/%s)", ns, owner)
+        return []
+    now = _now()
+    stubs = [s for s in jobs if s["Name"].startswith(_JOB_PREFIXES)]
+    for stub in stubs:
+        if store.read_accum(ns, stub["ID"]) is not None:
+            continue
+        try:
+            j = Nomad.job.get_job(id_=stub["ID"], namespace=ns)
+            process_single(_info_from_job(j, ns), now)
+        except Exception:
+            LOG.warning(
+                "on-demand energy sweep failed for %s/%s", ns, stub["ID"], exc_info=True
+            )
+    return stubs
+
+
+_live_only_doc_cache: TTLCache = TTLCache(
+    maxsize=8192, ttl=papiconf.MAIN_CONF["energy"].get("topup_cache_seconds", 25)
+)
+
+
+@cached(_live_only_doc_cache)
+def live_only_doc(ns: str, uuid: str) -> dict | None:
+    """
+    Transient stand-in for a deployment `process_single` has not written any doc
+    for at all yet -- typically younger than one `series_bucket_seconds`, so it
+    has no completed bucket to fold into an accumulator (see `ensure_swept`,
+    which still leaves such a deployment with no doc by design: there is
+    nothing settled to persist). Never written to the store.
+
+    Cached for `topup_cache_seconds`: without it, every read of a deployment
+    still in this bootstrap window would fetch its Nomad job and resolve its
+    allocations from scratch on every single request for as long as it stays
+    doc-less (which can be several minutes). A few seconds of staleness on
+    which allocation is "current" is a good trade against that.
+
+    Shaped so the normal `topup` / `live_series` machinery -- and therefore
+    `accounting._to_stats` / `_apply_topup` / `_build_series` -- treats it like
+    a real doc with an all-zero accumulator and `pointer_ts = submit_time`: the
+    whole reported number then comes from the live top-up's Mimir query, capped
+    at the same lookback `topup` itself uses. `None` if the job cannot be
+    resolved to a running, monitored allocation (not found, queued, or no
+    allocation yet).
+    """
+    if not enabled():
+        return None
+    try:
+        j = Nomad.job.get_job(id_=uuid, namespace=ns)
+    except Exception:
+        return None
+    info = _info_from_job(j, ns)
+    try:
+        allocs_by_dc, _windows, running_allocs, _partial = compute.resolve_alloc_ids(
+            uuid, ns
+        )
+    except Exception:
+        return None
+    if not running_allocs:
+        return None
+    submit = info.get("submit_time")
+    submit_ts = submit or _now().timestamp()
+    # `window_start` below is pinned to the exact submit time, same as
+    # `process_single`'s first-encounter `window_start` -- not started late or
+    # clamped, so `complete` is `True` unless we had no real `submit_time` to
+    # pin it to at all (job fetched with no `SubmitTime`, an edge case) or it
+    # somehow predates the lookback window (impossible in practice: this path
+    # only ever runs for a deployment too young to have a doc yet).
+    complete = bool(submit) and submit >= _now().timestamp() - _cfg()[
+        "initial_lookback_hours"
+    ] * 3600
+    return {
+        "deployment_uuid": uuid,
+        "namespace": ns,
+        "job_name": info.get("job_name"),
+        "owner": info.get("owner"),
+        "status": "running",
+        "metrics_available": True,
+        "complete": complete,
+        "window_start": compute._iso(submit_ts),
+        "settled_ts": compute._iso(submit_ts),
+        "pointer_ts": compute._iso(submit_ts),
+        "active_allocs": running_allocs,
+        "datacenters": sorted(allocs_by_dc),
+        "tail": [],
+        "settled": dict(_EMPTY),
+        "accumulated": dict(_EMPTY),
+    }
 
 
 def process_single(info: dict, now: datetime.datetime, closing: bool = False) -> None:
@@ -529,8 +686,18 @@ _live_cache: TTLCache = TTLCache(
 
 
 def _live_window(pointer_iso: str) -> tuple[float, float]:
+    """
+    `[pointer_ts, now]`, clamped on the left so a long-dormant pointer does not
+    trigger a huge query. No ingestion-lag cushion: Mimir data is immutable
+    once ingested (never revised), so querying right up to "now" cannot return
+    a wrong value -- worst case, a sample scraped a moment ago is not visible
+    *yet* and simply is not the one returned as "last", which self-corrects on
+    the very next call. Used by `topup` for both a real, persisted accumulator
+    and `live_only_doc`'s transient one (nothing persisted): both get the
+    freshest number Mimir can currently give.
+    """
     cfg = _cfg()
-    end_ts = _now().timestamp() - cfg["topup_lag_seconds"]
+    end_ts = _now().timestamp()
     start_ts = max(
         compute._parse_iso(pointer_iso),
         end_ts - (cfg["sweep_seconds"] + 4 * cfg["series_bucket_seconds"]),
@@ -555,7 +722,10 @@ def _live_buckets(alloc_pairs, start_ts: float, end_ts: float, bucket_s: int):
     """
     Integrate the live window from Mimir into `bucket_s` buckets (per DC, merged),
     plus the current draw from the last sample of that same query. Returns
-    `(buckets, power_w)`; `power_w` is `None` when nothing is fresh.
+    `(buckets, power_w)`; `power_w` is `None` only when a series has no sample
+    at all in the window (nothing to read yet), never because the last sample
+    is "too old" -- Mimir data is immutable once ingested, so the actual last
+    point is always the right one to show, however old it is.
     """
     cfg = _cfg()
     step_s = int(cfg["query_step_seconds"])
@@ -567,7 +737,6 @@ def _live_buckets(alloc_pairs, start_ts: float, end_ts: float, bucket_s: int):
         by_dc.setdefault(dc, []).append(alloc_id)
 
     start_dt, end_dt = _dt(start_ts), _dt(end_ts)
-    fresh_after = end_ts - 2 * step_s
     per_dc = []
     inst_w = 0.0
     any_inst = False
@@ -591,7 +760,7 @@ def _live_buckets(alloc_pairs, start_ts: float, end_ts: float, bucket_s: int):
                 buckets, metrics.get("carbon"), metrics.get("water")
             )
         )
-        iw = compute.instant_power(cpu, gpu, _tue(dc), fresh_after, dq)
+        iw = compute.instant_power(cpu, gpu, _tue(dc), dq)
         if iw is not None:
             inst_w += iw
             any_inst = True

@@ -294,20 +294,20 @@ def instant_power(
     cpu_result: list[dict],
     gpu_result: list[dict],
     tue_factor: float,
-    fresh_after_ts: float,
     data_quality: dict | None = None,
 ) -> float | None:
     """
     Current draw from a range query: the sum of the most recent (sanitized)
-    sample of every power series, normalized by TUE. A series whose last good
-    sample predates `fresh_after_ts` (source gone, scrape hole) is skipped.
-    `None` when nothing is fresh.
+    sample of every power series, normalized by TUE. Mimir data is immutable
+    once ingested, so the actual last sample is always used, however old it
+    is -- `None` only when a series has no sample at all (nothing ingested
+    yet, or dropped entirely by `sanitize`).
     """
     raw_w, fresh = 0.0, False
     for scale, result in ((1e-6, cpu_result), (1.0, gpu_result)):
         for samples in _series_samples(result, scale):
             clean = sanitize(samples, data_quality)
-            if clean and clean[-1][0] >= fresh_after_ts:
+            if clean:
                 raw_w += clean[-1][1]
                 fresh = True
     return raw_w * tue_factor if fresh else None

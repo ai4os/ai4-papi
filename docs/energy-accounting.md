@@ -31,7 +31,7 @@ The TUE is read from the `TUE` column of `var/datacenters.csv`, only populated f
 
 ## Architecture
 
-Two layers: a durable background sweep that owns the persisted record, and a live read-time top-up that makes the dashboard counter move.
+Four layers: a durable background sweep that owns the persisted record, a live read-time top-up on top of it, an on-demand version of the sweep for a deployment the background thread has not reached yet, and a pure-Mimir fallback for one still too young to have anything settled at all.
 
 ```
    background thread in ai4papi.main: @repeat_every(energy.sweep_seconds)
@@ -58,6 +58,8 @@ Two layers: a durable background sweep that owns the persisted record, and a liv
 ```
 
 The shape of the deployment `energy` block follows the existing `full_info` query param: `full_info=false` (the list default) attaches the accumulated `EnergyStats`; `full_info=true` (the individual-endpoint default) attaches the extended `EnergyTimeSeries`.
+
+The diagram above is the steady state, once a deployment has a persisted doc. Before that, the read path itself does the work the diagram shows the background thread doing (Layer 3), and short of that, falls back to querying Mimir directly with nothing persisted at all (Layer 4) -- see both below.
 
 ### Layer 1: durable sweep
 
@@ -91,15 +93,30 @@ Note on double counting: scaphandre host power is RAPL (CPU package + DRAM), it 
 
 ### Layer 2: read-time top-up
 
-The stored accumulator only reaches `pointer_ts` (up to one sweep interval behind). On each API read, `accounting.sweep.topup(doc)` queries Mimir live for `[pointer_ts, now - topup_lag_seconds]` (a single `query_range`, no chunking), applies the TUE and the current Wattnet intensity, and returns the energy deltas plus `live_as_of` and `power_w`. `power_w` is the **current draw**: the TUE-normalized sum of the last (sanitized, still fresh) sample of every series in that same query, not a window mean. The result is cached for `topup_cache_seconds` (25 s, below the dashboard's 30 s poll, so the number visibly moves). Any failure returns `{"degraded": true}` and the API serves the stored value.
+The stored accumulator only reaches `pointer_ts` (up to one sweep interval behind). On each API read, `accounting.sweep.topup(doc)` queries Mimir live for `[pointer_ts, now]` (a single `query_range`, no chunking, no ingestion-lag cushion -- Mimir data is immutable once ingested, so querying right up to "now" cannot return a wrong value, only occasionally miss a sample scraped a moment ago that is not visible *yet*, which self-corrects on the very next call), applies the TUE and the current Wattnet intensity, and returns the energy deltas plus `live_as_of` and `power_w`. `power_w` is the **current draw**: the TUE-normalized sum of the actual last sample of every series in that same query, however old that sample is, not a window mean. The result is cached for `topup_cache_seconds` (25 s, below the dashboard's 30 s poll, so the number visibly moves). Any failure returns `{"degraded": true}` and the API serves the stored value.
 
 `topup_cluster(dc, doc)` / `live_series_cluster(dc, doc, bucket_s)` are the datacenter equivalents (same window logic, `_cluster_promql` instead of the per-alloc query). They are computed inside `get_cluster_stats_bg()` (which runs every 30 s anyway), so the datacenter counter moves at the same cadence as the per-deployment one.
 
 `accumulated (stored, frozen for up to a sweep) + top-up (growing)` stays continuous: when the next sweep advances `pointer_ts` and folds that slice into `accumulated`, the top-up window shrinks by the same amount.
 
+### Layer 3: on-demand sweep
+
+A deployment the background thread has not reached yet has no `.accum.json`, so the top-up (which reads `pointer_ts` off the stored doc) has nothing to attach to. Rather than making a fresh deployment wait up to `sweep_seconds` for its first numbers, every read path runs one `process_single` pass synchronously (the same function and same write path the background thread uses) for whatever it is about to serve and has no doc yet:
+
+- Single-deployment reads (`get_accumulated`, `get_series`) call `accounting.sweep.ensure_swept(namespace, uuid)`: fetch that one Nomad job, sweep it, return the resulting doc.
+- Bulk/per-user reads (`get_accumulated_bulk`, `get_user_energy`) call `accounting.sweep.ensure_swept_bulk(namespace, owner)` first: list the owner's active jobs (one cheap Nomad call, no per-job fetch) and sweep only the ones still missing a doc, before falling back to the normal `store.iter_owner` scan.
+
+Once a doc exists, both are a single cheap `store.read_accum` check (or, for the bulk path, one job-list call) and defer entirely to the background sweep; neither re-queries Mimir beyond that first pass. A job Nomad no longer knows about (or a listing failure) degrades to `energy: null` / that deployment simply absent from the aggregate. `/stats/cluster` (`get_cluster_energy`, per-datacenter) is not covered by this: its instantaneous power is already live regardless (`get_datacenter_power`), and its accumulator is seeded by the small, fixed `metrics_datacenters` list, not by individual deployments.
+
+`process_single` also persists a bare stub (no `accumulated` key, no `metrics_available` verdict either way) the first time it runs for a job with no allocation resolved at all yet (eg. queued, or Nomad has not placed the allocation on a node). That stub is not a negative result, just "too early to tell": the read path treats "doc is `None`" and "doc exists but has no `accumulated` and `metrics_available` is not explicitly `False`" the same way, both falling through to Layer 4. Only an explicit `metrics_available: False` (a confirmed gap, set after the deployment has run long enough that the absence of data is meaningful) stops the fallback and returns `null` outright, deferring to the next real sweep.
+
+### Layer 4: pure-Mimir fallback
+
+`process_single` leaves a deployment with **no** doc when it is younger than one `series_bucket_seconds`: there is nothing settled to fold into an accumulator yet, so Layer 3 alone still reports `energy: null` for the first few minutes of a deployment's life. `sweep.live_only_doc(ns, uuid)` closes that gap: a transient, **never persisted** stand-in doc (`accumulated` all zero, `pointer_ts = submit_time`, the currently-running allocations) shaped so the normal `topup` / `live_series` machinery treats it exactly like a real doc -- the whole reported number then comes straight from Mimir, through the same lag-free `_live_window` as Layer 2. `accounting._live_only_stats()` wraps it and only returns something when the top-up actually found data (`power_w` set, or a non-zero energy/carbon/water delta) -- an all-zero top-up is indistinguishable from "no measurement yet", so it is treated as not populated (`null`) rather than shown as a fabricated `0` reading. Used by all four read functions whenever they still have no usable doc after Layer 3.
+
 ## Persistence
 
-One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomic writes (temp file + `os.replace`), the sweep thread is the only writer. Same convention as `ai4papi.utils.retrieve_from_snapshots`. No database. The `accounting.store` interface is deliberately small so it can move to PostgreSQL later without touching the routers.
+One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomic writes (temp file + `os.replace`). `process_single` / `process_datacenter` are the only writers, run either by the periodic sweep thread or, for a single deployment's very first doc, synchronously from the read path (see [Layer 3](#layer-3-on-demand-sweep)). Same convention as `ai4papi.utils.retrieve_from_snapshots`. No database. The `accounting.store` interface is deliberately small so it can move to PostgreSQL later without touching the routers.
 
 `<uuid>.accum.json` (rewritten every sweep, ~25 KB with a full 24h tail):
 
@@ -204,7 +221,7 @@ deployments          set only on the per-user aggregate: number of deployments s
 series               15-min EnergyTimeSeriesPoint list; null unless full_info=true (per-user aggregate only; the per-deployment full_info uses EnergyTimeSeries instead)
 ```
 
-`power_w` is a rate, not an accumulator, so it is never summed. The `power_w` in the block (deployment, user, datacenter) is the **current draw**: the last power sample read from Mimir. Deployment and user take it from the last point of the top-up range query (`compute.instant_power`, which drops stale or spiky last samples); the datacenter takes it from a dedicated instant query (`get_datacenter_power`). `series[].power_w` in the time series is different: a **mean** over its 15-min bucket (so `energy_wh ~= power_w * bucket_hours`).
+`power_w` is a rate, not an accumulator, so it is never summed. The `power_w` in the block (deployment, user, datacenter) is the **current draw**: the last power sample read from Mimir, however old it is (`compute.instant_power` does not drop it for being stale -- Mimir data is immutable once ingested, so the actual last sample is always the right one to show; it does still drop spiky samples via `sanitize`'s data-quality filter). Deployment and user take it from the last point of the top-up range query; the datacenter takes it from a dedicated instant query (`get_datacenter_power`). `series[].power_w` in the time series is different: a **mean** over its 15-min bucket (so `energy_wh ~= power_w * bucket_hours`).
 
 ### Time series, for the detail view
 
@@ -239,7 +256,6 @@ energy:
   mimir_retention_days: 90       # tune to Mimir's actual retention
   footprint_revision_hours: 24   # re-compute footprint for buckets newer than this
   topup_cache_seconds: 25        # live top-up cache (< dashboard poll)
-  topup_lag_seconds: 25          # live top-up query stops this far before "now"
   deployment_series_points: 1000 # downsample target for the per-deployment series in /deployments/*
   user_series_points: 1000       # downsample target for the merged per-user series in /stats/user
   cluster_series_points: 500     # downsample target for the per-datacenter series in /stats/cluster
@@ -261,7 +277,6 @@ energy:
 | Mimir scrape | 30 s | given |
 | Sweep thread | `sweep_seconds` (900) | keeps the accumulator current, consolidates the footprint at Wattnet's revision cadence, short enough to catch short jobs before Nomad GC |
 | Top-up cache | `topup_cache_seconds` (25) | below the dashboard's 30 s poll, so the counter moves |
-| Top-up lag | `topup_lag_seconds` (25) | Mimir ingestion margin; the displayed value trails real time by ~25-30 s |
 | Cluster archive-series cache | 300 s | the `.series.jsonl` only changes at sweep cadence; keeps the 30 s thread from re-parsing it |
 
 For the user to perceive the increment every 30 s the frontend must show Wh (or kWh with 3 decimals) or animate the counter: at 50 W, 30 s is ~0.4 Wh.

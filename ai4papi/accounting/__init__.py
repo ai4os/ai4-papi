@@ -26,6 +26,9 @@ from ai4papi.accounting.sweep import (
     CLUSTER_NS,
     _tue,
     enabled,
+    ensure_swept,
+    ensure_swept_bulk,
+    live_only_doc,
     live_series,
     live_series_cluster,
     process_single,
@@ -106,12 +109,49 @@ def _apply_topup(stats: dict, doc: dict) -> dict:
     return stats
 
 
+def _live_only_stats(namespace: str, uuid: str) -> tuple[dict, dict] | None:
+    """
+    `(doc, stats)` for a deployment with no accumulator doc yet, computed purely
+    from `live_only_doc` + its top-up. `None` whenever there is nothing to show:
+    no running allocation, Mimir unreachable (`degraded`), or Mimir simply has
+    not returned a single sample for this allocation yet -- an all-zero top-up
+    with no instantaneous power is indistinguishable from "no measurement", so
+    it is treated as not populated rather than shown as a fabricated `0` reading.
+    """
+    doc = live_only_doc(namespace, uuid)
+    if doc is None:
+        return None
+    stats = _apply_topup(_to_stats(doc), doc)
+    has_data = stats.get("power_w") is not None or any(
+        stats.get(k, 0.0) for k in _KEYS
+    )
+    if not has_data:
+        return None
+    return doc, stats
+
+
 def get_accumulated(namespace: str, uuid: str, live: bool = True) -> dict | None:
     if not enabled():
         return None
     doc = _read_doc(namespace, uuid)
-    if not doc or doc.get("metrics_available") is False or "accumulated" not in doc:
+    if doc is None:
+        # never swept: run one sweep pass for just this deployment instead of
+        # waiting up to `sweep_seconds` for the background thread to reach it.
+        doc = ensure_swept(namespace, uuid)
+    if doc is not None and doc.get("metrics_available") is False:
+        # confirmed: ran a significant time with no usable data. Do not keep
+        # retrying live -- wait for the real sweep to reassess it.
         return None
+    if doc is None or "accumulated" not in doc:
+        # nothing settled yet: either too young for a bucket, or an
+        # inconclusive on-demand stub written before Nomad had even placed the
+        # allocation (no `metrics_available` verdict either way). Fall back to
+        # a pure-Mimir number, but only once Mimir actually has a sample for
+        # it - never a fabricated zero.
+        if not live:
+            return None
+        res = _live_only_stats(namespace, uuid)
+        return res[1] if res else None
     stats = _to_stats(doc)
     return _apply_topup(stats, doc) if live else stats
 
@@ -121,12 +161,26 @@ def get_accumulated_bulk(
 ) -> dict[str, dict]:
     if not enabled():
         return {}
+    live_jobs = ensure_swept_bulk(namespace, owner)
     out: dict[str, dict] = {}
+    covered: set[str] = set()
     for uuid, doc in store.iter_owner(namespace, owner):
-        if doc.get("metrics_available") is False or "accumulated" not in doc:
+        if doc.get("metrics_available") is False:
+            covered.add(uuid)
             continue
+        if "accumulated" not in doc:
+            continue  # inconclusive stub: leave uncovered, try live-only below
+        covered.add(uuid)
         stats = _to_stats(doc)
         out[uuid] = _apply_topup(stats, doc) if live else stats
+    if live:
+        for stub in live_jobs:
+            uuid = stub["ID"]
+            if uuid in covered:
+                continue
+            res = _live_only_stats(namespace, uuid)
+            if res is not None:
+                out[uuid] = res[1]
     return out
 
 
@@ -142,6 +196,7 @@ def get_user_energy(
     """
     if not enabled():
         return None
+    live_jobs = ensure_swept_bulk(namespace, owner)
 
     if target_points is None:
         target_points = int(
@@ -149,10 +204,22 @@ def get_user_energy(
         )
 
     rows = []
+    covered: set[str] = set()
     for uuid, doc in store.iter_owner(namespace, owner):
-        if doc.get("metrics_available") is False or "accumulated" not in doc:
+        if doc.get("metrics_available") is False:
+            covered.add(uuid)
             continue
+        if "accumulated" not in doc:
+            continue  # inconclusive stub: leave uncovered, try live-only below
+        covered.add(uuid)
         rows.append((uuid, doc, _apply_topup(_to_stats(doc), doc)))
+    for stub in live_jobs:
+        uuid = stub["ID"]
+        if uuid in covered:
+            continue
+        res = _live_only_stats(namespace, uuid)
+        if res is not None:
+            rows.append((uuid, res[0], res[1]))
     if not rows:
         return None
 
@@ -375,8 +442,16 @@ def get_series(
     if not enabled():
         return None
     doc = _read_doc(namespace, uuid)
-    if not doc or doc.get("metrics_available") is False or "accumulated" not in doc:
+    if doc is None:
+        doc = ensure_swept(namespace, uuid)
+    if doc is not None and doc.get("metrics_available") is False:
         return None
+    live_only_stats = None
+    if doc is None or "accumulated" not in doc:
+        res = _live_only_stats(namespace, uuid)
+        if res is None:
+            return None
+        doc, live_only_stats = res
 
     cfg = papiconf.MAIN_CONF["energy"]
     if target_points is None:
@@ -388,7 +463,10 @@ def get_series(
         live_series(doc, bucket_s=step_s),
         target_points,
     )
-    stats = _apply_topup(_to_stats(doc), doc)
+    # already computed (and confirmed non-empty) by `_live_only_stats` above;
+    # `_apply_topup` is cached at the Mimir-query level, so this is not a
+    # second call for the swept-doc branch either.
+    stats = live_only_stats or _apply_topup(_to_stats(doc), doc)
 
     return {
         "deployment_uuid": uuid,

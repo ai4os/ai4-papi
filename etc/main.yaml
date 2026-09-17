@@ -97,7 +97,6 @@ energy:  # per-deployment energy consumption and environmental footprint stats
   mimir_retention_days: 90       # tune to Mimir's actual retention
   footprint_revision_hours: 24   # re-compute footprint for buckets newer than this
   topup_cache_seconds: 25        # live top-up cache (< dashboard poll so the counter moves)
-  topup_lag_seconds: 25          # live top-up query stops this far before "now"
   deployment_series_points: 1000 # downsample target for the per-deployment series in /deployments/*
   user_series_points: 1000       # downsample target for the merged per-user series in /stats/user (full_info=true)
   cluster_series_points: 500     # downsample target for the per-datacenter series in /stats/cluster (full_info=true)
