@@ -25,6 +25,14 @@ from ai4papi.wattnet import green_director
 
 LOG = logging.getLogger(__name__)
 
+
+def _log_safe(value: str) -> str:
+    """Strip CR/LF from an identifier that may come straight from a request
+    path or auth token before it is interpolated into a log message, so it
+    cannot be used to forge log lines (CWE-117)."""
+    return str(value).replace("\r", "").replace("\n", "")
+
+
 _JOB_PREFIXES = ("module", "tool", "batch", "try")
 _KEYS = ("energy_wh", "carbon_g", "water_l")  # TUE-normalized totals kept per accum
 _EMPTY = dict.fromkeys(_KEYS, 0.0)
@@ -229,7 +237,12 @@ def ensure_swept(ns: str, uuid: str) -> dict | None:
     try:
         process_single(_info_from_job(j, ns), _now())
     except Exception:
-        LOG.warning("on-demand energy sweep failed for %r/%r", ns, uuid, exc_info=True)
+        LOG.warning(
+            "on-demand energy sweep failed for %s/%s",
+            _log_safe(ns),
+            _log_safe(uuid),
+            exc_info=True,
+        )
         return None
     return store.read_accum(ns, uuid)
 
@@ -268,7 +281,11 @@ def ensure_swept_bulk(ns: str, owner: str) -> list[dict]:
             filter_=f'Meta.owner == "{owner}" and Status != "dead"',
         )
     except Exception:
-        LOG.warning("could not list jobs for on-demand sweep (%r/%r)", ns, owner)
+        LOG.warning(
+            "could not list jobs for on-demand sweep (%s/%s)",
+            _log_safe(ns),
+            _log_safe(owner),
+        )
         return []
     now = _now()
     stubs = [s for s in jobs if s["Name"].startswith(_JOB_PREFIXES)]
@@ -280,7 +297,10 @@ def ensure_swept_bulk(ns: str, owner: str) -> list[dict]:
             process_single(_info_from_job(j, ns), now)
         except Exception:
             LOG.warning(
-                "on-demand energy sweep failed for %r/%r", ns, stub["ID"], exc_info=True
+                "on-demand energy sweep failed for %s/%s",
+                _log_safe(ns),
+                _log_safe(stub["ID"]),
+                exc_info=True,
             )
     return stubs
 
