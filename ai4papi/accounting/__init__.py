@@ -122,9 +122,7 @@ def _live_only_stats(namespace: str, uuid: str) -> tuple[dict, dict] | None:
     if doc is None:
         return None
     stats = _apply_topup(_to_stats(doc), doc)
-    has_data = stats.get("power_w") is not None or any(
-        stats.get(k, 0.0) for k in _KEYS
-    )
+    has_data = stats.get("power_w") is not None or any(stats.get(k, 0.0) for k in _KEYS)
     if not has_data:
         return None
     return doc, stats

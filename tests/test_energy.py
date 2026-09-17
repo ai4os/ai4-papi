@@ -427,6 +427,7 @@ _ond_stats = accounting.get_accumulated(_NS, _OND_UUID, live=False)
 assert _ond_stats is not None and _ond_stats["energy_wh"] > 0, _ond_stats
 assert store.read_accum(_NS, _OND_UUID) is not None
 
+
 # already swept once (on-demand or not): no further Nomad call needed
 def _boom(id_, namespace):
     raise AssertionError("ensure_swept should not touch Nomad once a doc exists")
@@ -693,6 +694,7 @@ assert store.read_accum(_NS, _BULK_UUID) is not None
 
 _ue = accounting.get_user_energy(_NS, _BULK_OWNER, series=False)
 assert _ue is not None and _ue["deployments"] == 1, _ue
+
 
 # already swept: the listing is still cheap (Nomad.jobs.get_jobs), but no
 # per-job fetch / re-sweep for a uuid that already has a doc

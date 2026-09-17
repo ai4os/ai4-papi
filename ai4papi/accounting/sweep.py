@@ -336,9 +336,10 @@ def live_only_doc(ns: str, uuid: str) -> dict | None:
     # pin it to at all (job fetched with no `SubmitTime`, an edge case) or it
     # somehow predates the lookback window (impossible in practice: this path
     # only ever runs for a deployment too young to have a doc yet).
-    complete = bool(submit) and submit >= _now().timestamp() - _cfg()[
-        "initial_lookback_hours"
-    ] * 3600
+    complete = (
+        bool(submit)
+        and submit >= _now().timestamp() - _cfg()["initial_lookback_hours"] * 3600
+    )
     return {
         "deployment_uuid": uuid,
         "namespace": ns,
