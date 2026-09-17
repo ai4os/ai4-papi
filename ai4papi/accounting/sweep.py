@@ -229,7 +229,7 @@ def ensure_swept(ns: str, uuid: str) -> dict | None:
     try:
         process_single(_info_from_job(j, ns), _now())
     except Exception:
-        LOG.warning("on-demand energy sweep failed for %s/%s", ns, uuid, exc_info=True)
+        LOG.warning("on-demand energy sweep failed for %r/%r", ns, uuid, exc_info=True)
         return None
     return store.read_accum(ns, uuid)
 
@@ -268,7 +268,7 @@ def ensure_swept_bulk(ns: str, owner: str) -> list[dict]:
             filter_=f'Meta.owner == "{owner}" and Status != "dead"',
         )
     except Exception:
-        LOG.warning("could not list jobs for on-demand sweep (%s/%s)", ns, owner)
+        LOG.warning("could not list jobs for on-demand sweep (%r/%r)", ns, owner)
         return []
     now = _now()
     stubs = [s for s in jobs if s["Name"].startswith(_JOB_PREFIXES)]
@@ -280,7 +280,7 @@ def ensure_swept_bulk(ns: str, owner: str) -> list[dict]:
             process_single(_info_from_job(j, ns), now)
         except Exception:
             LOG.warning(
-                "on-demand energy sweep failed for %s/%s", ns, stub["ID"], exc_info=True
+                "on-demand energy sweep failed for %r/%r", ns, stub["ID"], exc_info=True
             )
     return stubs
 
