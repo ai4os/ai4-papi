@@ -4,7 +4,6 @@ Test FastAPI is correctly generating the routes
 
 from ai4papi.main import app
 
-
 # Check routes
 routes = [(getattr(r, "path", ""), getattr(r, "methods", set())) for r in app.routes]
 

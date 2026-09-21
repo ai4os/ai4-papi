@@ -5,7 +5,6 @@ from fastapi import Request
 from ai4papi.routers.v1.catalog import common
 from ai4papi.routers.v1.catalog.modules import Modules
 
-
 # List modules
 modules_list = list(Modules.get_items().keys())
 

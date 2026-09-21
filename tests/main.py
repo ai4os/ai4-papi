@@ -14,7 +14,6 @@ from pathlib import Path
 
 import ai4papi.conf as papiconf
 
-
 # We want to test full functionality, without disabling any parts
 papiconf.IS_DEV = False
 
