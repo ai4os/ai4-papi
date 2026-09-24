@@ -54,6 +54,9 @@ assert ("/v1/llm/chat", {"POST"}) in routes
 assert ("/v1/llm/api_keys", {"POST"}) in routes
 assert ("/v1/llm/api_keys", {"GET"}) in routes
 assert ("/v1/llm/api_keys", {"DELETE"}) in routes
+assert ("/v1/llm/mcp", {"GET"}) in routes
+assert ("/v1/llm/mcp", {"POST"}) in routes
+assert ("/v1/llm/mcp/{server_id}", {"DELETE"}) in routes
 
 assert ("/v1/proxies/zenodo", {"POST"}) in routes
 
