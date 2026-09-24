@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 
+from ai4papi import accounting
 from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
@@ -48,6 +49,7 @@ description = (
 async def lifespan(app: fastapi.FastAPI):
     # on startup
     await get_cluster_stats_thread()
+    await energy_accounting_thread()
     yield
     # on shutdown
     # (nothing to do)
@@ -150,6 +152,20 @@ def get_cluster_stats_thread():
         get_cluster_stats_bg()
     except Exception:
         logging.exception("Error in background task get_cluster_stats_bg")
+
+
+# Accumulate per-deployment energy / footprint stats in background task.
+# No-op unless the `energy` feature is enabled and Mimir credentials are set.
+@repeat_every(seconds=MAIN_CONF.get("energy", {}).get("sweep_seconds", 900))
+def energy_accounting_thread():
+    """
+    Incrementally integrate Mimir power into per-deployment energy/carbon/water.
+    Not async, same reasoning as get_cluster_stats_thread.
+    """
+    try:
+        accounting.run_sweep()
+    except Exception:
+        logging.exception("Error in background task energy_accounting")
 
 
 if __name__ == "__main__":
