@@ -63,6 +63,6 @@ jobs:
             ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:latest
             ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod
             ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod-${{ env.GIT_COMMIT_SHORT }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/ai4-papi:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
           file: docker/Dockerfile

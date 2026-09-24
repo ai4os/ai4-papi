@@ -55,8 +55,11 @@ class ToolsCatalog(Catalog):
             # Parse docker registry
             registry = metadata["links"]["docker_image"]
             repo, image = registry.split("/")[-2:]
-            if repo not in ["deephdc", "ai4oshub"]:
-                repo = "ai4oshub"
+            if repo not in papiconf.MAIN_CONF["docker"]["valid_origins"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"The docker image does not belong to a valid Docker origin: {registry}",
+                )
             conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
 
             # Retrieve Docker tags
