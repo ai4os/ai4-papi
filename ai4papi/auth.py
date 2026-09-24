@@ -23,9 +23,8 @@ The curl calls still remain the same, but now in the http://localhost/docs you w
 
 import re
 
-from fastapi import HTTPException
 import jwt
-
+from fastapi import HTTPException
 
 KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
 jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")

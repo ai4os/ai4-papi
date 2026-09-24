@@ -2,19 +2,18 @@
 Create an app with FastAPI
 """
 
+import logging
 from contextlib import asynccontextmanager
+
 import fastapi
 import uvicorn
-import logging
-
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi_utils.tasks import repeat_every
 
-from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
+from ai4papi.conf import MAIN_CONF, papi_branch, papi_commit, paths
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
-
 
 description = (
     "<img"

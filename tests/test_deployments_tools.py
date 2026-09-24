@@ -1,10 +1,9 @@
 import time
 from types import SimpleNamespace
 
-from ai4papi.routers.v1.deployments import modules
-from ai4papi.routers.v1.deployments import tools
 from conf import token
 
+from ai4papi.routers.v1.deployments import modules, tools
 
 # Only use mandatory config parameters, otherwise use defaults
 tools_config = {

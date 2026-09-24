@@ -1,7 +1,7 @@
-from pydantic import BaseModel
-from fastapi import Query
-from typing import Annotated, Any, Dict, Optional
+from typing import Annotated, Any
 
+from fastapi import Query
+from pydantic import BaseModel
 
 TagList = Annotated[tuple | None, Query()]
 VoList = Annotated[list[str] | None, Query()]
@@ -25,7 +25,7 @@ class ResourceStats(BaseModel):
         gpu_total: int = 0
         gpu_used: int = 0
 
-    gpu_models: Dict[str, GpuModelStats]
+    gpu_models: dict[str, GpuModelStats]
 
 
 class NodeInfo(ResourceStats):
@@ -45,18 +45,18 @@ class DatacenterStats(BaseModel):
     PUE: float
 
     # Dict mapping a node ID to its stats
-    nodes: Dict[str, NodeInfo]
+    nodes: dict[str, NodeInfo]
 
     # Optional fields (added dynamically)
-    footprints: Optional[Dict[str, Any]] = None  # fromwattnet.GreenDirector
+    footprints: dict[str, Any] | None = None  # fromwattnet.GreenDirector
 
 
 class ClusterStats(BaseModel):
     # Dict mapping Datacenter ID/Name to Datacenter metadata
-    datacenters: Dict[str, DatacenterStats]
+    datacenters: dict[str, DatacenterStats]
 
     # Overall aggregated metrics
     cluster: ResourceStats
 
     # Added in get_cluster_stats()
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
