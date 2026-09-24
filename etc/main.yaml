@@ -44,6 +44,14 @@ nomad:
     kmd4eosc: kmd4eosc
     tutorials: tutorials
 
+docker:
+
+  valid_origins:  # valid origins for user-provided Docker images
+    - deephdc
+    - ai4oshub
+    - ai4os
+    - registry.cloud.ai4eosc.eu
+
 lb:  # load balancer, Traefik
 
   domain:  # each VO accesses deployments through their domain

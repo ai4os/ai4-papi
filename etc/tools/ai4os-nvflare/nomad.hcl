@@ -174,7 +174,7 @@ job "tool-nvflare-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image      = "registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
+        image      = "ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
         force_pull = true
         ports      = ["dashboard"]
       }
@@ -319,7 +319,7 @@ job "tool-nvflare-${JOB_UUID}" {
       driver = "docker"
 
       config {
-        image      = "registry.cloud.ai4eosc.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
+        image      = "ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
         command    = "/bin/bash"
         args       = [ "-c", "/workspace/entrypoint.sh"]
         force_pull = true
