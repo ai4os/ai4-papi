@@ -28,7 +28,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
@@ -64,5 +64,5 @@ jobs:
             ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod
             ${{ vars.HARBOR_URL }}/ai4os/ai4-papi:prod-${{ env.GIT_COMMIT_SHORT }}
             ${{ vars.DOCKERHUB_USERNAME }}/ai4-papi:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/ai4-papi:prod
+            ${{ vars.DOCKERHUB_USERNAME }}/ai4-papi:prod
           file: docker/Dockerfile
