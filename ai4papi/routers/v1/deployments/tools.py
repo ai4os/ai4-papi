@@ -405,8 +405,74 @@ def create_deployment(
 
         tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
+    # Deploy the server and all simulated clients on one site.
+    if tool_name == "arena-simulation-fedllm":
+        storage = user_conf["storage"]
+        if not all(v for k, v in storage.items() if k.startswith("rclone")):
+            raise HTTPException(400, "You must fill all RCLONE-related variables.")
+        if len(storage["datasets"]) != 1:
+            raise HTTPException(
+                400, "Provide one dataset to download for the simulation."
+            )
+        if not user_conf["fedllm"]["data_file_name"]:
+            raise HTTPException(400, "Provide the training CSV path in Nextcloud.")
+
+        hardware = user_conf["hardware"]
+        nomad_conf_str = nomad_template.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "BASE_DOMAIN": base_domain,
+                "CPU_NUM": hardware["cpu_num"],
+                "RAM": hardware["ram"],
+                "DISK": hardware["disk"],
+                "GPU_NUM": hardware["gpu_num"],
+                "SHARED_MEMORY": int(hardware["ram"] * 10**6 * 0.5),
+            }
+        )
+        nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
+        nomad_conf["Meta"] = {
+            "owner": auth_info["id"],
+            "owner_name": auth_info["name"],
+            "owner_email": auth_info["email"],
+            "title": user_conf["general"]["title"][:45],
+            "description": user_conf["general"]["desc"][:1000],
+        }
+        tasks = {t["Name"]: t for t in nomad_conf["TaskGroups"][0]["Tasks"]}
+        tasks["storage_mount"]["Env"] = {
+            "RCLONE_CONFIG": storage["rclone_conf"],
+            "RCLONE_CONFIG_RSHARE_TYPE": "webdav",
+            "RCLONE_CONFIG_RSHARE_URL": storage["rclone_url"],
+            "RCLONE_CONFIG_RSHARE_VENDOR": storage["rclone_vendor"],
+            "RCLONE_CONFIG_RSHARE_USER": storage["rclone_user"],
+            # docker-storage obscures the password itself before invoking rclone.
+            "RCLONE_CONFIG_RSHARE_PASS": storage["rclone_password"],
+            "REMOTE_PATH": "rshare:/",
+            "LOCAL_PATH": "/storage",
+        }
+        dataset = storage["datasets"][0]
+        tasks["dataset_download"]["Env"] = {
+            "DOI": dataset["doi"],
+            "FORCE_PULL": str(dataset["force_pull"]).lower(),
+        }
+        usertask = tasks["main"]
+        usertask["Config"]["image"] = user_conf["general"]["docker_image"]
+        usertask["Env"] = {
+            key.upper(): str(value) for key, value in user_conf["fedllm"].items()
+        }
+        usertask["Env"]["jupyterPASSWORD"] = user_conf["general"]["jupyter_password"]
+        if hardware["gpu_num"] <= 0:
+            usertask["Resources"]["Devices"] = None
+        elif not hardware["gpu_type"]:
+            usertask["Resources"]["Devices"][0]["Constraints"] = None
+        else:
+            usertask["Resources"]["Devices"][0]["Constraints"][0]["RTarget"] = hardware[
+                "gpu_type"
+            ]
+
     # Deploy a Federated server
-    if tool_name == "ai4os-federated-server":
+    elif tool_name == "ai4os-federated-server":
         # Create a default secret for the Federated Server
         _ = ai4secrets.create_secret(
             vo=vo,
