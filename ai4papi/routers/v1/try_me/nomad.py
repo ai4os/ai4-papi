@@ -3,19 +3,17 @@ This route is meant to be public for everyone authenticated to try (no VO member
 required). We deploy jobs by default in the AI4EOSC namespace.
 """
 
-from copy import deepcopy
 import types
 import uuid
+from copy import deepcopy
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth
 import ai4papi.conf as papiconf
+from ai4papi import auth, nomad_utils
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
-import ai4papi.nomad_utils as nomad_utils
-
 
 router = APIRouter(
     prefix="/nomad",
