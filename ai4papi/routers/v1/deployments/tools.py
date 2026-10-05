@@ -414,7 +414,7 @@ def create_deployment(
             raise HTTPException(
                 400, "Provide one dataset to download for the simulation."
             )
-        if not user_conf["fedllm"]["data_file_name"]:
+        if not user_conf["fed_llm_simulation"]["data_file_name"]:
             raise HTTPException(400, "Provide the training CSV path in Nextcloud.")
 
         hardware = user_conf["hardware"]
@@ -459,7 +459,7 @@ def create_deployment(
         usertask = tasks["main"]
         usertask["Config"]["image"] = user_conf["general"]["docker_image"]
         usertask["Env"] = {
-            key.upper(): str(value) for key, value in user_conf["fedllm"].items()
+            key.upper(): str(value) for key, value in user_conf["fed_llm_simulation"].items()
         }
         usertask["Env"]["jupyterPASSWORD"] = user_conf["general"]["jupyter_password"]
         if hardware["gpu_num"] <= 0:

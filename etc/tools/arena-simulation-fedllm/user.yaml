@@ -2,105 +2,135 @@
 general:
   title:
     name: Deployment title
-    value: ''
-    description: Provide short title for this deployment (less than 45 characters).
+    value: ""
+    description:
+      Provide short title for this deployment (less than 45 characters).
       Useful when you have lots of different active deployments.
+
   desc:
     name: Deployment description
-    value: ''
+    value: ""
     description: Provide some additional extended information about this deployment.
+
   docker_image:
     name: Docker image
     value: sainzpardo/arena-simulation-fedllm:v0.6
     description: Docker image to be used.
+
+  service:
+    name: Service to run
+    value: 'jupyter'
+    options: ['jupyter', 'vscode']
+
   jupyter_password:
     name: IDE password
-    value: ''
-    description: Select a password for your IDE (JupyterLab or VS Code). It should
+    value: ""
+    description:
+      Select a password for your IDE (JupyterLab or VS Code). It should
       have at least 9 characters.
+
 hardware:
   cpu_num:
     name: Number of CPUs
     value: 10
     range:
-    - 1
-    - 10
+      - 1
+      - 10
+
   gpu_num:
     name: Number of GPUs
     value: 1
     range:
-    - 1
-    - 1
+      - 1
+      - 1
+
   gpu_type:
     name: GPU model
-    value: 'Tesla T4'
-    options:
-    - ''
-    description: Fill this field only if you have a *hard* requirement for a given
+    value: "Tesla T4"
+    options: ["Tesla T4"]
+    description:
+      Fill this field only if you have a *hard* requirement for a given
       kind of GPU model.
+
   ram:
     name: RAM memory (in MB)
     value: 40000
     range:
-    - 2000
-    - 40000
+      - 2000
+      - 40000
+
   disk:
     name: Disk memory (in MB)
     value: 30000
     range:
-    - 1000
-    - 50000
+      - 1000
+      - 50000
+
 storage:
   rclone_conf:
     name: RCLONE configuration
     value: /srv/.rclone/rclone.conf
     description: rclone.conf location
+
   rclone_url:
     name: Storage URL
-    value: ''
-    description: Remote storage link to be accessed via rclone (webdav). For example,
+    value: ""
+    description:
+      Remote storage link to be accessed via rclone (webdav). For example,
       in Nextcloud `https://share.cloud.ai4eosc.eu/remote.php/dav/files/<USER-ID>`
+
   rclone_vendor:
     name: RCLONE vendor
     value: nextcloud
     options:
-    - nextcloud
+      - nextcloud
     description: RCLONE vendor (webdav)
+
   rclone_user:
     name: RCLONE user
-    value: ''
+    value: ""
     description: rclone user to access a webdav remote storage
+
   rclone_password:
     name: RCLONE user password
-    value: ''
+    value: ""
+
   datasets:
     name: Info of the datasets you want to download
     value: []
-    description: Each element in the list should be a dict containing "doi" and "force_pull"
+    description:
+      Each element in the list should be a dict containing "doi" and "force_pull"
       keys. It requires the definition of all RCLONE variables.
-fedllm:
+
+fed_llm_simulation:
   data_file_name:
     name: Training CSV path
-    value: ''
+    value: ""
     description: Path inside the container, e.g. /storage/ai4os-storage/datasets/10.5281/zenodo.123456/train.csv.
+  
   model_name:
     name: Base model
     value: HuggingFaceTB/SmolLM2-1.7B-Instruct
+  
   hf_token:
     name: Hugging Face token
-    value: ''
-  federated_strategy:
+    value: ""
+  
+  strategy:
     name: Federated Strategy
     value: FedAvg
     options:
-    - FedAvg
-    - FedProx
-  num_runs:
+      - FedAvg
+      - FedProx
+  
+  num_rounds:
     name: Federated rounds
     value: 100
+    range: [1, null]
+  
   model_quantization:
     name: Model quantization
     value: 4
     options:
-    - 4
-    - 8
+      - 4
+      - 8
