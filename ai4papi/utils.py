@@ -57,9 +57,11 @@ def validate_conf(conf):
     # Check that the Dockerhub image belongs either to "deephdc" or "ai4oshub"
     # or that it points to our Harbor instance (eg. CVAT)
     image = conf.get("general", {}).get("docker_image")
+    # TODO: temporal patch (arena-fl-server-llm, arena-simulation-fedllm)
+    # undo when the images are stored in a valid origin
     if (
         image
-        and image.split("/")[0] not in papiconf.MAIN_CONF["docker"]["valid_origins"]
+        and image.split("/")[0] not in papiconf.MAIN_CONF["docker"]["valid_origins"] and image.split("/")[0] != "sainzpardo"
     ):
         raise HTTPException(
             status_code=400,
