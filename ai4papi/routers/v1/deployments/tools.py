@@ -414,7 +414,7 @@ def create_deployment(
             raise HTTPException(
                 400, "Provide one dataset to download for the simulation."
             )
-        if not user_conf["fedllm"]["data_file_name"]:
+        if not user_conf["fed_llm_server"]["data_file_name"]:
             raise HTTPException(400, "Provide the training CSV path in Nextcloud.")
 
         hardware = user_conf["hardware"]
@@ -459,7 +459,8 @@ def create_deployment(
         usertask = tasks["main"]
         usertask["Config"]["image"] = user_conf["general"]["docker_image"]
         usertask["Env"] = {
-            key.upper(): str(value) for key, value in user_conf["fedllm"].items()
+            key.upper(): str(value)
+            for key, value in user_conf["fed_llm_server"].items()
         }
         usertask["Env"]["jupyterPASSWORD"] = user_conf["general"]["jupyter_password"]
         if hardware["gpu_num"] <= 0:
@@ -492,12 +493,12 @@ def create_deployment(
                 "DISK": user_conf["hardware"]["disk"],
                 "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
                 "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
-                "NUM_ROUNDS": user_conf["fedllm"]["num_rounds"],
-                "MODEL_NAME": user_conf["fedllm"]["model_name"],
-                "MODEL_QUANTIZATION": user_conf["fedllm"]["model_quantization"],
-                "NUM_EPOCHS": user_conf["fedllm"]["num_epochs"],
-                "FRACTION_TRAIN": user_conf["fedllm"]["fraction_train"],
-                "FRACTION_EVALUATE": user_conf["fedllm"]["fraction_evaluate"],
+                "NUM_ROUNDS": user_conf["fed_llm_server"]["num_rounds"],
+                "MODEL_NAME": user_conf["fed_llm_server"]["model_name"],
+                "MODEL_QUANTIZATION": user_conf["fed_llm_server"]["model_quantization"],
+                "NUM_EPOCHS": user_conf["fed_llm_server"]["num_epochs"],
+                "FRACTION_TRAIN": user_conf["fed_llm_server"]["fraction_train"],
+                "FRACTION_EVALUATE": user_conf["fed_llm_server"]["fraction_evaluate"],
             }
         )
 
