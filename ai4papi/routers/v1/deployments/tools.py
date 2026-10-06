@@ -459,7 +459,8 @@ def create_deployment(
         usertask = tasks["main"]
         usertask["Config"]["image"] = user_conf["general"]["docker_image"]
         usertask["Env"] = {
-            key.upper(): str(value) for key, value in user_conf["fed_llm_server"].items()
+            key.upper(): str(value)
+            for key, value in user_conf["fed_llm_server"].items()
         }
         usertask["Env"]["jupyterPASSWORD"] = user_conf["general"]["jupyter_password"]
         if hardware["gpu_num"] <= 0:
