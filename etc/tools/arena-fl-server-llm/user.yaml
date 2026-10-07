@@ -45,7 +45,7 @@ hardware:
   disk:
     name: Disk memory (in MB)
     value: 1000
-    range: [1000, 2000]
+    range: [5000, 20000]
 
 fed_llm_server:
   num_rounds:
