@@ -10,7 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, module_patches, quotas, schemas, utils
+from ai4papi import accounting, auth, module_patches, quotas, schemas, utils
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
@@ -29,6 +29,7 @@ security = HTTPBearer()
 def get_deployments(
     vos: schemas.VoList = None,
     full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -40,6 +41,9 @@ def get_deployments(
     * **full_info**: retrieve the full information of each deployment.
       Disabled by default, as it will increase latency too much if there are many
       deployments.
+    * **energy**: attach energy/footprint stats to each deployment (`energy`
+      key). Enabled by default. `full_info=false` -> accumulated `EnergyStats`;
+      `full_info=true` -> extended `EnergyTimeSeries`.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -58,6 +62,8 @@ def get_deployments(
 
     user_jobs = []
     for vo in user_vos:
+        namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+
         # Retrieve all jobs in namespace (including dead jobs)
         job_filter = (
             'Name matches "^batch" and '
@@ -65,17 +71,19 @@ def get_deployments(
             + f'Meta.owner == "{auth_info["id"]}"'
         )
         jobs = nomad_utils.Nomad.jobs.get_jobs(
-            namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+            namespace=namespace,
             filter_=job_filter,
         )
 
         # Retrieve info for jobs in namespace
+        vo_jobs = []
         for j in jobs:
             try:
                 job_info = get_deployment(
                     vo=vo,
                     deployment_uuid=j["ID"],
                     full_info=full_info,
+                    energy=False,
                     authorization=types.SimpleNamespace(
                         credentials=authorization.credentials  # token
                     ),
@@ -83,7 +91,20 @@ def get_deployments(
             except HTTPException:  # not a module
                 continue
 
-            user_jobs.append(job_info)
+            vo_jobs.append(job_info)
+
+        # `full_info=False` (default): one cheap batch. `full_info=True`: the
+        # extended time series per deployment (heavier).
+        if energy and vo_jobs:
+            if full_info:
+                for job in vo_jobs:
+                    job["energy"] = accounting.get_series(namespace, job["job_ID"])
+            else:
+                env = accounting.get_accumulated_bulk(namespace, auth_info["id"])
+                for job in vo_jobs:
+                    job["energy"] = env.get(job["job_ID"])
+
+        user_jobs.extend(vo_jobs)
 
     # Sort deployments by submission time in descending order
     sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
@@ -96,6 +117,7 @@ def get_deployment(
     vo: str,
     deployment_uuid: str,
     full_info: bool = True,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -107,6 +129,9 @@ def get_deployment(
     * **deployment_uuid**: uuid of deployment to gather info about
     * **full_info**: retrieve the full information of that deployment (may increase
       latency)
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=true` (default here) -> extended `EnergyTimeSeries`;
+      `full_info=false` -> accumulated `EnergyStats`.
 
     Returns a dict with info
     """
@@ -131,6 +156,12 @@ def get_deployment(
             status_code=400,
             detail="This deployment is not a batch job.",
         )
+
+    if energy:
+        if full_info:
+            job["energy"] = accounting.get_series(namespace, deployment_uuid)
+        else:
+            job["energy"] = accounting.get_accumulated(namespace, deployment_uuid)
 
     return job
 
@@ -202,6 +233,7 @@ async def create_deployment(
     # jobs)
     batch_deps = get_deployments(
         vos=[vo],
+        energy=False,
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
         ),

@@ -195,6 +195,8 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
   It will serve the contents of the `ai4-accounting/summaries` folder.
   </details>
 
+  Energy consumption and footprint (carbon and water) is attached additively to the existing responses: an `energy` key per deployment, per user in `stats/user` and per datacenter in `stats/cluster`. It needs the `MIMIR_USER` / `MIMIR_PASSWORD` variables and the `energy` section of `etc/main.yaml`. Dashboard integration reference: [docs/energy-api.md](./docs/energy-api.md); architecture and internals: [docs/energy-accounting.md](./docs/energy-accounting.md).
+
 
 <details>
 <summary>The API methods can also be accessed by interacting directly with

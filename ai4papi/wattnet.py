@@ -1,25 +1,27 @@
 """
-Utilities for the integration with WattNet.
+Utilities for the integration with Wattnet.
 API reference: https://api.wattnet.eu/v1/docs
 """
 
-from collections.abc import Iterable
 import datetime
 import json
-import requests
 import os
 import statistics
 import warnings
+from collections.abc import Iterable
 
-from cachetools import cached, TTLCache
-from ai4papi import utils
+import requests
+from cachetools import TTLCache, cached
+
 import ai4papi.conf as papiconf
-
+from ai4papi import utils
 
 session = requests.Session()
 
 WATTNET_URL = "https://api.wattnet.eu"
-WATTNET_EMAIL = "bot@ai4eosc.eu"
+WATTNET_EMAIL = os.environ.get("WATTNET_EMAIL")
+if not WATTNET_EMAIL:
+    print("You should define a WATTNET_EMAIL")
 WATTNET_PASS = os.environ.get("WATTNET_PASSWORD")
 if not WATTNET_PASS:
     print("You should define a WATTNET_PASSWORD")
@@ -32,11 +34,11 @@ def algorithm(func):
 
 
 class GreenDirector:
-    # Define sensible default footprint values for datacenter outside WattNet scope (Europe)
+    # Define sensible default footprint values for datacenter outside Wattnet scope (Europe)
     DEFAULTS = {
         "carbon": 301,  # default energy quality in gCO2/kWh
         "water": 12,  # default water usage in L/kWh
-        "green-score": 50,  # default green score (combining carbon and water).
+        "environmental-score": 50,  # default environmental score (combining carbon and water).
     }
 
     def __init__(self, algorithm: str = "linear_rank"):
@@ -68,7 +70,7 @@ class GreenDirector:
     @cached(cache=TTLCache(maxsize=1024, ttl=20 * 60 * 60))
     def _retrieve_token(self):
         """
-        WattNet tokens last only one day, so we cache the response for 20 hours.
+        Wattnet tokens last only one day, so we cache the response for 20 hours.
         """
         url = f"{WATTNET_URL}/token-request/get_token"
         headers = {"Content-Type": "application/json"}
@@ -80,8 +82,8 @@ class GreenDirector:
     @cached(cache=TTLCache(maxsize=1024, ttl=15 * 60))
     def _fetch_footprint_data(self, lat, lon):
         """
-        Fetch footprint data and green score data from WattNet for a specific
-        lat-lon location. WattNet has a temporal resolution of 15 minutes, so we
+        Fetch footprint data and environmental score data from Wattnet for a specific
+        lat-lon location. Wattnet has a temporal resolution of 15 minutes, so we
         cache for that amount of time.
         """
         end = datetime.datetime.now(datetime.timezone.utc)
@@ -98,11 +100,11 @@ class GreenDirector:
 
         r1 = session.get(f"{WATTNET_URL}/v1/footprints", headers=headers, params=params)
         r2 = session.get(
-            f"{WATTNET_URL}/v1/green-score", headers=headers, params=params
+            f"{WATTNET_URL}/v1/environmental-score", headers=headers, params=params
         )
         if not (r1.ok and r2.ok):
             warnings.warn(
-                f"[wattnet] Failed to retrieve WattNet data for coordinates ({lat}, {lon})"
+                f"[wattnet] Failed to retrieve Wattnet data for coordinates ({lat}, {lon})"
             )
             return []
 
@@ -110,9 +112,48 @@ class GreenDirector:
         score = r2.json()
         if (not footprints) or (not score):
             raise Exception("Error retrieving information from Wattnet.")
-        score[0].update({"footprint_type": "green-score"})
+        score[0].update({"footprint_type": "environmental-score"})
 
         return footprints + score
+
+    def footprint_series(self, datacenter: str, start, end):
+        """
+        Fetch the carbon/water intensity series for a datacenter over an
+        arbitrary [start, end] window (Wattnet serves historical data well
+        beyond the 7-day window kept in `self.metrics`). Used by the
+        energy-accounting sweep when backfilling a deployment.
+
+        Returns `{"carbon": [[iso_ts, gCO2/kWh], ...], "water": [[iso_ts, L/kWh], ...]}`
+        or `{}` if Wattnet has no data for that location (caller falls back to
+        DEFAULTS).
+        """
+        dc = papiconf.datacenters.get(datacenter, {})
+        lat, lon = dc.get("lat"), dc.get("lon")
+        if lat is None or lon is None:
+            return {}
+
+        params = {
+            "lat": lat,
+            "lon": lon,
+            "start": start.isoformat().replace("+00:00", "Z"),
+            "end": end.isoformat().replace("+00:00", "Z"),
+            "aggregate": "false",
+        }
+        headers = {"Authorization": f"Bearer {self._retrieve_token()}"}
+        r = session.get(f"{WATTNET_URL}/v1/footprints", headers=headers, params=params)
+        if not r.ok:
+            warnings.warn(
+                f"[wattnet] Failed to retrieve footprint series for {datacenter}"
+            )
+            return {}
+
+        out = {}
+        for footprint in r.json():
+            series = []
+            for sublist in footprint.get("series", []):
+                series += sublist["values"]
+            out[footprint["footprint_type"]] = sorted(series, key=lambda x: x[0])
+        return out
 
     def retrieve_footprints(self):
         """
@@ -143,7 +184,7 @@ class GreenDirector:
                 series = sorted(series, key=lambda data: data[0])
                 self.metrics[k][fp_type] = series
 
-            # For datacenters outside Europe (e.g. Tubitak), WattNet offers no data
+            # For datacenters outside Europe, Wattnet offers no data
             # Therefore we return timeseries with default values
             if not data:
                 round_end = end.replace(
@@ -184,13 +225,13 @@ class GreenDirector:
         return [target_min + ((x - val_min) * target_span) / range_span for x in values]
 
     @algorithm
-    def _linear_rank(self, stats: dict, metric: str = "green-score"):
+    def _linear_rank(self, stats: dict, metric: str = "environmental-score"):
         """
-        Computes a DIRAC-like score for each node:
+        Computes a DIRAC-like green_score for each node:
 
-          score = processor_efficiency / (datacenter_PUE * datacenter_footprint)
+          green_score = processor_efficiency / (datacenter_PUE * datacenter_footprint)
         """
-        metrics = ["carbon", "water", "green-score"]
+        metrics = ["carbon", "water", "environmental-score"]
         if metric not in metrics:
             raise ValueError(f"Invalid metric: {metric}. Must be one of: {metrics}")
 
@@ -229,21 +270,21 @@ class GreenDirector:
         scaled_values = self.normalize_list(gpu_eff.values(), target_range=(1, 2))
         gpu_eff = dict(zip(gpu_eff.keys(), scaled_values))
 
-        # Compute the individual node scores (the higher the better)
-        scores = {}
+        # Compute the individual node green_scores (the higher the better)
+        green_scores = {}
         for dc_name, dc in stats.datacenters.items():
             # Compute the overall datacenter footprint
             mean = statistics.mean([i[1] for i in self.metrics[dc_name][metric]])
-            # In the case of green score, high values lower the footprint
-            mean = 1 / mean if metric in ["green-score"] else mean
+            # In the case of environmental score, high values lower the footprint
+            mean = 1 / mean if metric in ["environmental-score"] else mean
 
-            # Now compute per node Dirac-style green-score, weighting the datacenter
+            # Now compute per node Dirac-style environmental-score, weighting the datacenter
             # footprint with the node specific efficiency
             for nid, node in dc.nodes.items():
                 if nid not in cpu_eff.keys():
                     continue
-                scores[nid] = {}
-                scores[nid]["cpu"] = cpu_eff[nid] / (mean * dc.PUE)
+                green_scores[nid] = {}
+                green_scores[nid]["cpu"] = cpu_eff[nid] / (mean * dc.PUE)
 
                 if nid not in gpu_eff.keys():
                     continue
@@ -251,9 +292,9 @@ class GreenDirector:
                 # We *assume* that a typical GPU workload consumes 80% of its power on
                 # the GPU and 20% on a CPU
                 combined_eff = 0.2 * cpu_eff[nid] + 0.8 * gpu_eff[nid]
-                scores[nid]["gpu"] = combined_eff / (mean * dc.PUE)
+                green_scores[nid]["gpu"] = combined_eff / (mean * dc.PUE)
 
-        return scores
+        return green_scores
 
     def rank(self, stats: dict):
         """

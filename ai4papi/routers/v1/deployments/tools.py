@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, quotas, schemas, utils
+from ai4papi import accounting, auth, quotas, schemas, utils
 from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
@@ -34,6 +34,7 @@ security = HTTPBearer()
 def get_deployments(
     vos: schemas.VoList = None,
     full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -45,6 +46,9 @@ def get_deployments(
     * **full_info**: retrieve the full information of each deployment.
       Disabled by default, as it will increase latency too much if there are many
       deployments.
+    * **energy**: attach energy/footprint stats to each deployment (`energy`
+      key). Enabled by default. `full_info=false` -> accumulated `EnergyStats`;
+      `full_info=true` -> extended `EnergyTimeSeries`.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -63,20 +67,24 @@ def get_deployments(
 
     user_jobs = []
     for vo in user_vos:
+        namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+
         # Retrieve all jobs in namespace
         jobs = nomad_utils.get_deployments(
-            namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+            namespace=namespace,
             owner=auth_info["id"],
             prefix="tool",
         )
 
         # Retrieve info for jobs in namespace
+        vo_jobs = []
         for j in jobs:
             try:
                 job_info = get_deployment(
                     vo=vo,
                     deployment_uuid=j["ID"],
                     full_info=full_info,
+                    energy=False,
                     authorization=types.SimpleNamespace(
                         credentials=authorization.credentials  # token
                     ),
@@ -84,7 +92,20 @@ def get_deployments(
             except HTTPException:  # not a tool
                 continue
 
-            user_jobs.append(job_info)
+            vo_jobs.append(job_info)
+
+        # `full_info=False` (default): one cheap batch. `full_info=True`: the
+        # extended time series per deployment (heavier).
+        if energy and vo_jobs:
+            if full_info:
+                for job in vo_jobs:
+                    job["energy"] = accounting.get_series(namespace, job["job_ID"])
+            else:
+                env = accounting.get_accumulated_bulk(namespace, auth_info["id"])
+                for job in vo_jobs:
+                    job["energy"] = env.get(job["job_ID"])
+
+        user_jobs.extend(vo_jobs)
 
     # Sort deployments by submission time in descending order
     sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
@@ -97,6 +118,7 @@ def get_deployment(
     vo: str,
     deployment_uuid: str,
     full_info: bool = True,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -108,6 +130,9 @@ def get_deployment(
     * **deployment_uuid**: uuid of deployment to gather info about
     * **full_info**: retrieve the full information of that deployment (may increase
       latency)
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=true` (default here) -> extended `EnergyTimeSeries`;
+      `full_info=false` -> accumulated `EnergyStats`.
 
     Returns a dict with info
     """
@@ -164,6 +189,12 @@ def get_deployment(
             job["active_endpoints"] = [
                 k for k in job["active_endpoints"] if k not in ignore
             ]
+
+    if energy:
+        if full_info:
+            job["energy"] = accounting.get_series(namespace, deployment_uuid)
+        else:
+            job["energy"] = accounting.get_accumulated(namespace, deployment_uuid)
 
     return job
 
@@ -246,9 +277,9 @@ def create_deployment(
 
     # Check if requested hardware is within the user total quota (summing modules and
     # tools)
-    tools_deps = get_deployments(vos=[vo], authorization=auth_arg)
+    tools_deps = get_deployments(vos=[vo], energy=False, authorization=auth_arg)
     modules_deps = ai4_deployments.modules.get_deployments(
-        vos=[vo], authorization=auth_arg
+        vos=[vo], energy=False, authorization=auth_arg
     )
     quotas.check_userwise(
         conf=user_conf,
@@ -755,7 +786,7 @@ def create_deployment(
     # Add affinity for greener nodes
     nomad_conf = green_director.add_green_affinities(
         nomad_conf=nomad_conf,
-        stats=ai4_stats.get_cluster_stats(vo),
+        stats=ai4_stats.get_cluster_stats(vo, energy=False),
         workload_type="cpu"
         if user_conf.get("hardware", {}).get("gpu_num", 0) == 0
         else "gpu",

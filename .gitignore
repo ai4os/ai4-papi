@@ -142,3 +142,6 @@ GTAGS
 
 # Things specific to this project #
 ###################################
+
+# Local energy-accounting store ($ACCOUNTING_PTH), runtime data
+.local-accounting/

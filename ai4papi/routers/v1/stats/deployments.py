@@ -4,6 +4,7 @@ Return stats from the user/VO/cluster
 
 import copy
 import csv
+import logging
 import time
 from datetime import datetime, timedelta
 import os
@@ -13,7 +14,7 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, schemas
+from ai4papi import accounting, auth, schemas
 from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
@@ -90,6 +91,8 @@ def load_stats(
 @router.get("/user")
 def get_user_stats(
     vo: str,
+    full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -100,6 +103,11 @@ def get_user_stats(
 
     Parameters:
     * **vo**: Virtual Organization where you want the stats from.
+    * **energy**: attach the `energy` accounting block (the user's accumulated
+      consumption and footprint, each deployment's live Mimir top-up included).
+      Enabled by default.
+    * **full_info**: when `true`, the `energy` block also carries a merged 15-min
+      time series of the user's deployments. Off by default (accumulated only).
     """
 
     # Retrieve authenticated user info
@@ -109,18 +117,31 @@ def get_user_stats(
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
-    # Load proper namespace stats
-    full_stats = load_stats(namespace=namespace)
-
-    # Keep only stats from the current user
-    user_stats = copy.deepcopy(full_stats)
+    # Load proper namespace stats (CSV usage stats from the `ai4-accounting` repo).
+    # These are independent of the energy accounting below: if they are missing,
+    # still serve the energy block instead of failing the whole endpoint.
     try:
-        idx = full_stats["users-agg"]["owner"].index(auth_info["id"])
-        user_stats["users-agg"] = {
-            k: v[idx] for k, v in full_stats["users-agg"].items()
-        }
-    except ValueError:  # user has still no recorded stats
-        user_stats["users-agg"] = None
+        full_stats = load_stats(namespace=namespace)
+        user_stats = copy.deepcopy(full_stats)
+        try:
+            idx = full_stats["users-agg"]["owner"].index(auth_info["id"])
+            user_stats["users-agg"] = {
+                k: v[idx] for k, v in full_stats["users-agg"].items()
+            }
+        except ValueError:  # user has still no recorded stats
+            user_stats["users-agg"] = None
+    except HTTPException:
+        if not (energy and accounting.enabled()):
+            raise
+        user_stats = {}
+
+    # Accumulated energy consumption + footprint of the user in that VO (each
+    # deployment's accumulator + its live top-up, summed). `full_info` adds the
+    # merged time series.
+    if energy and accounting.enabled():
+        user_stats["energy"] = accounting.get_user_energy(
+            namespace, auth_info["id"], series=full_info
+        )
 
     return user_stats
 
@@ -160,6 +181,8 @@ def get_proper_allocation(allocs):
 @cached(cache=TTLCache(maxsize=1024, ttl=30))
 def get_cluster_stats(
     vo: str | None = None,
+    full_info: bool = False,
+    energy: bool = True,
 ) -> schemas.ClusterStats:
     """
     Returns the following stats of the nodes and the cluster (per resource type):
@@ -170,6 +193,14 @@ def get_cluster_stats(
     ----------
     vo: string
       Keep only the nodes supporting a specific VO. If not provided, returns all nodes.
+    energy: bool
+      Attach the per-datacenter `energy` block (site infrastructure power draw plus
+      the accumulated energy/footprint). Enabled by default.
+    full_info: bool
+      When `true`, each `datacenters[<dc>].energy` block also carries its 15-min
+      time series. Off by default (accumulated numbers only); the live top-up is
+      always applied either way. Energy is reported per datacenter, there is no
+      platform-wide total.
     """
 
     global cluster_stats, cluster_stats_updated_at
@@ -180,7 +211,7 @@ def get_cluster_stats(
         # So if None, we need to initialize it
         cluster_stats = get_cluster_stats_bg()
 
-    # If the background task fails for some reason (failed Nomad calls, failed WattNet
+    # If the background task fails for some reason (failed Nomad calls, failed Wattnet
     # calls, etc), the stats won't be updated and this endpoint will keep serving the
     # same (old) stats, which can be misleading because it gives the impression that
     # everything works normally. So we give a 1 hour grace time and then raise an Error.
@@ -192,6 +223,12 @@ def get_cluster_stats(
 
     stats = copy.deepcopy(cluster_stats)
 
+    # Drop the energy blocks when not requested (the background thread computes
+    # them regardless; this just keeps them out of the response).
+    if not energy:
+        for dc_stats in stats.datacenters.values():
+            dc_stats.energy = None
+
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo] if vo else "all"
 
     for k, v in list(stats.datacenters.items()):  # we make an object copy with list()
@@ -201,8 +238,9 @@ def get_cluster_stats(
             if namespace == "all" or namespace in n_stats.namespaces:
                 nodes[n_id] = n_stats
 
-        # Ignore datacenters with no nodes
-        if not nodes:
+        # Ignore datacenters with no nodes, unless they carry an energy block
+        # (site infrastructure energy is reported regardless of the VO filter).
+        if not nodes and stats.datacenters[k].energy is None:
             del stats.datacenters[k]
         else:
             stats.datacenters[k].nodes = nodes
@@ -231,6 +269,14 @@ def get_cluster_stats(
                     )
                 stats.cluster.gpu_models[model_name].gpu_total += g_stats.gpu_total
                 stats.cluster.gpu_models[model_name].gpu_used += g_stats.gpu_used
+
+    # Per-datacenter energy time series only with `full_info=true` (it is large:
+    # ~500 points per datacenter). The accumulated numbers and the live top-up
+    # are always present.
+    if not full_info:
+        for dc_stats in stats.datacenters.values():
+            if dc_stats.energy is not None:
+                dc_stats.energy.series = None
 
     # Add update time
     stats.updated_at = (
@@ -418,6 +464,24 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
                     setattr(n_stats, f"{r}_total", getattr(n_stats, f"{r}_used"))
                 for g_stats in n_stats.gpu_models.values():
                     g_stats.gpu_total = n_stats.gpu_used
+
+    # Per-datacenter energy (energy feature): instantaneous power draw + the
+    # accumulated energy/footprint since accounting started + a 15-min series.
+    # Reported per datacenter only, there is no platform-wide total (clients sum
+    # the datacenters they care about). Best-effort: a failure here must not
+    # break the cluster stats.
+    if accounting.enabled():
+        try:
+            for dc_name, dc_energy in accounting.get_cluster_energy(
+                series=True
+            ).items():
+                if dc_name not in stats.datacenters:
+                    stats.datacenters[dc_name] = schemas.DatacenterStats(
+                        lat=0.0, lon=0.0, PUE=0.0, nodes={}
+                    )
+                stats.datacenters[dc_name].energy = schemas.EnergyStats(**dc_energy)
+        except Exception:
+            logging.exception("Error computing cluster energy stats")
 
     # Set the new shared variable
     global cluster_stats, cluster_stats_updated_at
