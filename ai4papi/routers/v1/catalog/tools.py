@@ -1,13 +1,13 @@
 from copy import deepcopy
 
+import natsort
 from fastapi import APIRouter, HTTPException
 from fastapi.security import HTTPBearer
-import natsort
 
-from ai4papi import quotas, utils, nomad_utils
 import ai4papi.conf as papiconf
-from .common import Catalog, retrieve_docker_tags, fmt_map
+from ai4papi import nomad_utils, quotas, utils
 
+from .common import Catalog, fmt_map, retrieve_docker_tags
 
 security = HTTPBearer()
 

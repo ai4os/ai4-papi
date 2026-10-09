@@ -9,15 +9,13 @@ the Zenodo token).
 
 import os
 import re
+
 import requests
-
-
-from cachetools import cached, TTLCache
+from cachetools import TTLCache, cached
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
-
 
 router = APIRouter(
     prefix="/zenodo",
