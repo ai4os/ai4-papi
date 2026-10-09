@@ -36,10 +36,7 @@ dependencies = [
     "PyJWT>=2.6.0,<3.0",
     "cryptography>=41.0.5",
     # needed for pyjwt "RS256" algorithm
-    "click==8.2.1",
-    # Fixing "click" version is a temporal patch, because higher versions caused the "ai4papi-run"
-    # entrypoint to fail. Not sure if it is related to this: https://github.com/pallets/click/issues/3066
-    # If version 8.3.1 doesn't fix this, I will need to try to adapt PAPI code.
+    "click>=8.2.1,<9.0",
     "typer>=0.7.0,<1.0",
     "oscar_python==2.1.0",
     "hvac>=2.1.0,<3.0",
@@ -49,7 +46,7 @@ dependencies = [
     "ai4_metadata>=2.4,<3.0",
     "harborapi>=0.26.2,<1.0",
     "pre-commit>=4.0.1,<=5.0",
-    "openai>=1.70.0,<2.0",
+    "openai>=2.54.0,<3.0",
     "python-multipart>=0.0.9,<1.0",
     "python-dotenv>=1.2.2,<2.0",
 ]
