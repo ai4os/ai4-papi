@@ -9,7 +9,12 @@ import subprocess
 # Retrieve token with oidc-token command
 try:
     result = subprocess.run(
-        ["oidc-token", "ai4os-keycloak"], capture_output=True, text=True, check=True
+        # TODO: revert back when we move Keycloak to production
+        # ["oidc-token", "ai4os-keycloak"], capture_output=True, text=True, check=True
+        ["oidc-token", "ai4os-keycloak-dev"],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     token = result.stdout.strip()
 except Exception:
