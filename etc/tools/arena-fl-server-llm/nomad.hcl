@@ -125,7 +125,7 @@ job "tool-fedserver-llm-${JOB_UUID}" {
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
         storage_opt = {
-          size = "${DISK}M"
+        size       = "${DISK}M"
         }
       }
 
