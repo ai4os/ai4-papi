@@ -9,6 +9,22 @@ from conf import token
 # Only use mandatory config parameters, otherwise use defaults
 tools_config = {
     "ai4os-federated-server": {},
+    "arena-simulation-fedllm": {
+        "general": {
+            "jupyter_password": "mock_password",
+        },
+        "storage": {
+            "rclone_conf": "/srv/.rclone/rclone.conf",
+            "rclone_url": "https://share.cloud.ai4eosc.eu/remote.php/webdav",
+            "rclone_vendor": "nextcloud",
+            "rclone_user": "mock_user",
+            "rclone_password": "mock_password",
+            "datasets": [{"doi": "10.5281/zenodo.21127982", "force_pull": False}],
+        },
+        "fed_llm_simulation": {
+            "data_file_name": "mock_path",
+        },
+    },
     "ai4os-cvat": {
         "general": {
             "cvat_username": "mock_user",

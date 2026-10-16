@@ -51,6 +51,8 @@ docker:
     - ai4oshub
     - ai4os
     - registry.cloud.ai4eosc.eu
+    - sainzpardo
+    - ignacioheredia
 
 lb:  # load balancer, Traefik
 

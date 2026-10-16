@@ -306,10 +306,9 @@ async def create_deployment(
         # Delete GPU section in CPU deployments
         usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
         usertask["Resources"]["Devices"] = None
-    else:
+    elif not user_conf["hardware"]["gpu_type"]:
         # If gpu_type not provided, remove constraint to GPU model
-        if not user_conf["hardware"]["gpu_type"]:
-            usertask["Resources"]["Devices"][0]["Constraints"] = None
+        usertask["Resources"]["Devices"][0]["Constraints"] = None
 
     # Check if it's a user snapshot
     docker_image = user_conf["general"]["docker_image"]

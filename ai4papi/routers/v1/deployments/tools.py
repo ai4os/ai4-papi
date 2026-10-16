@@ -370,10 +370,9 @@ def create_deployment(
             # Delete GPU section in CPU deployments
             usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
             usertask["Resources"]["Devices"] = None
-        else:
+        elif not user_conf["hardware"]["gpu_type"]:
             # If gpu_type not provided, remove constraint to GPU model
-            if not user_conf["hardware"]["gpu_type"]:
-                usertask["Resources"]["Devices"][0]["Constraints"] = None
+            usertask["Resources"]["Devices"][0]["Constraints"] = None
 
         # If storage credentials not provided, remove all storage-related tasks
         rclone = {
@@ -405,8 +404,77 @@ def create_deployment(
 
         tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
+    # Deploy the server and all simulated clients on one site.
+    if tool_name == "arena-simulation-fedllm":
+        storage = user_conf["storage"]
+        if not all(v for k, v in storage.items() if k.startswith("rclone")):
+            raise HTTPException(400, "You must fill all RCLONE-related variables.")
+        if len(storage["datasets"]) != 1:
+            raise HTTPException(
+                400, "Provide one dataset to download for the simulation."
+            )
+
+        if not user_conf["fed_llm_simulation"]["data_file_name"]:
+            raise HTTPException(400, "Provide the training CSV path in Nextcloud.")
+
+        # Check IDE password length
+        if len(user_conf["general"]["jupyter_password"]) < 9:
+            raise HTTPException(
+                status_code=400,
+                detail="Your IDE needs a password of at least 9 characters.",
+            )
+
+        hardware = user_conf["hardware"]
+        dataset = storage["datasets"][0]
+        nomad_conf_str = nomad_template.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "BASE_DOMAIN": base_domain,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "CPU_NUM": hardware["cpu_num"],
+                "RAM": hardware["ram"],
+                "DISK": hardware["disk"],
+                "SHARED_MEMORY": int(hardware["ram"] * 10**6 * 0.5),
+                "GPU_NUM": hardware["gpu_num"],
+                "GPU_MODELNAME": user_conf["hardware"]["gpu_type"],
+                "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
+                "RCLONE_CONFIG_RSHARE_URL": user_conf["storage"]["rclone_url"],
+                "RCLONE_CONFIG_RSHARE_VENDOR": user_conf["storage"]["rclone_vendor"],
+                "RCLONE_CONFIG_RSHARE_USER": user_conf["storage"]["rclone_user"],
+                "RCLONE_CONFIG_RSHARE_PASS": user_conf["storage"]["rclone_password"],
+                "RCLONE_CONFIG": user_conf["storage"]["rclone_conf"],
+                "DATASET_DOI": dataset["doi"],
+                "DATASET_FORCE_PULL": str(dataset["force_pull"]).lower(),
+            }
+        )
+        nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
+        tasks = {t["Name"]: t for t in nomad_conf["TaskGroups"][0]["Tasks"]}
+        usertask = tasks["main"]
+
+        # Add specific FedLLM envars
+        usertask["Env"] |= {
+            key.upper(): str(value)
+            for key, value in user_conf["fed_llm_simulation"].items()
+        }
+
+        # Modify the GPU section
+        if hardware["gpu_num"] <= 0:
+            # Delete GPU section in CPU deployments
+            usertask["Env"]["NVIDIA_VISIBLE_DEVICES"] = "none"
+            usertask["Resources"]["Devices"] = None
+        elif not user_conf["hardware"]["gpu_type"]:
+            # If gpu_type not provided, remove constraint to GPU model
+            usertask["Resources"]["Devices"][0]["Constraints"] = None
+
     # Deploy a Federated server
-    if tool_name == "ai4os-federated-server":
+    elif tool_name == "ai4os-federated-server":
         # Create a default secret for the Federated Server
         _ = ai4secrets.create_secret(
             vo=vo,
@@ -430,12 +498,8 @@ def create_deployment(
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
                 "OWNER_EMAIL": auth_info["email"],
-                "TITLE": user_conf["general"]["title"][
-                    :45
-                ],  # keep only 45 first characters
-                "DESCRIPTION": user_conf["general"]["desc"][
-                    :1000
-                ],  # limit to 1K characters
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
                 "CODE_CARBON": user_conf["general"]["co2"],
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
@@ -517,12 +581,8 @@ def create_deployment(
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
                 "OWNER_EMAIL": auth_info["email"],
-                "TITLE": user_conf["general"]["title"][
-                    :45
-                ],  # keep only 45 first characters
-                "DESCRIPTION": user_conf["general"]["desc"][
-                    :1000
-                ],  # limit to 1K characters
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
                 "CVAT_USERNAME": user_conf["general"]["cvat_username"],
@@ -716,12 +776,8 @@ def create_deployment(
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
                 "OWNER_EMAIL": auth_info["email"],
-                "TITLE": user_conf["general"]["title"][
-                    :45
-                ],  # keep only 45 first characters
-                "DESCRIPTION": user_conf["general"]["desc"][
-                    :1000
-                ],  # limit to 1K characters
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
                 "BASE_DOMAIN": base_domain,
                 "HOSTNAME": job_uuid,
                 "DOCKER_IMAGE": user_conf["general"]["docker_image"],
@@ -747,10 +803,9 @@ def create_deployment(
         if user_conf["hardware"]["gpu_num"] <= 0:
             # Delete GPU section in CPU deployments
             usertask["Resources"]["Devices"] = None
-        else:
+        elif not user_conf["hardware"]["gpu_type"]:
             # If gpu_type not provided, remove constraint to GPU model
-            if not user_conf["hardware"]["gpu_type"]:
-                usertask["Resources"]["Devices"][0]["Constraints"] = None
+            usertask["Resources"]["Devices"][0]["Constraints"] = None
 
     # Add affinity for greener nodes
     nomad_conf = green_director.add_green_affinities(
