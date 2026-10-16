@@ -405,6 +405,55 @@ def create_deployment(
 
         tasks[:] = [t for t in tasks if t["Name"] not in exclude_tasks]
 
+    elif tool_name == "arena-fl-server-llm":
+        # Check IDE password length
+        if len(user_conf["general"]["jupyter_password"]) < 9:
+            raise HTTPException(
+                status_code=400,
+                detail="Your IDE needs a password of at least 9 characters.",
+            )
+
+        # Replace the Nomad job template
+        nomad_conf_str = nomad_template.safe_substitute(
+            {
+                "JOB_UUID": job_uuid,
+                "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+                "PRIORITY": priority,
+                "OWNER": auth_info["id"],
+                "OWNER_NAME": auth_info["name"],
+                "OWNER_EMAIL": auth_info["email"],
+                "TITLE": user_conf["general"]["title"][:45],
+                "DESCRIPTION": user_conf["general"]["desc"][:1000],
+                "CODE_CARBON": user_conf["general"]["co2"],
+                "BASE_DOMAIN": base_domain,
+                "HOSTNAME": job_uuid,
+                "DOCKER_IMAGE": user_conf["general"]["docker_image"],
+                "CPU_NUM": user_conf["hardware"]["cpu_num"],
+                "RAM": user_conf["hardware"]["ram"],
+                "DISK": user_conf["hardware"]["disk"],
+                "SHARED_MEMORY": user_conf["hardware"]["ram"] * 10**6 * 0.5,
+                "JUPYTER_PASSWORD": user_conf["general"]["jupyter_password"],
+                "NUM_ROUNDS": user_conf["fed_llm_server"]["num_rounds"],
+                "MODEL_NAME": user_conf["fed_llm_server"]["model_name"],
+                "MODEL_QUANTIZATION": user_conf["fed_llm_server"]["model_quantization"],
+                "NUM_EPOCHS": user_conf["fed_llm_server"]["num_epochs"],
+                "FRACTION_TRAIN": user_conf["fed_llm_server"]["fraction_train"],
+                "FRACTION_EVALUATE": user_conf["fed_llm_server"]["fraction_evaluate"],
+            }
+        )
+
+        nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
+        usertask = nomad_conf["TaskGroups"][0]["Tasks"][0]
+
+        service = user_conf["general"]["service"]
+        if service == "fedserver":
+            usertask["Config"]["command"] = (
+                "/srv/arena-fl-server-llm/start_superlink.sh"
+            )
+        elif service in ["jupyter", "vscode"]:
+            usertask["Config"]["command"] = "deep-start"
+            usertask["Config"]["args"] = [f"--{service}"]
+
     # Deploy a Federated server
     if tool_name == "ai4os-federated-server":
         # Create a default secret for the Federated Server
