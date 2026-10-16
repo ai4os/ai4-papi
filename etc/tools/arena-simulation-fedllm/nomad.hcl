@@ -16,6 +16,14 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
   id        = "${JOB_UUID}"
   priority  = "${PRIORITY}"
 
+  meta {
+    owner       = "${OWNER}"  # user-id from OIDC
+    owner_name  = "${OWNER_NAME}"
+    owner_email = "${OWNER_EMAIL}"
+    title       = "${TITLE}"
+    description = "${DESCRIPTION}"
+  }
+
   # Only use nodes that have successfully passed the ai4-nomad_tests (ie. meta.status=ready)
   constraint {
     attribute = "${meta.status}"
@@ -121,6 +129,17 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
         ]
       }
 
+      env {
+        RCLONE_CONFIG               = "${RCLONE_CONFIG}"
+        RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
+        RCLONE_CONFIG_RSHARE_URL    = "${RCLONE_CONFIG_RSHARE_URL}"
+        RCLONE_CONFIG_RSHARE_VENDOR = "${RCLONE_CONFIG_RSHARE_VENDOR}"
+        RCLONE_CONFIG_RSHARE_USER   = "${RCLONE_CONFIG_RSHARE_USER}"
+        RCLONE_CONFIG_RSHARE_PASS   = "${RCLONE_CONFIG_RSHARE_PASS}"
+        REMOTE_PATH                 = "rshare:/"
+        LOCAL_PATH                  = "/storage"
+      }
+
       resources {
         cpu    = 50        # minimum number of CPU MHz is 2
         memory = 2000
@@ -145,6 +164,11 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
         ]
       }
 
+      env {
+        DOI        = "${DATASET_DOI}"
+        FORCE_PULL = "${DATASET_FORCE_PULL}"
+      }
+
       resources {
         cpu    = 50
         memory = 2000
@@ -159,7 +183,7 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "configured-by-papi"
+        image      = "${DOCKER_IMAGE}"
         ports      = ["ide"]
         shm_size   = ${SHARED_MEMORY}
         memory_hard_limit = ${RAM}
@@ -169,6 +193,10 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
+      }
+
+      env {
+        jupyterPASSWORD = "${JUPYTER_PASSWORD}"
       }
 
       resources {
@@ -183,7 +211,7 @@ job "tool-fedserver-simulation-${JOB_UUID}" {
           constraint {
             attribute = "${device.model}"
             operator  = "="
-            value     = "configured-by-papi"
+            value     = "${GPU_MODELNAME}"
           }
 
         }

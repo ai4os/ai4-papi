@@ -14,6 +14,7 @@ general:
 
   docker_image:
     name: Docker image
+    # TODO: revert to official image when ready
     value: sainzpardo/arena-simulation-fedllm:v0.6
     description: Docker image to be used.
 
@@ -107,27 +108,27 @@ fed_llm_simulation:
     name: Training CSV path
     value: ""
     description: Path inside the container, e.g. /storage/ai4os-storage/datasets/10.5281/zenodo.123456/train.csv.
-  
+
   model_name:
     name: Base model
     value: HuggingFaceTB/SmolLM2-1.7B-Instruct
-  
+
   hf_token:
     name: Hugging Face token
     value: ""
-  
+
   strategy:
     name: Federated Strategy
     value: FedAvg
     options:
       - FedAvg
       - FedProx
-  
+
   num_rounds:
     name: Federated rounds
     value: 100
     range: [1, null]
-  
+
   model_quantization:
     name: Model quantization
     value: 4
