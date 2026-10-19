@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 
-from ai4papi import accounting
+from ai4papi import energy as energy_accounting
 from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
@@ -163,7 +163,7 @@ def energy_accounting_thread():
     Not async, same reasoning as get_cluster_stats_thread.
     """
     try:
-        accounting.run_sweep()
+        energy_accounting.run_sweep()
     except Exception:
         logging.exception("Error in background task energy_accounting")
 

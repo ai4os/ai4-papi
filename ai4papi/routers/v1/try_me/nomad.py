@@ -10,7 +10,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import accounting, auth
+from ai4papi import auth
+from ai4papi import energy as energy_accounting
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
@@ -81,14 +82,8 @@ def get_deployments(
 
         user_jobs.append(job_info)
 
-    if energy and user_jobs:
-        if full_info:
-            for job in user_jobs:
-                job["energy"] = accounting.get_series(NAMESPACE, job["job_ID"])
-        else:
-            env = accounting.get_accumulated_bulk(NAMESPACE, auth_info["id"])
-            for job in user_jobs:
-                job["energy"] = env.get(job["job_ID"])
+    if energy:
+        energy_accounting.add_to_jobs(user_jobs, NAMESPACE, auth_info["id"], full_info)
 
     # Sort deployments by submission time in descending order
     sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
@@ -131,10 +126,7 @@ def get_deployment(
     job["main_endpoint"] = "ui"
 
     if energy:
-        if full_info:
-            job["energy"] = accounting.get_series(NAMESPACE, deployment_uuid)
-        else:
-            job["energy"] = accounting.get_accumulated(NAMESPACE, deployment_uuid)
+        energy_accounting.add_to_job(job, NAMESPACE, full_info)
 
     return job
 

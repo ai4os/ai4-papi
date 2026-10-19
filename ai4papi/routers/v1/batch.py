@@ -10,7 +10,8 @@ import uuid
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.security import HTTPBearer
 
-from ai4papi import accounting, auth, module_patches, quotas, schemas, utils
+from ai4papi import auth, module_patches, quotas, schemas, utils
+from ai4papi import energy as energy_accounting
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
@@ -95,14 +96,10 @@ def get_deployments(
 
         # `full_info=False` (default): one cheap batch. `full_info=True`: the
         # extended time series per deployment (heavier).
-        if energy and vo_jobs:
-            if full_info:
-                for job in vo_jobs:
-                    job["energy"] = accounting.get_series(namespace, job["job_ID"])
-            else:
-                env = accounting.get_accumulated_bulk(namespace, auth_info["id"])
-                for job in vo_jobs:
-                    job["energy"] = env.get(job["job_ID"])
+        if energy:
+            energy_accounting.add_to_jobs(
+                vo_jobs, namespace, auth_info["id"], full_info
+            )
 
         user_jobs.extend(vo_jobs)
 
@@ -158,10 +155,7 @@ def get_deployment(
         )
 
     if energy:
-        if full_info:
-            job["energy"] = accounting.get_series(namespace, deployment_uuid)
-        else:
-            job["energy"] = accounting.get_accumulated(namespace, deployment_uuid)
+        energy_accounting.add_to_job(job, namespace, full_info)
 
     return job
 

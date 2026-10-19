@@ -11,6 +11,8 @@ it can be swapped for a database later.
 
 import json
 import os
+import threading
+import time
 from pathlib import Path
 
 
@@ -64,6 +66,10 @@ def write_accum(ns: str, uuid: str, doc: dict) -> None:
     if not path:
         return
     _atomic_write(path, json.dumps(doc, separators=(",", ":")))
+    with _owner_lock:
+        entry = _owner_idx.get(ns)
+        if entry:
+            entry[1].setdefault(doc.get("owner"), set()).add(uuid)
 
 
 def iter_namespace(ns: str):
@@ -79,10 +85,32 @@ def iter_namespace(ns: str):
             continue
 
 
+# owner -> uuids of a namespace, so listing one user's deployments does not parse
+# every document of the namespace. Kept in sync by `write_accum` and rebuilt from
+# disk every `_OWNER_IDX_TTL` seconds (heals anything written by another process).
+# shortcut: assumes one PAPI process writes the store, upgrade to a database index
+# if PAPI runs as several replicas on the same storage.
+_OWNER_IDX_TTL = 300
+_owner_idx: dict[str, tuple[float, dict[str | None, set[str]]]] = {}
+_owner_lock = threading.Lock()
+
+
+def _owner_uuids(ns: str, owner: str) -> list[str]:
+    with _owner_lock:
+        entry = _owner_idx.get(ns)
+        if entry is None or time.monotonic() - entry[0] > _OWNER_IDX_TTL:
+            idx: dict[str | None, set[str]] = {}
+            for uuid, doc in iter_namespace(ns):
+                idx.setdefault(doc.get("owner"), set()).add(uuid)
+            entry = _owner_idx[ns] = (time.monotonic(), idx)
+        return sorted(entry[1].get(owner, ()))
+
+
 def iter_owner(ns: str, owner: str):
     """Yield (uuid, doc) for the accumulator documents owned by `owner`."""
-    for uuid, doc in iter_namespace(ns):
-        if doc.get("owner") == owner:
+    for uuid in _owner_uuids(ns, owner):
+        doc = read_accum(ns, uuid)
+        if doc is not None and doc.get("owner") == owner:
             yield uuid, doc
 
 
@@ -97,15 +125,14 @@ def append_series(ns: str, uuid: str, buckets: list[dict]) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
-        for b in buckets:
-            f.write(json.dumps(b, separators=(",", ":")) + "\n")
+        f.writelines(json.dumps(b, separators=(",", ":")) + "\n" for b in buckets)
 
 
 def read_series(ns: str, uuid: str, start_ts: str | None, end_ts: str | None):
     path = _series_path(ns, uuid)
     if not path or not path.is_file():
         return []
-    out = []
+    out: dict[str, dict] = {}  # by ts: a bucket appended twice counts once
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -119,6 +146,5 @@ def read_series(ns: str, uuid: str, start_ts: str | None, end_ts: str | None):
                 continue
             if end_ts and b["ts"] > end_ts:
                 continue
-            out.append(b)
-    out.sort(key=lambda b: b["ts"])
-    return out
+            out[b["ts"]] = b
+    return [out[ts] for ts in sorted(out)]

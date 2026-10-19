@@ -16,45 +16,36 @@ is not available; it never raises to the caller.
 
 import datetime
 import logging
+import threading
 
 from cachetools import TTLCache, cached
 
-import ai4papi.conf as papiconf
-from ai4papi import mimir
-from ai4papi.accounting import compute, store
-from ai4papi.accounting.sweep import (
-    CLUSTER_NS,
-    _tue,
-    enabled,
-    ensure_swept,
-    ensure_swept_bulk,
-    live_only_doc,
-    live_series,
-    live_series_cluster,
-    process_single,
-    run_sweep,
-    topup,
-    topup_cluster,
-)
+from ai4papi.clients import mimir
+from ai4papi.energy import compute, config, store
+from ai4papi.energy.series import build_series, persisted
+from ai4papi.energy.config import CLUSTER_NS, KEYS, enabled
+from ai4papi.energy.live import live_series, topup
+from ai4papi.energy.ondemand import ensure_swept, ensure_swept_bulk, live_only_doc
+from ai4papi.energy.sweep import process_single, run_sweep
 
 __all__ = [
+    "add_to_job",
+    "add_to_jobs",
     "enabled",
-    "run_sweep",
-    "process_single",
     "get_accumulated",
     "get_accumulated_bulk",
+    "get_cluster_energy",
+    "get_datacenter_power",
     "get_series",
     "get_user_energy",
-    "get_datacenter_power",
-    "get_cluster_energy",
+    "process_single",
+    "run_sweep",
 ]
 
 LOG = logging.getLogger(__name__)
 
-_KEYS = ("energy_wh", "carbon_g", "water_l")  # everything is TUE-normalized
 
-
-@cached(cache=TTLCache(maxsize=8192, ttl=60))
+@cached(cache=TTLCache(maxsize=8192, ttl=60), lock=threading.Lock())
 def _read_doc(namespace: str, uuid: str):
     return store.read_accum(namespace, uuid)
 
@@ -65,7 +56,7 @@ def _doc_tue(doc: dict) -> float | None:
     if doc.get("tue_factor"):
         return doc["tue_factor"]
     dcs = doc.get("datacenters") or []
-    return _tue(dcs[0]) if len(dcs) == 1 else None
+    return config.tue(dcs[0]) if len(dcs) == 1 else None
 
 
 def _to_stats(doc: dict) -> dict:
@@ -101,7 +92,7 @@ def _apply_topup(stats: dict, doc: dict) -> dict:
         return stats
     # the top-up slice uses the same TUE as the accumulator, so `tue_factor`
     # does not move; just add the energy / footprint deltas and refresh power.
-    for k in _KEYS:
+    for k in KEYS:
         stats[k] += t.get(k, 0.0)
     if t.get("power_w") is not None:
         stats["power_w"] = t["power_w"]
@@ -122,15 +113,18 @@ def _live_only_stats(namespace: str, uuid: str) -> tuple[dict, dict] | None:
     if doc is None:
         return None
     stats = _apply_topup(_to_stats(doc), doc)
-    has_data = stats.get("power_w") is not None or any(stats.get(k, 0.0) for k in _KEYS)
+    has_data = stats.get("power_w") is not None or any(stats.get(k, 0.0) for k in KEYS)
     if not has_data:
         return None
     return doc, stats
 
 
-def get_accumulated(namespace: str, uuid: str, live: bool = True) -> dict | None:
-    if not enabled():
-        return None
+def _resolve(namespace: str, uuid: str, live: bool) -> tuple[dict, dict] | None:
+    """
+    `(doc, stats)` of one deployment, or `None` when there is nothing to report.
+    The stored doc is swept on demand when missing; without a usable doc the
+    number comes from Mimir alone (`live_only_doc`).
+    """
     doc = _read_doc(namespace, uuid)
     if doc is None:
         # never swept: run one sweep pass for just this deployment instead of
@@ -146,21 +140,16 @@ def get_accumulated(namespace: str, uuid: str, live: bool = True) -> dict | None
         # allocation (no `metrics_available` verdict either way). Fall back to
         # a pure-Mimir number, but only once Mimir actually has a sample for
         # it - never a fabricated zero.
-        if not live:
-            return None
-        res = _live_only_stats(namespace, uuid)
-        return res[1] if res else None
+        return _live_only_stats(namespace, uuid) if live else None
     stats = _to_stats(doc)
-    return _apply_topup(stats, doc) if live else stats
+    return doc, (_apply_topup(stats, doc) if live else stats)
 
 
-def get_accumulated_bulk(
-    namespace: str, owner: str, live: bool = True
-) -> dict[str, dict]:
-    if not enabled():
-        return {}
+def _owner_rows(namespace: str, owner: str, live: bool) -> list[tuple[str, dict, dict]]:
+    """`(uuid, doc, stats)` of every accounted deployment of `owner` in `namespace`,
+    sweeping the missing ones on demand first."""
     live_jobs = ensure_swept_bulk(namespace, owner)
-    out: dict[str, dict] = {}
+    rows: list[tuple[str, dict, dict]] = []
     covered: set[str] = set()
     for uuid, doc in store.iter_owner(namespace, owner):
         if doc.get("metrics_available") is False:
@@ -170,7 +159,7 @@ def get_accumulated_bulk(
             continue  # inconclusive stub: leave uncovered, try live-only below
         covered.add(uuid)
         stats = _to_stats(doc)
-        out[uuid] = _apply_topup(stats, doc) if live else stats
+        rows.append((uuid, doc, _apply_topup(stats, doc) if live else stats))
     if live:
         for stub in live_jobs:
             uuid = stub["ID"]
@@ -178,8 +167,82 @@ def get_accumulated_bulk(
                 continue
             res = _live_only_stats(namespace, uuid)
             if res is not None:
-                out[uuid] = res[1]
-    return out
+                rows.append((uuid, *res))
+    return rows
+
+
+def get_accumulated(namespace: str, uuid: str, live: bool = True) -> dict | None:
+    if not enabled():
+        return None
+    res = _resolve(namespace, uuid, live)
+    return res[1] if res else None
+
+
+def get_accumulated_bulk(
+    namespace: str, owner: str, live: bool = True
+) -> dict[str, dict]:
+    if not enabled():
+        return {}
+    return {uuid: stats for uuid, _doc, stats in _owner_rows(namespace, owner, live)}
+
+
+def add_to_job(job: dict, namespace: str, full_info: bool) -> None:
+    """Set `job["energy"]`: the extended time series if `full_info`, else just the
+    accumulated stats."""
+    get = get_series if full_info else get_accumulated
+    job["energy"] = get(namespace, job["job_ID"])
+
+
+def add_to_jobs(jobs: list[dict], namespace: str, owner: str, full_info: bool) -> None:
+    """`add_to_job` for all the `owner`'s jobs of a namespace. Without `full_info`
+    it uses one batch of cheap file reads and a single cached Mimir top-up;
+    with it, the extended time series per deployment (heavier)."""
+    if not jobs:
+        return
+    if full_info:
+        for job in jobs:
+            add_to_job(job, namespace, full_info)
+    else:
+        stats = get_accumulated_bulk(namespace, owner)
+        for job in jobs:
+            job["energy"] = stats.get(job["job_ID"])
+
+
+def _aggregate(stats_list: list[dict]) -> dict:
+    """Sum the `EnergyStats` of several deployments into one block."""
+    agg = dict.fromkeys(KEYS, 0.0)
+    dcs: set[str] = set()
+    power = raw_energy = 0.0  # raw_energy: Σ energy_wh / tue, to blend `tue_factor`
+    since, as_of, live_as_of, coverage = [], [], [], []
+    for s in stats_list:
+        for k in KEYS:
+            agg[k] += s.get(k, 0.0) or 0.0
+        if s.get("tue_factor"):
+            raw_energy += s["energy_wh"] / s["tue_factor"]
+        dcs.update(s.get("datacenters") or [])
+        power += s.get("power_w") or 0.0
+        since += [s["since"]] if s.get("since") else []
+        as_of += [s["as_of"]] if s.get("as_of") else []
+        live_as_of += [s["live_as_of"]] if s.get("live_as_of") else []
+        coverage.append(s.get("coverage_ratio", 1.0))
+
+    return {
+        # not rounded, same as the per-deployment `EnergyStats`: the values can be
+        # legitimately tiny (idle CPU workloads) and must reconcile with the sum
+        # of `series`.
+        **agg,
+        "tue_factor": (agg["energy_wh"] / raw_energy) if raw_energy else None,
+        "power_w": power or None,
+        # time range these numbers cover: [since, as_of], live top-up to live_as_of
+        "since": min(since, default=None),
+        "as_of": max(as_of, default=None),
+        "live_as_of": max(live_as_of, default=None),
+        "complete": all(s.get("complete", True) for s in stats_list),
+        "coverage_ratio": round(sum(coverage) / len(coverage), 3),
+        "degraded": any(s.get("degraded") for s in stats_list),
+        "datacenters": sorted(dcs),
+        "deployments": len(stats_list),
+    }
 
 
 def get_user_energy(
@@ -194,78 +257,28 @@ def get_user_energy(
     """
     if not enabled():
         return None
-    live_jobs = ensure_swept_bulk(namespace, owner)
-
-    if target_points is None:
-        target_points = int(
-            papiconf.MAIN_CONF["energy"].get("user_series_points", 1000)
-        )
-
-    rows = []
-    covered: set[str] = set()
-    for uuid, doc in store.iter_owner(namespace, owner):
-        if doc.get("metrics_available") is False:
-            covered.add(uuid)
-            continue
-        if "accumulated" not in doc:
-            continue  # inconclusive stub: leave uncovered, try live-only below
-        covered.add(uuid)
-        rows.append((uuid, doc, _apply_topup(_to_stats(doc), doc)))
-    for stub in live_jobs:
-        uuid = stub["ID"]
-        if uuid in covered:
-            continue
-        res = _live_only_stats(namespace, uuid)
-        if res is not None:
-            rows.append((uuid, res[0], res[1]))
+    rows = _owner_rows(namespace, owner, live=True)
     if not rows:
         return None
 
-    agg = dict.fromkeys(_KEYS, 0.0)
-    dcs: set[str] = set()
-    power = raw_energy = 0.0  # raw_energy: Σ energy_wh / tue, to blend `tue_factor`
-    since, as_of, live_as_of, coverage = [], [], [], []
-    complete, degraded = True, False
-    for _uuid, _doc, s in rows:
-        for k in _KEYS:
-            agg[k] += s.get(k, 0.0) or 0.0
-        if s.get("tue_factor"):
-            raw_energy += s["energy_wh"] / s["tue_factor"]
-        dcs.update(s.get("datacenters") or [])
-        if s.get("power_w"):
-            power += s["power_w"]
-        if s.get("since"):
-            since.append(s["since"])
-        if s.get("as_of"):
-            as_of.append(s["as_of"])
-        if s.get("live_as_of"):
-            live_as_of.append(s["live_as_of"])
-        coverage.append(s.get("coverage_ratio", 1.0))
-        complete = complete and s.get("complete", True)
-        degraded = degraded or bool(s.get("degraded"))
-
-    out = {
-        # not rounded, same as the per-deployment `EnergyStats`: the values can be
-        # legitimately tiny (idle CPU workloads) and must reconcile with the sum
-        # of `series`.
-        "energy_wh": agg["energy_wh"],
-        "tue_factor": (agg["energy_wh"] / raw_energy) if raw_energy else None,
-        "carbon_g": agg["carbon_g"],
-        "water_l": agg["water_l"],
-        "power_w": power or None,
-        # time range these numbers cover: [since, as_of], live top-up to live_as_of
-        "since": min(since) if since else None,
-        "as_of": max(as_of) if as_of else None,
-        "live_as_of": max(live_as_of) if live_as_of else None,
-        "complete": complete,
-        "coverage_ratio": round(sum(coverage) / len(coverage), 3),
-        "degraded": degraded,
-        "datacenters": sorted(dcs),
-        "deployments": len(rows),
-        "series": None,
-    }
+    out = _aggregate([stats for _uuid, _doc, stats in rows])
+    out["series"] = None
     if series:
-        out["series"] = _user_series(namespace, rows, target_points) or None
+        cfg = config.get()
+        step_s = int(cfg["series_bucket_seconds"])
+        if target_points is None:
+            target_points = int(cfg.get("user_series_points", 1000))
+        out["series"] = (
+            build_series(
+                [
+                    persisted(store.read_series(namespace, uuid, None, None), doc)
+                    for uuid, doc, _stats in rows
+                ],
+                [live_series(doc, bucket_s=step_s) for _uuid, doc, _stats in rows],
+                target_points,
+            )
+            or None
+        )
     return out
 
 
@@ -288,7 +301,7 @@ def _sum_by_datacenter(promql: str, scale: float) -> dict[str, float]:
     return out
 
 
-@cached(cache=TTLCache(maxsize=1, ttl=25))
+@cached(cache=TTLCache(maxsize=1, ttl=25), lock=threading.Lock())
 def get_datacenter_power() -> dict[str, dict]:
     """
     Instantaneous power draw per datacenter, normalized by TUE:
@@ -302,7 +315,7 @@ def get_datacenter_power() -> dict[str, dict]:
     if not enabled():
         return {}
 
-    metrics_dcs = set(papiconf.MAIN_CONF["energy"].get("metrics_datacenters") or [])
+    metrics_dcs = set(config.get().get("metrics_datacenters") or [])
     try:
         host_w = _sum_by_datacenter(
             "sum by (datacenter) (scaph_host_power_microwatts)", 1e-6
@@ -312,7 +325,7 @@ def get_datacenter_power() -> dict[str, dict]:
         LOG.warning("mimir cluster-power query failed")
         return {}
 
-    as_of = compute._iso(datetime.datetime.now(datetime.timezone.utc).timestamp())
+    as_of = compute.iso(datetime.datetime.now(datetime.timezone.utc).timestamp())
     out: dict[str, dict] = {}
     for dc in set(host_w) | set(gpu_w):
         if metrics_dcs:
@@ -323,7 +336,7 @@ def get_datacenter_power() -> dict[str, dict]:
             # no allowlist: require host power so a stray GPU metric for an
             # unmonitored datacenter does not fabricate a total
             continue
-        tue = _tue(dc)
+        tue = config.tue(dc)
         out[dc] = {
             "power_w": (host_w.get(dc, 0.0) + gpu_w.get(dc, 0.0)) * tue,
             "tue_factor": tue,
@@ -332,7 +345,7 @@ def get_datacenter_power() -> dict[str, dict]:
     return out
 
 
-@cached(cache=TTLCache(maxsize=16, ttl=300))
+@cached(cache=TTLCache(maxsize=16, ttl=300), lock=threading.Lock())
 def _cluster_archive_series(dc: str) -> list[dict]:
     """
     Consolidated 15-min buckets of a datacenter (the `.series.jsonl`). Cached for
@@ -340,16 +353,6 @@ def _cluster_archive_series(dc: str) -> list[dict]:
     at sweep cadence, so the 30s `get_cluster_stats` thread need not re-read it.
     """
     return store.read_series(CLUSTER_NS, dc, None, None)
-
-
-def _cluster_series(
-    dc: str, doc: dict, bucket_s: int, target_points: int
-) -> list[dict]:
-    return _build_series(
-        list(_cluster_archive_series(dc)) + list(doc.get("tail") or []),
-        live_series_cluster(dc, doc, bucket_s=bucket_s),
-        target_points,
-    )
 
 
 def get_cluster_energy(
@@ -363,7 +366,7 @@ def get_cluster_energy(
     """
     if not enabled():
         return {}
-    cfg = papiconf.MAIN_CONF["energy"]
+    cfg = config.get()
     if target_points is None:
         target_points = int(cfg.get("cluster_series_points", 500))
     bucket_s = int(cfg["series_bucket_seconds"])
@@ -376,13 +379,13 @@ def get_cluster_energy(
         entry = dict(inst.get(dc) or {})
         doc = store.read_accum(CLUSTER_NS, dc)
         if doc and doc.get("accumulated") and doc.get("metrics_available") is not False:
-            acc = {k: doc["accumulated"].get(k, 0.0) for k in _KEYS}
+            acc = {k: doc["accumulated"].get(k, 0.0) for k in KEYS}
             live_as_of, degraded = None, False
-            t = topup_cluster(dc, doc)
+            t = topup(doc)
             if t and t.get("degraded"):
                 degraded = True
             elif t:
-                for k in _KEYS:
+                for k in KEYS:
                     acc[k] += t.get(k, 0.0)
                 live_as_of = t.get("live_as_of")
             # not rounded: consistent with the per-deployment / per-user blocks,
@@ -391,7 +394,7 @@ def get_cluster_energy(
                 energy_wh=acc["energy_wh"],
                 carbon_g=acc["carbon_g"],
                 water_l=acc["water_l"],
-                tue_factor=doc.get("tue_factor") or _tue(dc),
+                tue_factor=doc.get("tue_factor") or config.tue(dc),
                 complete=doc.get("complete", True),
                 since=doc.get("window_start") or doc.get("settled_ts"),
                 as_of=doc.get("pointer_ts"),
@@ -399,7 +402,11 @@ def get_cluster_energy(
                 degraded=degraded,
             )
             if series:
-                entry["series"] = _cluster_series(dc, doc, bucket_s, target_points)
+                entry["series"] = build_series(
+                    [persisted(_cluster_archive_series(dc), doc)],
+                    [live_series(doc, bucket_s=bucket_s)],
+                    target_points,
+                )
         if entry:
             out[dc] = entry
     return out
@@ -410,61 +417,25 @@ def get_cluster_energy(
 # ---------------------------------------------------------------------------
 
 
-def _build_series(
-    archive_and_tail: list[dict], live_points: list[dict], target_points: int
-) -> list[dict]:
-    """
-    One entity's whole-life time series: persisted 15-min buckets (archive + the
-    still-mutable tail) `compute.downsample`d to `target_points`, then the live
-    Mimir tail appended un-downsampled. Shared by the per-deployment (`get_series`)
-    and per-datacenter (`_cluster_series`) paths. The points carry the per-bucket
-    increments only; a running total is `cumsum(series[].energy_wh)` and matches
-    `accumulated.energy_wh`.
-    """
-    raw = sorted(archive_and_tail, key=lambda b: b["ts"])
-    series = [
-        _point(b, live=False)
-        for b in compute.downsample([_bucket(b) for b in raw], target_points)
-    ]
-    series += [
-        _point(_bucket(p), live=True)
-        for p in live_points
-        if not series or p["ts"] > series[-1]["ts"]
-    ]
-    return series
-
-
 def get_series(
     namespace: str, uuid: str, target_points: int | None = None
 ) -> dict | None:
     if not enabled():
         return None
-    doc = _read_doc(namespace, uuid)
-    if doc is None:
-        doc = ensure_swept(namespace, uuid)
-    if doc is not None and doc.get("metrics_available") is False:
+    res = _resolve(namespace, uuid, live=True)
+    if res is None:
         return None
-    live_only_stats = None
-    if doc is None or "accumulated" not in doc:
-        res = _live_only_stats(namespace, uuid)
-        if res is None:
-            return None
-        doc, live_only_stats = res
+    doc, stats = res
 
-    cfg = papiconf.MAIN_CONF["energy"]
+    cfg = config.get()
     if target_points is None:
         target_points = int(cfg.get("deployment_series_points", 1000))
     step_s = int(cfg["series_bucket_seconds"])
-    series = _build_series(
-        list(store.read_series(namespace, uuid, None, None))
-        + list(doc.get("tail") or []),
-        live_series(doc, bucket_s=step_s),
+    series = build_series(
+        [persisted(store.read_series(namespace, uuid, None, None), doc)],
+        [live_series(doc, bucket_s=step_s)],
         target_points,
     )
-    # already computed (and confirmed non-empty) by `_live_only_stats` above;
-    # `_apply_topup` is cached at the Mimir-query level, so this is not a
-    # second call for the swept-doc branch either.
-    stats = live_only_stats or _apply_topup(_to_stats(doc), doc)
 
     return {
         "deployment_uuid": uuid,
@@ -476,61 +447,3 @@ def get_series(
         "series": series,
         "accumulated": stats,
     }
-
-
-def _bucket(b: dict) -> compute.Bucket:
-    return compute.Bucket(
-        ts=b["ts"],
-        energy_wh=b.get("energy_wh", 0.0),
-        power_w_avg=b.get("power_w_avg", 0.0),
-        carbon_g=b.get("carbon_g", 0.0),
-        water_l=b.get("water_l", 0.0),
-    )
-
-
-def _point(b: compute.Bucket, live: bool) -> dict:
-    return {
-        "ts": b.ts,
-        "power_w": b.power_w_avg,
-        "energy_wh": b.energy_wh,
-        "carbon_g": b.carbon_g,
-        "water_l": b.water_l,
-        "live": live,
-    }
-
-
-def _user_series(namespace: str, rows: list, target_points: int) -> list[dict]:
-    """
-    One time series for a set of the user's deployments. The raw 15-min buckets
-    of every deployment (persisted archive + 24h tail) are merged by timestamp
-    first, then downsampled once: uniform resolution across the whole series and
-    the same hard `target_points` cap as the other levels, regardless of how long
-    each deployment individually has been running. The live Mimir tails are then
-    merged and appended un-downsampled (as `get_series` / `_cluster_series` do).
-    """
-    step_s = int(papiconf.MAIN_CONF["energy"]["series_bucket_seconds"])
-
-    persisted = [
-        [
-            _bucket(b)
-            for b in list(store.read_series(namespace, uuid, None, None))
-            + list(doc.get("tail") or [])
-        ]
-        for uuid, doc, _ in rows
-    ]
-    merged = sorted(compute.merge_buckets(persisted), key=lambda b: b.ts)
-    series = [_point(b, live=False) for b in compute.downsample(merged, target_points)]
-
-    live = sorted(
-        compute.merge_buckets(
-            [
-                [_bucket(b) for b in live_series(doc, bucket_s=step_s)]
-                for _uuid, doc, _ in rows
-            ]
-        ),
-        key=lambda b: b.ts,
-    )
-    series += [
-        _point(b, live=True) for b in live if not series or b.ts > series[-1]["ts"]
-    ]
-    return series

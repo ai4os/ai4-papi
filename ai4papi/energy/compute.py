@@ -8,15 +8,16 @@ cached node->datacenter lookup); everything else is pure and unit-testable.
 """
 
 import bisect
-from collections import namedtuple
 import datetime
+import threading
+import statistics
+from collections import namedtuple
 
-from cachetools import cached, TTLCache
+from cachetools import TTLCache, cached
 
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
 from ai4papi.wattnet import GreenDirector
-
 
 # Bucket start `ts` is an ISO-8601 UTC string ("...Z"). Energy in Wh (normalized
 # by the datacenter TUE), power in W, footprint per bucket.
@@ -28,7 +29,7 @@ DEFAULT_WATER = GreenDirector.DEFAULTS["water"]  # L/kWh
 _TERMINAL_STATUSES = {"complete", "failed", "lost"}
 
 
-def _iso(ts: float) -> str:
+def iso(ts: float) -> str:
     return (
         datetime.datetime.fromtimestamp(ts, datetime.timezone.utc)
         .isoformat()
@@ -36,7 +37,7 @@ def _iso(ts: float) -> str:
     )
 
 
-def _parse_iso(s: str) -> float:
+def parse_iso(s: str) -> float:
     return datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
 
 
@@ -47,7 +48,7 @@ def _parse_iso(s: str) -> float:
 AllocWindow = namedtuple("AllocWindow", ["alloc_id", "start_ts", "end_ts"])
 
 
-@cached(cache=TTLCache(maxsize=4096, ttl=60 * 60))
+@cached(cache=TTLCache(maxsize=4096, ttl=60 * 60), lock=threading.Lock())
 def _node_datacenter(node_id: str) -> str:
     return Nomad.node.get_node(node_id)["Datacenter"]
 
@@ -154,6 +155,17 @@ def power_promql(alloc_ids: list[str]) -> tuple[str, str]:
     return cpu_q, gpu_q
 
 
+def cluster_promql(dc: str) -> tuple[str, str]:
+    """
+    (host_query, gpu_query) for a whole datacenter: one series per host and one
+    per GPU (grouped, not summed) so `integrate` runs the data-quality filter on
+    each raw Mimir series before summing the energy.
+    """
+    host_q = f'sum by (node) (scaph_host_power_microwatts{{datacenter="{dc}"}})'
+    gpu_q = f'sum by (UUID) (DCGM_FI_DEV_POWER_USAGE{{datacenter="{dc}"}})'
+    return host_q, gpu_q
+
+
 # ---------------------------------------------------------------------------
 # Integration: power samples -> energy buckets
 # ---------------------------------------------------------------------------
@@ -175,15 +187,6 @@ def _series_samples(
             s.sort()
             out.append(s)
     return out
-
-
-def _median(xs: list[float]) -> float:
-    s = sorted(xs)
-    n = len(s)
-    if n == 0:
-        return 0.0
-    m = n // 2
-    return s[m] if n % 2 else (s[m - 1] + s[m]) / 2
 
 
 def sanitize(
@@ -218,7 +221,7 @@ def sanitize(
         for i, (t, p) in enumerate(out):
             lo_i, hi_i = max(0, i - half), min(len(vals), i + half + 1)
             neighbours = vals[lo_i:i] + vals[i + 1 : hi_i]
-            med = _median(neighbours)
+            med = statistics.median(neighbours) if neighbours else 0.0
             if med > 1e-6 and p > factor * med:
                 continue  # spike -> drop
             kept.append((t, p))
@@ -278,7 +281,7 @@ def integrate(
         hours = covered / 3600 if covered else 0.0
         buckets.append(
             Bucket(
-                ts=_iso(b),
+                ts=iso(b),
                 energy_wh=energy_wh,
                 # mean power over the covered part of the bucket, normalized like
                 # energy_wh so `energy_wh ~= power_w_avg * bucket_hours`
@@ -343,7 +346,7 @@ def _prep_series(series):
     """[[iso_ts, value], ...] -> (sorted ts floats, values) for bisect lookup."""
     if not series:
         return [], []
-    parsed = sorted((_parse_iso(t), float(v)) for t, v in series)
+    parsed = sorted((parse_iso(t), float(v)) for t, v in series)
     return [p[0] for p in parsed], [p[1] for p in parsed]
 
 
@@ -370,7 +373,7 @@ def apply_footprint(
 
     out = []
     for bk in buckets:
-        ts = _parse_iso(bk.ts)
+        ts = parse_iso(bk.ts)
         kwh = bk.energy_wh / 1000
         out.append(
             bk._replace(

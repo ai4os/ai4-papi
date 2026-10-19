@@ -14,7 +14,8 @@ from cachetools import cached, TTLCache
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import accounting, auth, schemas
+from ai4papi import auth, schemas
+from ai4papi import energy as energy_accounting
 from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
@@ -131,15 +132,15 @@ def get_user_stats(
         except ValueError:  # user has still no recorded stats
             user_stats["users-agg"] = None
     except HTTPException:
-        if not (energy and accounting.enabled()):
+        if not (energy and energy_accounting.enabled()):
             raise
         user_stats = {}
 
     # Accumulated energy consumption + footprint of the user in that VO (each
     # deployment's accumulator + its live top-up, summed). `full_info` adds the
     # merged time series.
-    if energy and accounting.enabled():
-        user_stats["energy"] = accounting.get_user_energy(
+    if energy and energy_accounting.enabled():
+        user_stats["energy"] = energy_accounting.get_user_energy(
             namespace, auth_info["id"], series=full_info
         )
 
@@ -470,9 +471,9 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
     # Reported per datacenter only, there is no platform-wide total (clients sum
     # the datacenters they care about). Best-effort: a failure here must not
     # break the cluster stats.
-    if accounting.enabled():
+    if energy_accounting.enabled():
         try:
-            for dc_name, dc_energy in accounting.get_cluster_energy(
+            for dc_name, dc_energy in energy_accounting.get_cluster_energy(
                 series=True
             ).items():
                 if dc_name not in stats.datacenters:
