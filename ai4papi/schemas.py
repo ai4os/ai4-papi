@@ -74,7 +74,7 @@ class EnergyStats(BaseModel):
     as_of: Optional[str] = None  # store pointer timestamp
     live_as_of: Optional[str] = None  # instant of the live top-up
     complete: bool = True  # False if it started late / clamped by Mimir retention
-    degraded: bool = False  # Mimir/Wattnet unavailable for the top-up
+    degraded: bool = False  # the live Mimir top-up failed
     coverage_ratio: Optional[float] = None  # per deployment / user: fraction with data
     datacenters: Optional[list[str]] = None  # per deployment / user
     deployments: Optional[int] = None  # per-user aggregate only

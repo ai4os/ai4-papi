@@ -35,7 +35,7 @@ Four layers: a durable background sweep that owns the persisted record, a live r
 
 ```
    background thread in ai4papi.main: @repeat_every(energy.sweep_seconds)
-     accounting.sweep.run_sweep()
+     energy.run_sweep()
        per deployment:   Nomad (jobs + allocations + node -> datacenter)
                          Mimir query_range (per-alloc power, un-consolidated window)
        per datacenter:   Mimir query_range (per-host + per-GPU power)
@@ -63,7 +63,7 @@ The diagram above is the steady state, once a deployment has a persisted doc. Be
 
 ### Layer 1: durable sweep
 
-`accounting.sweep.run_sweep()` runs on a `@repeat_every(energy.sweep_seconds)` thread started in `ai4papi.main`'s `lifespan`, next to `get_cluster_stats_thread`. Same posture: not async, one `try/except` per deployment, no-op if the feature is disabled.
+`energy.run_sweep()` runs on a `@repeat_every(energy.sweep_seconds)` thread started in `ai4papi.main`'s `lifespan`, next to `get_cluster_stats_thread`. Same posture: not async, one `try/except` per deployment, no-op if the feature is disabled.
 
 Per namespace it lists the active Nomad jobs (`Status != "dead"`, names matching `^(module|tool|batch|try)`) and also every existing `.accum.json` whose job has vanished, to close it out. Per deployment it calls `process_single(info, now)`:
 
@@ -76,26 +76,26 @@ Per namespace it lists the active Nomad jobs (`Status != "dead"`, names matching
 
 The sweep is idempotent: re-running with the same `now` produces the same document (buckets keyed by timestamp, `settled` only advances over buckets that leave the 24h window).
 
-The consolidation step (fold new buckets over the tail, age the old ones into `settled` + `.series.jsonl`, recompute `accumulated` / `pointer_ts`) is `sweep._fold_and_accumulate`, shared with the datacenter sweep below.
+The consolidation step (fold new buckets over the tail, age the old ones into `settled` + `.series.jsonl`, recompute `accumulated` / `pointer_ts`) is `sweep._fold_and_accumulate` (`ai4papi/energy/sweep.py`), shared with the datacenter sweep below.
 
 ### Layer 1b: per-datacenter sweep
 
-After the deployment loop, `run_sweep()` calls `_sweep_cluster(now)`, which runs `process_datacenter(dc, now)` for every `energy.metrics_datacenters`. Documents live under the pseudo-namespace `_cluster` (`$ACCOUNTING_PTH/energy/_cluster/<dc>.accum.json` + `.series.jsonl`), reusing `accounting.store` unchanged.
+After the deployment loop, `run_sweep()` calls `_sweep_cluster(now)`, which runs `process_datacenter(dc, now)` for every `energy.metrics_datacenters`. Documents live under the pseudo-namespace `_cluster` (`$ACCOUNTING_PTH/energy/_cluster/<dc>.accum.json` + `.series.jsonl`), reusing `energy.store` unchanged.
 
 `process_datacenter` is `process_single` without the Nomad parts: no allocation resolution, no `coverage_ratio`, no owner/close handling.
 
 1. Load the doc; `settled_ts` from it, else clamped to `initial_lookback_hours` / `mimir_retention_days` (retention clamp sets `complete: false`). `window_start` / `since` is pinned on the first sweep, same as the per-deployment path.
-2. Query Mimir over `[settled_ts, now - query_lag_seconds]` with `_cluster_promql(dc)`: `sum by (node) (scaph_host_power_microwatts{datacenter="<dc>"})` (one series per host) and `sum by (UUID) (DCGM_FI_DEV_POWER_USAGE{datacenter="<dc>"})` (one series per GPU). Grouped, not summed, so `compute.integrate` runs the data-quality filter on each raw host / GPU series before summing, exactly as the per-deployment path does per allocation.
-3. Data quality is `_cluster_dq()`: `energy.data_quality` with `max_power_w` forced to `0` (the per-alloc / per-GPU ceiling of ~1000 W is meaningless for a whole host). Negative-drop and the scale-free rolling-median spike check still apply.
+2. Query Mimir over `[settled_ts, now - query_lag_seconds]` with `compute.cluster_promql(dc)`: `sum by (node) (scaph_host_power_microwatts{datacenter="<dc>"})` (one series per host) and `sum by (UUID) (DCGM_FI_DEV_POWER_USAGE{datacenter="<dc>"})` (one series per GPU). Grouped, not summed, so `compute.integrate` runs the data-quality filter on each raw host / GPU series before summing, exactly as the per-deployment path does per allocation.
+3. Data quality is `config.cluster_dq()`: `energy.data_quality` with `max_power_w` forced to `0` (the per-alloc / per-GPU ceiling of ~1000 W is meaningless for a whole host). Negative-drop and the scale-free rolling-median spike check still apply.
 4. `integrate` with `TUE[dc]`, `apply_footprint` with the datacenter's Wattnet intensity, then `_fold_and_accumulate`. If the datacenter has no host-power series at all: `metrics_available: false`, retry next sweep, no zeros.
 
 Note on double counting: scaphandre host power is RAPL (CPU package + DRAM), it does not include the GPU board, so `host + GPU` is correct.
 
 ### Layer 2: read-time top-up
 
-The stored accumulator only reaches `pointer_ts` (up to one sweep interval behind). On each API read, `accounting.sweep.topup(doc)` queries Mimir live for `[pointer_ts, now]` (a single `query_range`, no chunking, no ingestion-lag cushion -- Mimir data is immutable once ingested, so querying right up to "now" cannot return a wrong value, only occasionally miss a sample scraped a moment ago that is not visible *yet*, which self-corrects on the very next call), applies the TUE and the current Wattnet intensity, and returns the energy deltas plus `live_as_of` and `power_w`. `power_w` is the **current draw**: the TUE-normalized sum of the actual last sample of every series in that same query, however old that sample is, not a window mean. The result is cached for `topup_cache_seconds` (25 s, below the dashboard's 30 s poll, so the number visibly moves). Any failure returns `{"degraded": true}` and the API serves the stored value.
+The stored accumulator only reaches `pointer_ts` (up to one sweep interval behind). On each API read, `energy.live.topup(doc)` queries Mimir live for `[pointer_ts, now]` (a single `query_range`, no chunking, no ingestion-lag cushion -- Mimir data is immutable once ingested, so querying right up to "now" cannot return a wrong value, only occasionally miss a sample scraped a moment ago that is not visible *yet*, which self-corrects on the very next call), applies the TUE and the current Wattnet intensity, and returns the energy deltas plus `live_as_of` and `power_w`. `power_w` is the **current draw**: the TUE-normalized sum of the actual last sample of every series in that same query, however old that sample is, not a window mean. The result is cached for `topup_cache_seconds` (25 s, below the dashboard's 30 s poll, so the number visibly moves). Any failure returns `{"degraded": true}` and the API serves the stored value.
 
-`topup_cluster(dc, doc)` / `live_series_cluster(dc, doc, bucket_s)` are the datacenter equivalents (same window logic, `_cluster_promql` instead of the per-alloc query). They are computed inside `get_cluster_stats_bg()` (which runs every 30 s anyway), so the datacenter counter moves at the same cadence as the per-deployment one.
+`topup` / `live_series` also accept a datacenter doc (`namespace == _cluster`), same window logic and `compute.cluster_promql` instead of the per-alloc query). They are computed inside `get_cluster_stats_bg()` (which runs every 30 s anyway), so the datacenter counter moves at the same cadence as the per-deployment one.
 
 `accumulated (stored, frozen for up to a sweep) + top-up (growing)` stays continuous: when the next sweep advances `pointer_ts` and folds that slice into `accumulated`, the top-up window shrinks by the same amount.
 
@@ -103,8 +103,8 @@ The stored accumulator only reaches `pointer_ts` (up to one sweep interval behin
 
 A deployment the background thread has not reached yet has no `.accum.json`, so the top-up (which reads `pointer_ts` off the stored doc) has nothing to attach to. Rather than making a fresh deployment wait up to `sweep_seconds` for its first numbers, every read path runs one `process_single` pass synchronously (the same function and same write path the background thread uses) for whatever it is about to serve and has no doc yet:
 
-- Single-deployment reads (`get_accumulated`, `get_series`) call `accounting.sweep.ensure_swept(namespace, uuid)`: fetch that one Nomad job, sweep it, return the resulting doc.
-- Bulk/per-user reads (`get_accumulated_bulk`, `get_user_energy`) call `accounting.sweep.ensure_swept_bulk(namespace, owner)` first: list the owner's active jobs (one cheap Nomad call, no per-job fetch) and sweep only the ones still missing a doc, before falling back to the normal `store.iter_owner` scan.
+- Single-deployment reads (`get_accumulated`, `get_series`) call `energy.ondemand.ensure_swept(namespace, uuid)`: fetch that one Nomad job, sweep it, return the resulting doc.
+- Bulk/per-user reads (`get_accumulated_bulk`, `get_user_energy`) call `energy.ondemand.ensure_swept_bulk(namespace, owner)` first: list the owner's active jobs (one cheap Nomad call, no per-job fetch) and sweep only the ones still missing a doc, before reading the owner's documents with `store.iter_owner`, which uses an in-memory owner to uuids index instead of scanning the namespace (see [Persistence](#persistence)).
 
 Once a doc exists, both are a single cheap `store.read_accum` check (or, for the bulk path, one job-list call) and defer entirely to the background sweep; neither re-queries Mimir beyond that first pass. A job Nomad no longer knows about (or a listing failure) degrades to `energy: null` / that deployment simply absent from the aggregate. `/stats/cluster` (`get_cluster_energy`, per-datacenter) is not covered by this: its instantaneous power is already live regardless (`get_datacenter_power`), and its accumulator is seeded by the small, fixed `metrics_datacenters` list, not by individual deployments.
 
@@ -112,11 +112,11 @@ Once a doc exists, both are a single cheap `store.read_accum` check (or, for the
 
 ### Layer 4: pure-Mimir fallback
 
-`process_single` leaves a deployment with **no** doc when it is younger than one `series_bucket_seconds`: there is nothing settled to fold into an accumulator yet, so Layer 3 alone still reports `energy: null` for the first few minutes of a deployment's life. `sweep.live_only_doc(ns, uuid)` closes that gap: a transient, **never persisted** stand-in doc (`accumulated` all zero, `pointer_ts = submit_time`, the currently-running allocations) shaped so the normal `topup` / `live_series` machinery treats it exactly like a real doc -- the whole reported number then comes straight from Mimir, through the same lag-free `_live_window` as Layer 2. `accounting._live_only_stats()` wraps it and only returns something when the top-up actually found data (`power_w` set, or a non-zero energy/carbon/water delta) -- an all-zero top-up is indistinguishable from "no measurement yet", so it is treated as not populated (`null`) rather than shown as a fabricated `0` reading. Used by all four read functions whenever they still have no usable doc after Layer 3.
+`process_single` leaves a deployment with **no** doc when it is younger than one `series_bucket_seconds`: there is nothing settled to fold into an accumulator yet, so Layer 3 alone still reports `energy: null` for the first few minutes of a deployment's life. `ondemand.live_only_doc(ns, uuid)` closes that gap: a transient, **never persisted** stand-in doc (`accumulated` all zero, `pointer_ts = submit_time`, the currently-running allocations) shaped so the normal `topup` / `live_series` machinery treats it exactly like a real doc -- the whole reported number then comes straight from Mimir, through the same lag-free `_live_window` as Layer 2. `energy._live_only_stats()` wraps it and only returns something when the top-up actually found data (`power_w` set, or a non-zero energy/carbon/water delta) -- an all-zero top-up is indistinguishable from "no measurement yet", so it is treated as not populated (`null`) rather than shown as a fabricated `0` reading. Used by all four read functions whenever they still have no usable doc after Layer 3.
 
 ## Persistence
 
-One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomic writes (temp file + `os.replace`). `process_single` / `process_datacenter` are the only writers, run either by the periodic sweep thread or, for a single deployment's very first doc, synchronously from the read path (see [Layer 3](#layer-3-on-demand-sweep)). Same convention as `ai4papi.utils.retrieve_from_snapshots`. No database. The `accounting.store` interface is deliberately small so it can move to PostgreSQL later without touching the routers.
+One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomic writes (temp file + `os.replace`). `process_single` / `process_datacenter` are the only writers, run either by the periodic sweep thread or, for a single deployment's very first doc, synchronously from the read path (see [Layer 3](#layer-3-on-demand-sweep)). Same convention as `ai4papi.utils.retrieve_from_snapshots`. No database. The `energy.store` interface is deliberately small so it can move to PostgreSQL later without touching the routers.
 
 `<uuid>.accum.json` (rewritten every sweep, ~25 KB with a full 24h tail):
 
@@ -138,9 +138,9 @@ One small JSON per deployment under `$ACCOUNTING_PTH/energy/<namespace>/`, atomi
 }
 ```
 
-`<uuid>.series.jsonl`: one line per consolidated bucket (`energy.series_bucket_seconds`, 15 min), append-only (a bucket is written once, when it leaves the 24h tail, never rewritten). About 35k lines (~3 MB) per year for an always-on deployment, a few KB appended per sweep.
+`<uuid>.series.jsonl`: one line per consolidated bucket (`energy.series_bucket_seconds`, 15 min), append-only (a bucket is written once, when it leaves the 24h tail, never rewritten). About 35k lines (~3 MB) per year for an always-on deployment, a few KB appended per sweep. If the process dies between appending the buckets and writing the doc, the next sweep appends them again; `read_series` keeps one line per `ts`, so a repeated bucket counts once.
 
-There is no summary file. Per-user and per-datacenter aggregates are computed on read from the `.accum.json` documents (`get_user_energy`, `get_cluster_energy`), because they need the live top-up anyway. If the per-user read (a namespace scan filtered by owner) ever gets heavy, cache a namespace snapshot rather than reviving a stale summary.
+There is no summary file. Per-user and per-datacenter aggregates are computed on read from the `.accum.json` documents (`get_user_energy`, `get_cluster_energy`), because they need the live top-up anyway. Listing one user's deployments does not parse the whole namespace: `store.iter_owner` uses an in-memory `owner -> uuids` index, built with one scan, kept in sync by every `write_accum` and rebuilt from disk every 5 minutes. It assumes a single PAPI process writes the store (marked with a `shortcut:` comment); with several replicas on the same storage a replica would see another one's new documents up to 5 minutes late, and the index should move to a database.
 
 ## Resolution strategy
 
@@ -158,12 +158,13 @@ What the `series` in an API response actually is: the persisted 15-min archive (
 
 ## Computation details
 
-Module `ai4papi/accounting/compute.py`, all pure and unit-testable except the cached Nomad lookup:
+Module `ai4papi/energy/compute.py`, all pure and unit-testable except the cached Nomad lookup:
 
 - `resolve_alloc_ids(job_id, namespace)`: `Nomad.job.get_allocations` plus `_node_datacenter` (TTLCache), filtered to `energy.metrics_datacenters`.
 - `power_promql(alloc_ids)`: the CPU and GPU queries for one datacenter's alloc subset. Grouped, not fully summed, so the data-quality filter runs on the original per-source series.
   - CPU: `sum by (container_label_com_hashicorp_nomad_alloc_id) (scaph_process_power_consumption_microwatts{container_label_com_hashicorp_nomad_alloc_id=~"id1|id2"})` (one series per allocation)
   - GPU: `DCGM_FI_DEV_POWER_USAGE * on(UUID, instance) group_left(alloc_id) nomad_gpu_allocation_info{alloc_id=~"id1|id2"}` (one series per GPU)
+- `cluster_promql(dc)`: the host and GPU queries of a whole datacenter (one series per host and per GPU), used by the datacenter sweep and its live top-up.
 - `sanitize(samples, dq)`: data-quality filter on one power series (see below).
 - `integrate(cpu_result, gpu_result, step_s, bucket_s, tue_factor, gap_factor, data_quality)`: CPU uW/1e6 plus GPU W, `sanitize` per source series, trapezoidal integral of each into `bucket_s` energy buckets, summed, then `energy_wh = raw_integral * tue_factor`. Gaps longer than `gap_factor * step_s` are not integrated across (deployment stopped, scrape hole, dropped anomaly).
 - `apply_footprint(buckets, carbon_series, water_series)`: `carbon_g = (energy_wh / 1000) * intensity_at(ts)`, same for water. `intensity_at` is a bisect for the last Wattnet sample at or before the bucket, `DEFAULTS` otherwise.
@@ -176,6 +177,8 @@ Module `ai4papi/accounting/compute.py`, all pure and unit-testable except the ca
 The sweep uses `green_director.metrics[dc]` (Wattnet, already refreshed every 30 s for the cluster stats) with `DEFAULTS` as fallback. For a backfill older than the 7-day window it calls `green_director.footprint_series(dc, start, end)`, which reuses the Wattnet token and hits `/v1/footprints` for the requested range.
 
 Every sweep recomputes carbon and water for all buckets newer than `now - footprint_revision_hours` (24 h) with the current intensity, so a bucket's footprint firms up as Wattnet settles it. Older buckets are frozen. The accumulated footprint is always `sum` over buckets, so it self-corrects.
+
+Wattnet failures are contained in `GreenDirector.retrieve_footprints` (`ai4papi/wattnet.py`). Every request has a 30 s timeout, so a stalled Wattnet cannot block the background threads. A failed or empty answer raises inside `_fetch_footprint_data`, so the 15-minute cache never stores it. The datacenter keeps its last good data (or gets `DEFAULTS` if it never had any), and is not asked again for 5 minutes (`FAILURE_BACKOFF`), so a Wattnet outage costs one round of timeouts per 5 minutes. The log has one warning when a datacenter starts failing (with the date up to which data is kept) and one info line when it recovers, not one per refresh.
 
 The live top-up multiplies its `delta_wh` by the current provisional intensity; the next sweep reconciles it (typical correction under 1-2%).
 
@@ -193,10 +196,10 @@ The consumer-facing reference (response formats field by field, examples, pollin
 
 ### `energy` embedded in the deployment info
 
-The four deployment routers (`modules`, `tools`, `batch`, `try_me/nomad`), in both `get_deployment` and `get_deployments`, attach an `energy` object built from the store plus the live top-up. Its shape follows the existing `full_info` param:
+The four deployment routers (`modules`, `tools`, `batch`, `try_me/nomad`), in both `get_deployment` and `get_deployments`, attach an `energy` object built from the store plus the live top-up, through two helpers of the read API: `energy.add_to_job(job, namespace, full_info)` for a single deployment and `energy.add_to_jobs(jobs, namespace, owner, full_info)` for a list (a no-op on an empty list). The router only keeps the `if energy:` check. Its shape follows the existing `full_info` param:
 
-- `full_info=false` (the `get_deployments` default): `energy` = `accounting.get_accumulated(...)` for the individual endpoint, or one batch `accounting.get_accumulated_bulk(namespace, owner)` mapped over the list. `EnergyStats`. One or two Mimir queries total for a whole list.
-- `full_info=true` (the `get_deployment` default): `energy` = `accounting.get_series(namespace, uuid)` (whole life). `EnergyTimeSeries` with `accumulated` nested. On a list this is one `get_series` per deployment, matching the "may increase latency" note that `full_info` already carries.
+- `full_info=false` (the `get_deployments` default): `energy` = `energy.get_accumulated(...)` for the individual endpoint, or one batch `energy.get_accumulated_bulk(namespace, owner)` mapped over the list. `EnergyStats`. One or two Mimir queries total for a whole list.
+- `full_info=true` (the `get_deployment` default): `energy` = `energy.get_series(namespace, uuid)` (whole life). `EnergyTimeSeries` with `accumulated` nested. On a list this is one `get_series` per deployment, matching the "may increase latency" note that `full_info` already carries.
 
 A `energy: bool = True` query param lets a client opt out; the internal quota-check calls pass `False`. `nomad_utils` is not touched.
 
@@ -215,7 +218,7 @@ as_of                store pointer timestamp
 live_as_of           instant of the live top-up
 complete             False if it started late or was clamped by Mimir retention
 coverage_ratio       fraction of run time that has power data (float, 1.0 = full); null on the per-datacenter block
-degraded             Mimir or Wattnet unavailable for the top-up
+degraded             the live Mimir top-up failed (the stored value is served)
 datacenters          list of datacenters the deployment or user has run in; null on the per-datacenter block
 deployments          set only on the per-user aggregate: number of deployments summed
 series               15-min EnergyTimeSeriesPoint list; null unless full_info=true (per-user aggregate only; the per-deployment full_info uses EnergyTimeSeries instead)
@@ -225,21 +228,21 @@ series               15-min EnergyTimeSeriesPoint list; null unless full_info=tr
 
 ### Time series, for the detail view
 
-The detail view calls the deployment's own individual endpoint (`GET /v1/deployments/{type}/{uuid}`, which defaults to `full_info=true`) and reads `energy` from the response. That `energy` is `schemas.EnergyTimeSeries` from `accounting.get_series(namespace, uuid)`: `{deployment_uuid, start, end, source, series, accumulated}`, where `series` is a list of points (`energy` / `carbon` / `water` per-bucket increment, `power_w` per point; a running total is `cumsum` client-side and matches `accumulated`) and `accumulated` is the `EnergyStats`. It serves the persisted 15-min archive downsampled to ~1000 points plus the live tail (`pointer_ts -> now` from Mimir, `live: true`) appended un-downsampled, so the graph keeps growing on every refresh; `source` is then `"mixed"`. Ownership and 404 handling are the individual endpoint's usual behaviour; `energy` is simply `null` when there is no rollup.
+The detail view calls the deployment's own individual endpoint (`GET /v1/deployments/{type}/{uuid}`, which defaults to `full_info=true`) and reads `energy` from the response. That `energy` is `schemas.EnergyTimeSeries` from `energy.get_series(namespace, uuid)`: `{deployment_uuid, start, end, source, series, accumulated}`, where `series` is a list of points (`energy` / `carbon` / `water` per-bucket increment, `power_w` per point; a running total is `cumsum` client-side and matches `accumulated`) and `accumulated` is the `EnergyStats`. It serves the persisted 15-min archive downsampled to ~1000 points plus the live tail (`pointer_ts -> now` from Mimir, `live: true`) appended un-downsampled, so the graph keeps growing on every refresh; `source` is then `"mixed"`. Ownership and 404 handling are the individual endpoint's usual behaviour; `energy` is simply `null` when there is no rollup.
 
 ### Per-datacenter energy, in the cluster stats
 
-`get_cluster_stats_bg()` (the 30 s background thread, which already refreshes `green_director`) calls `accounting.get_cluster_energy(series=True)`, which merges three things per datacenter into `schemas.EnergyStats`:
+`get_cluster_stats_bg()` (the 30 s background thread, which already refreshes `green_director`) calls `energy.get_cluster_energy(series=True)`, which merges three things per datacenter into `schemas.EnergyStats`:
 
-1. **Instantaneous power** from `accounting.get_datacenter_power()`: two instant Mimir queries, `power_w = (sum by (datacenter) scaph_host_power_microwatts + sum by (datacenter) DCGM_FI_DEV_POWER_USAGE) * TUE[dc]`. The host / GPU split is not exposed (on the ifca VMs `scaph_host_power` reads near zero, so it would be misleading; in practice `power_w` is GPU-dominated). A datacenter listed in `energy.metrics_datacenters` is reported with whatever it has (host-only, GPU-only or both); without that allowlist a host-power series is required so a stray GPU metric for an unmonitored site does not fabricate a total.
-2. **Accumulated energy** from the `_cluster/<dc>.accum.json` document (persisted by the datacenter sweep) plus a `topup_cluster` live slice: `energy_wh`, `carbon_g`, `water_l`, `since`, `complete`, `live_as_of`.
-3. **Time series**: the consolidated `.series.jsonl` (`_cluster_archive_series`, cached ~5 min so the 30 s thread does not re-parse it) plus the 24h tail, downsampled to `energy.cluster_series_points`, with the live tail (`live_series_cluster`) appended. Points carry per-bucket increments only.
+1. **Instantaneous power** from `energy.get_datacenter_power()`: two instant Mimir queries, `power_w = (sum by (datacenter) scaph_host_power_microwatts + sum by (datacenter) DCGM_FI_DEV_POWER_USAGE) * TUE[dc]`. The host / GPU split is not exposed (on the ifca VMs `scaph_host_power` reads near zero, so it would be misleading; in practice `power_w` is GPU-dominated). A datacenter listed in `energy.metrics_datacenters` is reported with whatever it has (host-only, GPU-only or both); without that allowlist a host-power series is required so a stray GPU metric for an unmonitored site does not fabricate a total.
+2. **Accumulated energy** from the `_cluster/<dc>.accum.json` document (persisted by the datacenter sweep) plus a live top-up slice (`live.topup` on the datacenter doc): `energy_wh`, `carbon_g`, `water_l`, `since`, `complete`, `live_as_of`.
+3. **Time series**: the consolidated `.series.jsonl` (`_cluster_archive_series`, cached ~5 min so the 30 s thread does not re-parse it) plus the 24h tail, downsampled to `energy.cluster_series_points`, with the live tail (`live.live_series` on the datacenter doc) appended. Points carry per-bucket increments only.
 
 Attached as `stats.datacenters[<dc>].energy`. There is **no** response-root total: `schemas.ClusterStats` has no `energy` field, and clients sum the datacenter blocks they want. `get_cluster_stats()` (the VO-filtered endpoint) prunes each datacenter's node list but keeps the `energy` block, so an instrumented datacenter with no nodes for that VO is still returned (empty `nodes`). The background thread always computes the series; `get_cluster_stats(full_info=false)` (the default) strips it from every datacenter block before returning, so the series only ships when the caller asks for it. Any failure in this block is caught and leaves the datacenters without `energy`. A datacenter that is not in `energy.metrics_datacenters` and has no accumulator doc simply has no `energy` block; a monitored GPU-only site does get one (accumulator plus series, and an instantaneous `power_w` from its GPU draw).
 
 ### Per-user aggregate
 
-`stats.deployments.get_user_stats` gains an `energy` key from `accounting.get_user_energy(namespace, owner, series=full_info)`: it iterates the owner's `.accum.json` documents, applies each one's live top-up, and sums them into one `EnergyStats`-shaped block (`since` = earliest, `as_of` / `live_as_of` = latest, `complete` = AND, `degraded` = OR, `power_w` = sum of the running ones, `coverage_ratio` = mean, `tue_factor` = blended `energy_wh / raw`, `datacenters` = union, plus a `deployments` count). With `full_info=true` it also returns a merged time series (`_user_series`): the raw 15-min buckets of every deployment (archive + tail) are summed by timestamp first, then `compute.downsample`d once to `target_points` (1000). Merging before downsampling keeps the resolution uniform across the whole series and gives the same hard cap as the other levels, regardless of how long each deployment individually has been running; the live tails are merged and appended un-downsampled, as elsewhere. The energy block is independent of the pre-existing CSV usage stats: if those are missing, the endpoint still returns the `energy` block instead of failing.
+`stats.deployments.get_user_stats` gains an `energy` key from `energy.get_user_energy(namespace, owner, series=full_info)`: it reads the owner's `.accum.json` documents (through the owner index), applies each one's live top-up, and sums them into one `EnergyStats`-shaped block (`since` = earliest, `as_of` / `live_as_of` = latest, `complete` = AND, `degraded` = OR, `power_w` = sum of the running ones, `coverage_ratio` = mean, `tue_factor` = blended `energy_wh / raw`, `datacenters` = union, plus a `deployments` count). With `full_info=true` it also returns a merged time series (`series.build_series`): the raw 15-min buckets of every deployment (archive + tail) are summed by timestamp first, then `compute.downsample`d once to `target_points` (1000). Merging before downsampling keeps the resolution uniform across the whole series and gives the same hard cap as the other levels, regardless of how long each deployment individually has been running; the live tails are merged and appended un-downsampled, as elsewhere. The energy block is independent of the pre-existing CSV usage stats: if those are missing, the endpoint still returns the `energy` block instead of failing.
 
 ## Configuration
 
@@ -266,7 +269,7 @@ energy:
 
 `max_power_w` is a per-source ceiling (one allocation's CPU, or one GPU), not the deployment total, so `1000` W is safe for any single GPU and any CPU allocation on a VM. A dropped sample becomes a gap in that source only. The datacenter sweep reuses this `data_quality` block but forces `max_power_w` to `0` (a whole host draws far more than any single alloc), keeping only the negative-drop and the rolling-median spike check.
 
-- `ai4papi/mimir.py`: `MIMIR_URL` is a module constant. `MIMIR_USER` and `MIMIR_PASSWORD` come from the environment (`os.environ.get`, like `wattnet.py`, not `load_env`, so a missing value disables the feature instead of breaking PAPI startup). Add both to `template.env` and to the PAPI deployment.
+- `ai4papi/clients/mimir.py`: `MIMIR_URL` is a module constant; `BACKOFF_SECONDS` too (60 s). Request timeouts are 10 s (instant query) and 15 s (range query): measured against the real Mimir, a 24h range query takes under 1 s and a full 11,000-point backfill chunk about 1.5 s. `MIMIR_USER` and `MIMIR_PASSWORD` come from the environment (`os.environ.get`, like `wattnet.py`, not `load_env`, so a missing value disables the feature instead of breaking PAPI startup). Add both to `template.env` and to the PAPI deployment.
 - `var/datacenters.csv`: `TUE` column, populated only for the datacenters that have a value. `ai4papi/conf.py` tolerates a blank numeric cell (loads it as `None`).
 - The Prometheus `datacenter` label values must match the `name` column of `datacenters.csv`.
 
@@ -278,6 +281,11 @@ energy:
 | Sweep thread | `sweep_seconds` (900) | keeps the accumulator current, consolidates the footprint at Wattnet's revision cadence, short enough to catch short jobs before Nomad GC |
 | Top-up cache | `topup_cache_seconds` (25) | below the dashboard's 30 s poll, so the counter moves |
 | Cluster archive-series cache | 300 s | the `.series.jsonl` only changes at sweep cadence; keeps the 30 s thread from re-parsing it |
+| Mimir failure backoff | 60 s (`BACKOFF_SECONDS`, constant in `clients/mimir.py`) | after a timeout or connection error every Mimir call fails fast with `MimirError` |
+| Wattnet failure backoff | 300 s (`FAILURE_BACKOFF`, constant in `wattnet.py`) | a datacenter whose refresh failed is not asked again meanwhile |
+| Owner index rebuild | 300 s | heals anything written outside this process; `write_accum` keeps it current in between |
+
+Every TTL cache in `energy/` is built with `cachetools.cached(..., lock=threading.Lock())`: endpoints run in a thread pool next to the sweep and stats threads, and an unlocked `cachetools` cache raises `KeyError` / `RuntimeError` under concurrent access.
 
 For the user to perceive the increment every 30 s the frontend must show Wh (or kWh with 3 decimals) or animate the counter: at 50 W, 30 s is ~0.4 Wh.
 
@@ -285,8 +293,8 @@ For the user to perceive the increment every 30 s the frontend must show Wh (or 
 
 Same posture as `get_cluster_stats`.
 
-- Mimir down: the sweep logs and skips (store frozen); the top-up returns `degraded: true`; the API serves the stored accumulator with its `as_of`.
-- Wattnet down: energy is still computed; the footprint falls back to `DEFAULTS`; `degraded: true`.
+- Mimir down: the sweep logs and skips (store frozen); the top-up returns `degraded: true`; the API serves the stored accumulator with its `as_of`. A Mimir that hangs or refuses connections costs one timeout, then `clients/mimir.py` fails fast for 60 s (`BACKOFF_SECONDS`): the sweep stops the pass of the namespace with one warning instead of waiting two timeouts per deployment, and the on-demand sweep in a list request skips instead of blocking the page.
+- Wattnet down: energy is still computed; the footprint keeps using the last good intensity (or `DEFAULTS` for a datacenter that never had data) and `degraded` stays `false`; buckets still in the 24h tail are recomputed once Wattnet is back. See Footprint consolidation for the timeout and backoff.
 - Unreadable file: `get_accumulated` returns `None`, so `energy` is `null`.
 - `energy.enabled: false` or no Mimir credentials: `get_accumulated` / `get_series` / `get_datacenter_power` return `None` / `{}`, so `energy` is `null` everywhere and the rest of the API is unchanged.
 - Deployment on a site or node without power monitoring: Mimir returns nothing, `metrics_available` is `false`, `energy` is `null` (best-effort, no misleading zeros); retried every sweep in case monitoring appears or the alloc moves.
@@ -299,11 +307,16 @@ Same posture as `get_cluster_stats`.
 
 New:
 
-- `ai4papi/mimir.py`
-- `ai4papi/accounting/__init__.py` (read API: `get_accumulated*`, `get_series`, `get_user_energy`, `get_datacenter_power`, `get_cluster_energy`)
-- `ai4papi/accounting/store.py` (file store)
-- `ai4papi/accounting/compute.py` (pure functions)
-- `ai4papi/accounting/sweep.py` (deployment + datacenter sweep, top-up)
+- `ai4papi/clients/mimir.py`
+- `ai4papi/energy/__init__.py` (read API: `get_accumulated*`, `get_series`, `get_user_energy`, `get_datacenter_power`, `get_cluster_energy`; `add_to_job` / `add_to_jobs` are what the deployment routers call to set `job["energy"]`)
+- `ai4papi/energy/store.py` (file store)
+- `ai4papi/energy/series.py` (builds the time-series points of the API responses)
+- `ai4papi/energy/compute.py` (pure functions)
+- `ai4papi/energy/config.py` (config section, `enabled()`, TUE, shared constants and tiny helpers)
+- `ai4papi/energy/query.py` (Mimir power queries shared by the sweep and the live top-up)
+- `ai4papi/energy/sweep.py` (write path: deployment + datacenter sweep)
+- `ai4papi/energy/live.py` (read path: live top-up and live series, for deployments and datacenters)
+- `ai4papi/energy/ondemand.py` (read path: on-demand sweep and `live_only_doc`)
 - `tests/test_energy.py`
 
 Modified (all additive):
@@ -312,25 +325,31 @@ Modified (all additive):
 - `ai4papi/routers/v1/deployments/{modules,tools}.py`, `ai4papi/routers/v1/batch.py`, `ai4papi/routers/v1/try_me/nomad.py`: the `energy` key and param (`EnergyStats` or `EnergyTimeSeries` per `full_info`)
 - `ai4papi/routers/v1/stats/deployments.py`: the per-user `energy` aggregate in `get_user_stats` (`full_info` for the series) and the per-datacenter `energy` block in `get_cluster_stats` (`full_info` for the series); no response-root total
 - `ai4papi/schemas.py`: `EnergyStats` (per deployment and per user), `EnergyTimeSeriesPoint`, `EnergyTimeSeries` (its point list is `series`); `energy` on `DatacenterStats` (also `EnergyStats`)
-- `ai4papi/wattnet.py`: `GreenDirector.footprint_series`
+- `ai4papi/wattnet.py`: `GreenDirector.footprint_series`; request timeouts, failures raised instead of cached, last good data kept and failure backoff in `retrieve_footprints`
+- `pyproject.toml`: optional `test` extra (`pytest`); `tests/main.py`: runs `test_energy` through `pytest.main`
 - `ai4papi/conf.py`: blank numeric CSV cell tolerated
 - `var/datacenters.csv`: `TUE` column
 - `etc/main.yaml` (`energy` section incl. `deployment_series_points` / `user_series_points` / `cluster_series_points`), `template.env`, `tests/test_routes.py`
 
 ## Testing
 
-`tests/test_energy.py` (plain-script style, picked up by `tests/main.py`):
+`tests/test_energy.py` (pytest, unlike the plain-script tests; `tests/main.py` runs it through `pytest.main`):
 
 - Pure-function checks, no infrastructure: `integrate` (trapezoidal, TUE, gaps, single sample), `sanitize` (negatives, ceiling, spike detection, disabled passthrough), `apply_footprint` (Wattnet series and `DEFAULTS` fallback), `intensity_at`, `downsample`, `merge_buckets`, `running_seconds`.
 - Sweep pipeline, Mimir and Nomad monkeypatched: `process_single` writes a correct `.accum.json`, idempotency (same `now` gives a byte-identical document), monotonicity across sweeps, buckets aging into `.series.jsonl`, and `get_accumulated` / `get_series` validate against the pydantic models.
 - Cluster energy, `mimir.query` / `mimir.query_range` monkeypatched (several raw host series): `get_datacenter_power()` gives `power_w = (host + gpu) * TUE`; `process_datacenter` writes a correct `_cluster/<dc>.accum.json` with per-series sanitize then sum, monotonic across sweeps, buckets aging into `.series.jsonl`; `get_cluster_energy(series=True)` merges power + accumulator + a series that validates as `EnergyTimeSeriesPoint` and whose `cumsum` reconciles with the accumulated total.
 - Per-user aggregate: `get_user_energy` sums the owner's deployments (`EnergyStats`-shaped), with and without the merged series, and its total reconciles with the merged series.
+- On-demand paths: a never-swept deployment is swept by the read, an existing doc triggers no Nomad call, an unknown job degrades to `None`; the bulk variant for lists and per-user reads; the pure-Mimir fallback for a deployment younger than one bucket (never a fabricated zero); an inconclusive stub that does not block it.
+- `add_to_job` / `add_to_jobs` (list and detail shape, empty list), `series.build_series` (live tail only after the persisted points, several entities summed), and the store (a repeated bucket counts once, the owner index scans once and sees later writes).
+- Live top-up: a failing host query is `degraded` on a datacenter doc; a confirmed `metrics_available: false` is reported as `None`.
+- Mimir backoff: one timeout, then calls fail fast without a request until the backoff is over; with three deployments and a hung Mimir the sweep pays one timeout and stops the pass.
+- Wattnet failure handling with a fake session: defaults while it is down and nothing cached, no new request during the backoff, real data after it recovers, last good data kept on a later blip, one log line per outage, timeouts present.
 - An optional live Mimir check, gated on `PAPI_TESTS_MIMIR` plus real credentials.
 
-Run with the repo venv:
+Run with the repo venv (`pip install -e .[test]` installs `pytest`):
 
 ```bash
-IS_PROD=False env/bin/python tests/test_energy.py
+IS_PROD=False env/bin/python -m pytest tests/test_energy.py
 cd tests && IS_PROD=False ../env/bin/python test_routes.py && cd ..
 ```
 

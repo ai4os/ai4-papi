@@ -67,7 +67,7 @@ One object, the same shape at every level, always with the live top-up applied: 
 | `as_of` | string or null | Timestamp of the last persisted point. |
 | `live_as_of` | string or null | Instant the numbers actually reflect, once the live top-up is applied. Use this for "updated N ago". Null when the values come straight from the store with no live top-up. |
 | `complete` | boolean | `false` if accounting started after the deployment was created, or the window was clamped by Mimir retention. When `false`, treat `energy_wh` and the footprint as a lower bound. |
-| `degraded` | boolean | `true` if Mimir or Wattnet was unreachable for the live part. The stored value is still served, it may just be slightly stale. |
+| `degraded` | boolean | `true` if the live Mimir part failed. The stored value is still served, it may just be slightly stale. A Wattnet outage does not set it: the footprint then uses the last good intensity (or the default values) and the numbers stay available. |
 | `coverage_ratio` | number or null | Deployment and per-user only: fraction of the run time that has power data (`1.0` = fully covered). `null` on the datacenter block. |
 | `datacenters` | string[] or null | Deployment and per-user only: datacenters the deployment(s) ran in. `null` on the datacenter block. |
 | `deployments` | number or null | Per-user aggregate only: how many deployments went into the sum. |
