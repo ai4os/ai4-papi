@@ -30,6 +30,12 @@ if resume_from:
 
 for module in modules:
     try:
-        __import__(module)
+        if module == "test_energy":  # pytest-style, unlike the plain-script tests
+            import pytest
+
+            if pytest.main(["-q", str(Path(__file__).parent / f"{module}.py")]):
+                raise RuntimeError("pytest reported failures")
+        else:
+            __import__(module)
     except Exception as e:
         print(f"🔴 Error testing {module}:\n{e}")
