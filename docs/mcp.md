@@ -6,6 +6,13 @@ LiteLLM. A user provides the name of a server published in the supported Registr
 and PAPI decides whether it can use a provider-hosted remote endpoint or must
 deploy a package in Nomad.
 
+Self-deployed `stdio` packages are exposed as Streamable HTTP
+through Supergateway, while native Streamable HTTP packages run directly. Nomad
+lifecycle tasks register and deregister each deployment in LiteLLM.
+
+All PAPI-created MCPs are private. Each Keycloak user has one stable LiteLLM access
+group containing all their MCP servers and keys.
+
 The integration provides three authenticated operations:
 
 | Method | Endpoint | Operation |

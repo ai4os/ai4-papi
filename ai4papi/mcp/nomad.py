@@ -8,7 +8,7 @@ from nomad.api import exceptions as nomad_exceptions
 
 import ai4papi.conf as papiconf
 from ai4papi.clients.litellm import (
-    build_litellm_mcp_access_group_name,
+    build_user_access_group_name,
     build_litellm_mcp_server_name,
 )
 from ai4papi.mcp.packages import (
@@ -75,10 +75,7 @@ class MCPNomadClient:
         elif package_transport == "stdio":
             package_port = STDIO_GATEWAY_PORT
             endpoint_path = STDIO_GATEWAY_PATH
-            gateway_script, package_environment = build_stdio_gateway_command(
-                package,
-                papiconf.MCP_NOMAD_SUPERGATEWAY_PACKAGE,
-            )
+            gateway_script, package_environment = build_stdio_gateway_command(package)
             main_command = "/bin/sh"
             main_arguments = ["-c", gateway_script]
         else:
@@ -98,7 +95,7 @@ class MCPNomadClient:
                 "PRIORITY": priority,
                 "BASE_DOMAIN": base_domain,
                 "BASIC_AUTH_HASH": basic_auth.password_hash,
-                "NODE_IMAGE": papiconf.MCP_NOMAD_NODE_IMAGE,
+                "NODE_IMAGE": "node:22-alpine",
                 "CPU_CORES": resources["cpu_num"],
                 "MEMORY_MB": resources["ram"],
                 "DISK_MB": resources["disk"],
@@ -146,7 +143,7 @@ class MCPNomadClient:
             "CENTRAL_LITELLM_URL": litellm_url.rstrip("/"),
             "CENTRAL_LITELLM_API_KEY": litellm_api_key,
             "MCP_OWNER": owner,
-            "MCP_ACCESS_GROUP_NAME": build_litellm_mcp_access_group_name(owner),
+            "MCP_ACCESS_GROUP_NAME": build_user_access_group_name(owner),
         }
         register_task = tasks["register_mcp_in_litellm"]
         # Nomad's HCL parser returns ``Env=None`` when a task has no env block.
@@ -166,8 +163,8 @@ class MCPNomadClient:
                 "MCP_PACKAGE_IDENTIFIER": package["identifier"],
                 "MCP_PACKAGE_VERSION": package["version"],
                 "MCP_PACKAGE_TRANSPORT": package_transport,
-                "MCP_STARTUP_TIMEOUT": str(papiconf.MCP_NOMAD_STARTUP_TIMEOUT),
-                "MCP_POLL_INTERVAL": str(papiconf.MCP_NOMAD_POLL_INTERVAL),
+                "MCP_STARTUP_TIMEOUT": 180,
+                "MCP_POLL_INTERVAL": 2,
             }
         )
         register_task["Templates"][0]["EmbeddedTmpl"] = papiconf.MCP["register"]

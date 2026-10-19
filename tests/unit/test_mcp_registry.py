@@ -36,7 +36,7 @@ def client_with(entries):
     response.raise_for_status.return_value = None
     session = Mock(spec=requests.Session)
     session.get.return_value = response
-    return MCPRegistryClient(timeout=10, session=session), session
+    return MCPRegistryClient(session=session), session
 
 
 def test_get_server_selects_latest_active_exact_match():
@@ -139,7 +139,7 @@ def test_get_server_reports_registry_timeout():
 
     # Set the timeout explicitly so this unit test does not depend on the value of
     # MCP_REGISTRY_TIMEOUT configured in the developer's local .env file.
-    client = MCPRegistryClient(timeout=10, session=session)
+    client = MCPRegistryClient(session=session)
 
     with pytest.raises(MCPRegistryTimeoutError, match="within 10 seconds"):
         client.get_server("example/server")

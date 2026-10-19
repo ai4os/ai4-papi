@@ -1,10 +1,11 @@
-"""Client helpers for the official Model Context Protocol registry."""
+"""Client helpers for the official Model Context Protocol registry.
+
+https://registry.modelcontextprotocol.io
+"""
 
 from typing import Any, Literal, TypedDict
 
 import requests
-
-import ai4papi.conf as papiconf
 
 OFFICIAL_META_KEY = "io.modelcontextprotocol.registry/official"
 
@@ -46,12 +47,10 @@ class MCPRegistryClient:
 
     def __init__(
         self,
-        base_url: str | None = None,
-        timeout: float | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self.base_url = (base_url or papiconf.MCP_REGISTRY_URL).rstrip("/")
-        self.timeout = timeout or papiconf.MCP_REGISTRY_TIMEOUT
+        self.base_url = "https://registry.modelcontextprotocol.io"
+        self.timeout = 90
         self.session = session or requests.Session()
 
     def get_server(self, name: str) -> MCPServerInfo:

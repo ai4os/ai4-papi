@@ -1,15 +1,13 @@
 """
 Client for the LiteLLM management API.
 
-It avoids direct HTTP calls to LiteLLM from the MCP router, and provides a convenient
-interface for creating and managing remote MCP servers.
-
-TODO Update keys.py to use this client instead of direct HTTP calls to LiteLLM.
+It avoids direct HTTP calls to LiteLLM, and provides a convenient interface for creating
+and managing LiteLLM assets (MCPs, LLMs, agents).
 """
 
 import hashlib
 import re
-from typing import Any
+from typing import Any, Literal
 
 import requests
 
@@ -28,17 +26,12 @@ def build_litellm_mcp_server_name(registry_name: str, owner: str) -> str:
     return f"papi_{readable_name}_{digest}"
 
 
-def build_litellm_mcp_access_group_name(owner: str) -> str:
+def build_user_access_group_name(owner: str) -> str:
     """
-    Build the stable name of a user's single private MCP access group.
-
-    Each user has one private group that PAPI manages for them.
-    It is used to grant access to their own MCP servers.
-
+    Build the stable name of a user's single private access group.
+    It is used to grant access to their own MCPs/LLMs/agents.
     """
-
-    owner_digest = hashlib.sha256(owner.encode()).hexdigest()[:12]
-    return f"papi_user_mcp_{owner_digest}"
+    return f"user_{owner}"
 
 
 class LiteLLMClient:
@@ -46,7 +39,7 @@ class LiteLLMClient:
         self,
         base_url: str,
         api_key: str,
-        timeout: float,
+        timeout: float = 90,
         session: requests.Session | None = None,
     ) -> None:
 
@@ -60,6 +53,25 @@ class LiteLLMClient:
             }
         )
 
+    # ----------------------------------------------
+    # API keys
+    # ----------------------------------------------
+    def list_user_key_ids(self, user_id: str) -> list[str]:
+        """Return the stored LiteLLM identifiers of all keys owned by a user."""
+
+        response = self.session.get(
+            f"{self.base_url}/key/list",
+            params={"user_id": user_id, "return_full_object": "true"},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return [
+            key["token"] for key in response.json().get("keys", []) if key.get("token")
+        ]
+
+    # ----------------------------------------------
+    # MCP servers
+    # ----------------------------------------------
     def create_remote_mcp_server(
         self,
         *,
@@ -68,7 +80,7 @@ class LiteLLMClient:
         endpoint: dict[str, str],
     ) -> dict[str, Any]:
         """
-        Create a new remote MCP server (not deployed in Nomad).
+        Add a new remote MCP server (deployed externally, not in Nomad).
 
         Args:
             registry_server (dict[str, Any]): The registry server information.
@@ -119,136 +131,6 @@ class LiteLLMClient:
         """Return all MCP servers visible to PAPI's LiteLLM admin key."""
         response = self.session.get(
             f"{self.base_url}/v1/mcp/server",
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def list_user_mcp_key_ids(self, user_id: str) -> list[str]:
-        """Return the stored LiteLLM identifiers of all keys owned by a user."""
-
-        response = self.session.get(
-            f"{self.base_url}/key/list",
-            params={"user_id": user_id, "return_full_object": "true"},
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return [
-            key["token"] for key in response.json().get("keys", []) if key.get("token")
-        ]
-
-    def list_mcp_access_groups(self) -> list[dict[str, Any]]:
-        """
-        Return all unified access groups visible to PAPI's admin key.
-        Each user has its own private group.
-        All user MCPs are attached to that group.
-        """
-        response = self.session.get(
-            f"{self.base_url}/v1/access_group",
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def get_user_mcp_access_group(self, owner: str) -> dict[str, Any] | None:
-        """Find the single PAPI-managed MCP access group for a Keycloak user."""
-
-        expected_name = build_litellm_mcp_access_group_name(owner)
-        return next(
-            (
-                group
-                for group in self.list_mcp_access_groups()
-                if group.get("access_group_name") == expected_name
-            ),
-            None,
-        )
-
-    def add_mcp_server_to_user_access_group(
-        self,
-        *,
-        owner: str,
-        server_id: str,
-        key_ids: list[str],
-    ) -> dict[str, Any]:
-        """Create or update the user's one private group with another MCP."""
-
-        existing = self.get_user_mcp_access_group(owner)
-        if existing is not None:
-            server_ids = sorted(
-                {
-                    *(existing.get("access_mcp_server_ids") or []),
-                    server_id,
-                }
-            )
-            payload = {
-                "access_mcp_server_ids": server_ids,
-                # This list is the complete set of the owner's current keys. Using
-                # replacement semantics also removes assignments to deleted keys.
-                # Keys are needed in the request as user autenticates against the access group through their key,
-                # not through their user ID.
-                "assigned_key_ids": sorted(set(key_ids)),
-                "assigned_team_ids": [],
-            }
-            response = self.session.put(
-                f"{self.base_url}/v1/access_group/{existing['access_group_id']}",
-                json=payload,
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            return response.json()
-
-        # If user has no existing group, create a new one with the MCP and all their keys.
-        payload = {
-            "access_group_name": build_litellm_mcp_access_group_name(owner),
-            "description": "Private PAPI MCP access for one Keycloak user",
-            "access_mcp_server_ids": [server_id],
-            # The group is attached directly to all existing keys of its owner.
-            # It is never attached to a shared authorization team such as ``ap-d``.
-            "assigned_key_ids": sorted(set(key_ids)),
-            "assigned_team_ids": [],
-        }
-        response = self.session.post(
-            f"{self.base_url}/v1/access_group",
-            json=payload,
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def remove_mcp_server_from_user_access_group(
-        self,
-        *,
-        owner: str,
-        server_id: str,
-    ) -> dict[str, Any] | None:
-        """Remove one MCP from the user's group, keeping the group reusable."""
-
-        access_group = self.get_user_mcp_access_group(owner)
-        if access_group is None:
-            # Deletion is retryable: a previous request or manual cleanup may have
-            # already removed the group without deleting the MCP registration.
-            return None
-
-        remaining_server_ids = sorted(
-            set(access_group.get("access_mcp_server_ids") or []) - {server_id}
-        )
-
-        # Update users access group with the remaining server ids.
-        response = self.session.put(
-            f"{self.base_url}/v1/access_group/{access_group['access_group_id']}",
-            json={"access_mcp_server_ids": remaining_server_ids},
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def get_mcp_access_group(self, access_group_id: str) -> dict[str, Any]:
-        """
-        Get the details of an existing MCP access group by its ID.
-        """
-
-        response = self.session.get(
-            f"{self.base_url}/v1/access_group/{access_group_id}",
             timeout=self.timeout,
         )
         response.raise_for_status()
@@ -358,7 +240,7 @@ class LiteLLMClient:
 
         for access_group_id in access_group_ids:
             try:
-                access_group = self.get_mcp_access_group(access_group_id)
+                access_group = self.get_access_group(access_group_id)
             except requests.HTTPError as exc:
                 # A stale group reference must not prevent listing all other MCPs.
                 if exc.response is not None and exc.response.status_code == 404:
@@ -402,3 +284,240 @@ class LiteLLMClient:
             timeout=self.timeout,
         )
         response.raise_for_status()
+
+    # ----------------------------------------------
+    # Access groups
+    # ----------------------------------------------
+
+    def list_access_groups(self) -> list[dict[str, Any]]:
+        """
+        Return all unified access groups visible to PAPI's admin key.
+        Each user has its own private group.
+        All user MCPs are attached to that group.
+        """
+        response = self.session.get(
+            f"{self.base_url}/v1/access_group",
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_access_group(self, access_group_id: str) -> dict[str, Any]:
+        """
+        Get the details of an existing MCP access group by its ID.
+        """
+
+        response = self.session.get(
+            f"{self.base_url}/v1/access_group/{access_group_id}",
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_user_access_group(self, owner: str) -> dict[str, Any] | None:
+        """Find the single PAPI-managed access group for a Keycloak user."""
+
+        expected_name = build_user_access_group_name(owner)
+        return next(
+            (
+                group
+                for group in self.list_access_groups()
+                if group.get("access_group_name") == expected_name
+            ),
+            None,
+        )
+
+    def create_access_group(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        key_ids: list[str] | None = None,
+        team_ids: list[str] | None = None,
+        mcp_server_ids: list[str] | None = None,
+        model_names: list[str] | None = None,
+        agent_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create a new LiteLLM access group.
+        """
+        payload: dict[str, Any] = {
+            "access_group_name": name,
+            "assigned_key_ids": sorted(set(key_ids)) if key_ids else [],
+            "assigned_team_ids": sorted(set(team_ids)) if team_ids else [],
+        }
+        if description is not None:
+            payload["description"] = description
+        if mcp_server_ids is not None:
+            payload["access_mcp_server_ids"] = sorted(set(mcp_server_ids))
+        if model_names is not None:
+            payload["access_model_names"] = sorted(set(model_names))
+        if agent_ids is not None:
+            payload["access_agent_ids"] = sorted(set(agent_ids))
+
+        response = self.session.post(
+            f"{self.base_url}/v1/access_group",
+            json=payload,
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def create_user_access_group(
+        self,
+        *,
+        owner: str,
+        key_ids: list[str] | None = None,
+        description: str | None = "Private PAPI access for one Keycloak user",
+        mcp_server_ids: list[str] | None = None,
+        model_names: list[str] | None = None,
+        agent_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Create the single PAPI-managed private access group for a Keycloak user.
+        """
+        return self.create_access_group(
+            name=build_user_access_group_name(owner),
+            description=description,
+            key_ids=key_ids,
+            team_ids=[],
+            mcp_server_ids=mcp_server_ids,
+            model_names=model_names,
+            agent_ids=agent_ids,
+        )
+
+    def add_asset_to_user_access_group(
+        self,
+        *,
+        owner: str,
+        asset_type: Literal["mcp", "llm", "agent"],
+        asset_id: str,
+        key_ids: list[str],
+    ) -> dict[str, Any]:
+        """
+        Create or update the user's private access group with an asset (MCP, LLM, or agent).
+        """
+        existing = self.get_user_access_group(owner)
+
+        match asset_type:
+            case "mcp":
+                if existing is not None:
+                    server_ids = sorted(
+                        {
+                            *(existing.get("access_mcp_server_ids") or []),
+                            asset_id,
+                        }
+                    )
+                    payload = {
+                        "access_mcp_server_ids": server_ids,
+                        # This list is the complete set of the owner's current keys. Using
+                        # replacement semantics also removes assignments to deleted keys.
+                        # Keys are needed in the request as user autenticates against the access group through their key,
+                        # not through their user ID.
+                        "assigned_key_ids": sorted(set(key_ids)),
+                        "assigned_team_ids": [],
+                    }
+                    response = self.session.put(
+                        f"{self.base_url}/v1/access_group/{existing['access_group_id']}",
+                        json=payload,
+                        timeout=self.timeout,
+                    )
+                    response.raise_for_status()
+                    return response.json()
+
+                # If user has no existing group, create a new one with the MCP and all their keys.
+                return self.create_user_access_group(
+                    owner=owner,
+                    key_ids=key_ids,
+                    description="Private PAPI MCP access for one Keycloak user",
+                    mcp_server_ids=[asset_id],
+                )
+
+            case "llm":
+                # TODO: Implement logic for adding LLM assets (e.g. updating access_model_names)
+                raise NotImplementedError(
+                    "Adding LLM models to user access group is not yet implemented."
+                )
+
+            case "agent":
+                # TODO: Implement logic for adding agent assets (e.g. updating access_agent_ids)
+                raise NotImplementedError(
+                    "Adding agents to user access group is not yet implemented."
+                )
+
+            case _:
+                raise ValueError(f"Unknown asset type: {asset_type!r}")
+
+    def add_mcp_server_to_user_access_group(
+        self,
+        *,
+        owner: str,
+        server_id: str,
+        key_ids: list[str],
+    ) -> dict[str, Any]:
+        """Create or update the user's one private group with another MCP."""
+        return self.add_asset_to_user_access_group(
+            owner=owner,
+            asset_type="mcp",
+            asset_id=server_id,
+            key_ids=key_ids,
+        )
+
+    def remove_asset_from_user_access_group(
+        self,
+        *,
+        owner: str,
+        asset_type: Literal["mcp", "llm", "agent"],
+        asset_id: str,
+    ) -> dict[str, Any] | None:
+        """
+        Remove an asset (MCP, LLM, or agent) from the user's access group.
+        """
+        access_group = self.get_user_access_group(owner)
+        if access_group is None:
+            # Deletion is retryable: a previous request or manual cleanup may have
+            # already removed the group without deleting the asset registration.
+            return None
+
+        match asset_type:
+            case "mcp":
+                remaining_server_ids = sorted(
+                    set(access_group.get("access_mcp_server_ids") or []) - {asset_id}
+                )
+
+                # Update users access group with the remaining server ids.
+                response = self.session.put(
+                    f"{self.base_url}/v1/access_group/{access_group['access_group_id']}",
+                    json={"access_mcp_server_ids": remaining_server_ids},
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                return response.json()
+
+            case "llm":
+                # TODO: Implement logic for removing LLM assets (e.g. updating access_model_names)
+                raise NotImplementedError(
+                    "Removing LLM models from user access group is not yet implemented."
+                )
+
+            case "agent":
+                # TODO: Implement logic for removing agent assets (e.g. updating access_agent_ids)
+                raise NotImplementedError(
+                    "Removing agents from user access group is not yet implemented."
+                )
+
+            case _:
+                raise ValueError(f"Unknown asset type: {asset_type!r}")
+
+    def remove_mcp_server_from_user_access_group(
+        self,
+        *,
+        owner: str,
+        server_id: str,
+    ) -> dict[str, Any] | None:
+        """Remove one MCP from the user's group, keeping the group reusable."""
+        return self.remove_asset_from_user_access_group(
+            owner=owner,
+            asset_type="mcp",
+            asset_id=server_id,
+        )

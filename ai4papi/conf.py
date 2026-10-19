@@ -44,19 +44,10 @@ def load_env(varname: str):
 HARBOR_USER = "robot$user-snapshots+snapshot-api"
 HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 
-# External MCP and LiteLLM services.
-LITELLM_URL = load_env("LITELLM_URL")
+# LiteLLM configuration
+LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
 LITELLM_API_KEY = load_env("LITELLM_API_KEY")
-LITELLM_TIMEOUT = float(load_env("LITELLM_TIMEOUT") or 90)
-MCP_REGISTRY_URL = load_env("MCP_REGISTRY_URL")
-MCP_REGISTRY_TIMEOUT = float(load_env("MCP_REGISTRY_TIMEOUT") or 90)
-MCP_NOMAD_DEFAULT_VO = load_env("MCP_NOMAD_DEFAULT_VO") or "vo.ai4eosc.eu"
-MCP_NOMAD_STARTUP_TIMEOUT = float(load_env("MCP_NOMAD_STARTUP_TIMEOUT") or 180)
-MCP_NOMAD_POLL_INTERVAL = float(load_env("MCP_NOMAD_POLL_INTERVAL") or 2)
-MCP_NOMAD_NODE_IMAGE = load_env("MCP_NOMAD_NODE_IMAGE") or "node:22-alpine"
-MCP_NOMAD_SUPERGATEWAY_PACKAGE = (
-    load_env("MCP_NOMAD_SUPERGATEWAY_PACKAGE") or "supergateway@3.4.3"
-)
+MCP_NOMAD_DEFAULT_VO = "vo.ai4eosc.eu"
 
 # Paths
 main_path = Path(__file__).parent.absolute()

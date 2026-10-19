@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from ai4papi.clients.litellm import build_litellm_mcp_access_group_name
+from ai4papi.clients.litellm import build_user_access_group_name
 from ai4papi.routers.v1.llm import keys
 
 
@@ -21,12 +21,12 @@ def test_new_key_receives_the_users_single_mcp_access_group(monkeypatch):
     list_response.json.return_value = [
         {
             "access_group_id": "user-group",
-            "access_group_name": build_litellm_mcp_access_group_name("user-id"),
+            "access_group_name": build_user_access_group_name("user-id"),
             "access_mcp_server_ids": ["owned-1", "owned-2"],
         },
         {
             "access_group_id": "another-user-group",
-            "access_group_name": build_litellm_mcp_access_group_name("other-user"),
+            "access_group_name": build_user_access_group_name("other-user"),
             "access_mcp_server_ids": ["foreign"],
         },
     ]

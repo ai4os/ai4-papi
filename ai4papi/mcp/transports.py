@@ -3,7 +3,6 @@
 import base64
 from dataclasses import dataclass
 import hashlib
-import re
 import secrets
 import shlex
 from typing import Any
@@ -18,6 +17,7 @@ from ai4papi.mcp.packages import (
 
 STDIO_GATEWAY_PORT = 8000
 STDIO_GATEWAY_PATH = "/mcp"
+SUPERGATEWAY_PACKAGE = "supergateway@3.4.3"
 
 
 @dataclass(frozen=True)
@@ -58,29 +58,11 @@ def build_stdio_gateway_command(
     gateway_package: str,
 ) -> tuple[str, dict[str, str]]:
     """
-    Build a shell bootstrap that exposes one stdio package over HTTP.
+    Build a shell bootstrap that exposes a stdio package over HTTP, using Supergateway.
     """
-
-    # In order tu support STDIO, which i think is more common than Streamable HTTP
-    # or SSE (maybe not), we need to use a gateway package that will expose the stdio package over HTTP.
-
-    # For the moment i suggest using Supergateway.
-
     if (package.get("transport") or {}).get("type") != "stdio":
         raise MCPPackageNotDeployableError(
             "The selected npm package does not declare stdio transport."
-        )
-
-    # Gateway package comes from PAPI configuration. It is not currently exposed to the user, so value should be safe.
-    # However, validation does not hurt.
-
-    if not isinstance(gateway_package, str) or not re.fullmatch(
-        r"(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*"
-        r"@[0-9A-Za-z][0-9A-Za-z._+-]*",
-        gateway_package,
-    ):
-        raise MCPPackageNotDeployableError(
-            "MCP_NOMAD_SUPERGATEWAY_PACKAGE must contain a pinned valid npm package."
         )
 
     command_arguments, environment = build_npm_mcp_command(package)
@@ -101,7 +83,7 @@ def build_stdio_gateway_command(
             "--package-lock=false",
             "--no-audit",
             "--no-fund",
-            gateway_package,
+            SUPERGATEWAY_PACKAGE,
             package_reference,
         ]
     )

@@ -4,7 +4,7 @@ import requests
 
 from ai4papi.litellm_client import (
     LiteLLMClient,
-    build_litellm_mcp_access_group_name,
+    build_user_access_group_name,
     build_litellm_mcp_server_name,
 )
 
@@ -93,12 +93,12 @@ def test_create_remote_mcp_server_sends_owner_and_registry_metadata():
 def test_mcp_access_group_name_is_stable_per_owner():
     # Every operation for the same Keycloak user resolves one stable group name,
     # independently of how many MCP servers that user creates or removes.
-    first = build_litellm_mcp_access_group_name("user-1")
-    second = build_litellm_mcp_access_group_name("user-1")
+    first = build_user_access_group_name("user-1")
+    second = build_user_access_group_name("user-1")
 
     # Another user receives another group, preventing private MCP sets from being
     # mixed even when both users register the same Registry entry.
-    another_user = build_litellm_mcp_access_group_name("user-2")
+    another_user = build_user_access_group_name("user-2")
 
     # The prefix makes explicit that this is a PAPI-managed MCP access group.
     assert first == second
@@ -129,7 +129,7 @@ def test_list_user_mcp_key_ids_returns_only_valid_key_identifiers():
     )
 
     # Only the two valid keys are candidates for the private MCP access group.
-    assert client.list_user_mcp_key_ids("user-id") == [
+    assert client.list_user_key_ids("user-id") == [
         "hashed-key-1",
         "hashed-key-2",
     ]
@@ -190,7 +190,7 @@ def test_add_another_mcp_updates_existing_user_access_group():
     list_response.json.return_value = [
         {
             "access_group_id": "group-id",
-            "access_group_name": build_litellm_mcp_access_group_name("user-id"),
+            "access_group_name": build_user_access_group_name("user-id"),
             "access_mcp_server_ids": ["server-1"],
         }
     ]
@@ -235,7 +235,7 @@ def test_remove_mcp_keeps_user_access_group_and_other_servers():
     list_response.json.return_value = [
         {
             "access_group_id": "group-id",
-            "access_group_name": build_litellm_mcp_access_group_name("user-id"),
+            "access_group_name": build_user_access_group_name("user-id"),
             "access_mcp_server_ids": ["server-1", "server-2"],
         }
     ]

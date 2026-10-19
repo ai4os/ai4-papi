@@ -66,7 +66,6 @@ def get_litellm_client() -> LiteLLMClient:
     return LiteLLMClient(
         base_url=papiconf.LITELLM_URL,
         api_key=papiconf.LITELLM_API_KEY,
-        timeout=papiconf.LITELLM_TIMEOUT,
     )
 
 
@@ -304,7 +303,7 @@ def create_mcp(
 
         # All of this user's MCPs share one stable private access group. Existing
         # keys point to that group; the shared authorization team is never changed.
-        key_ids = litellm.list_user_mcp_key_ids(auth_info["id"])
+        key_ids = litellm.list_user_key_ids(auth_info["id"])
         access_group = litellm.add_mcp_server_to_user_access_group(
             owner=auth_info["id"],
             server_id=server_id,

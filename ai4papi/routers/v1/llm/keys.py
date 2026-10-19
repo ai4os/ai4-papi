@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import auth
-from ai4papi.clients.litellm import build_litellm_mcp_access_group_name
+from ai4papi.clients.litellm import build_user_access_group_name
 import ai4papi.conf as papiconf
 
 
@@ -148,14 +148,12 @@ def create_api_key(
     current_levels = list(auth_info["groups"].keys())
     team_id = auth.get_highest_level(current_levels)
 
-    # Every user has at most one PAPI-managed MCP access group. A key created
-    # after the user's first MCP points to that same stable group, so future MCPs
-    # become available by updating the group rather than updating every key.
-
-    # Because of this, we need to add the user's private MCP access group to the key's
-    # access groups.
+    # Every user has a private access group that gathers their private assets (mcps,
+    # llms, agents), whether the assets are self-deployed in Nomad or integrated
+    # externally. Because of this, we need to add the user's private access group to
+    # each key's access groups.
     r = session.get(f"{LITELLM_URL}/v1/access_group")
-    expected_group_name = build_litellm_mcp_access_group_name(user_id)
+    expected_group_name = build_user_access_group_name(user_id)
     access_group = next(
         (
             group
@@ -168,9 +166,6 @@ def create_api_key(
         [access_group["access_group_id"]] if access_group is not None else []
     )
 
-    # The key still belongs to the user's highest authorization-level team (for
-    # example ``ap-d``). The one ``access_group_ids`` entry is a separate,
-    # user-specific grant and never broadens the permissions of that shared team.
     data = {
         "user_id": user_id,
         "key_alias": f"{user_id}_{key_name}",
