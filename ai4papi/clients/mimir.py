@@ -7,9 +7,9 @@ API reference: https://prometheus.io/docs/prometheus/latest/querying/api/
 
 import datetime
 import os
+import time
 
 import requests
-
 
 MIMIR_URL = "https://mimir.k8s.cloud.ai4eosc.eu/prometheus"
 # Optional: the energy-accounting feature is disabled if these are not set.
@@ -20,8 +20,17 @@ if not (MIMIR_USER and MIMIR_PASSWORD):
 
 # Mimir keeps each series under a point cap per query; stay well below it.
 MAX_POINTS_PER_QUERY = 11_000
+# Measured against the real Mimir: a 24h range query takes under 1 s and a full
+# 11,000-point chunk about 1.5 s, so these leave a wide margin while a hung Mimir
+# does not hold a request or the sweep thread for a minute.
 
 session = requests.Session()
+
+# After a timeout or connection error Mimir is not asked again for this long (the
+# calls fail fast with `MimirError`), so a hung Mimir costs one timeout per minute
+# instead of one per query.
+BACKOFF_SECONDS = 60
+_down_until = 0.0
 
 
 class MimirError(RuntimeError):
@@ -32,7 +41,26 @@ def _auth():
     return (MIMIR_USER, MIMIR_PASSWORD) if MIMIR_USER else None
 
 
-def query(promql: str, at: datetime.datetime | None = None, timeout: int = 30):
+def _get(path: str, params: dict, timeout: int) -> list:
+    """GET a Prometheus API route and return `data.result`."""
+    global _down_until
+    if time.monotonic() < _down_until:
+        raise MimirError("Mimir unreachable, retrying shortly")
+    try:
+        r = session.get(
+            f"{MIMIR_URL}{path}", params=params, auth=_auth(), timeout=timeout
+        )
+    except (requests.ConnectionError, requests.Timeout):
+        _down_until = time.monotonic() + BACKOFF_SECONDS
+        raise
+    r.raise_for_status()
+    body = r.json()
+    if body.get("status") != "success":
+        raise MimirError(f"Mimir query failed: {body}")
+    return body.get("data", {}).get("result", [])
+
+
+def query(promql: str, at: datetime.datetime | None = None, timeout: int = 10):
     """
     Instantaneous query (`/api/v1/query`). Returns the raw `data.result` list
     (vector: one entry per series, each with `metric` and `value` = [ts, str]).
@@ -40,18 +68,7 @@ def query(promql: str, at: datetime.datetime | None = None, timeout: int = 30):
     params = {"query": promql}
     if at is not None:
         params["time"] = at.timestamp()
-
-    r = session.get(
-        f"{MIMIR_URL}/api/v1/query",
-        params=params,
-        auth=_auth(),
-        timeout=timeout,
-    )
-    r.raise_for_status()
-    body = r.json()
-    if body.get("status") != "success":
-        raise MimirError(f"Mimir query failed: {body}")
-    return body.get("data", {}).get("result", [])
+    return _get("/api/v1/query", params, timeout)
 
 
 def query_range(
@@ -59,29 +76,20 @@ def query_range(
     start: datetime.datetime,
     end: datetime.datetime,
     step_s: int = 30,
-    timeout: int = 60,
+    timeout: int = 15,
 ):
     """
     Range query (`/api/v1/query_range`). Returns the raw `data.result` list
     (matrix: one entry per series, each with `metric` and `values` =
     [[ts, str], ...]).
     """
-    r = session.get(
-        f"{MIMIR_URL}/api/v1/query_range",
-        params={
-            "query": promql,
-            "start": start.timestamp(),
-            "end": end.timestamp(),
-            "step": f"{step_s}s",
-        },
-        auth=_auth(),
-        timeout=timeout,
-    )
-    r.raise_for_status()
-    body = r.json()
-    if body.get("status") != "success":
-        raise MimirError(f"Mimir query failed: {body}")
-    return body.get("data", {}).get("result", [])
+    params = {
+        "query": promql,
+        "start": start.timestamp(),
+        "end": end.timestamp(),
+        "step": f"{step_s}s",
+    }
+    return _get("/api/v1/query_range", params, timeout)
 
 
 def _split_chunks(start, end, step_s, max_points):
