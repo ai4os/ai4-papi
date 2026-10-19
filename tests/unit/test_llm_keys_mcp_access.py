@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from ai4papi.litellm_client import build_litellm_mcp_access_group_name
+from ai4papi.clients.litellm import build_litellm_mcp_access_group_name
 from ai4papi.routers.v1.llm import keys
 
 
