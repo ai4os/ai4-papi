@@ -65,7 +65,7 @@ ai4papi/mcp/
 
 The HTTP router is implemented in `ai4papi/routers/v1/llm/mcp.py`. Shared
 operations against the LiteLLM management API are encapsulated in
-`ai4papi/litellm_client.py`.
+`ai4papi/clients/litellm.py`.
 
 The resources injected into jobs are located under `etc/mcp/`:
 

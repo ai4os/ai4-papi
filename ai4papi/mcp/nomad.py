@@ -7,7 +7,7 @@ import uuid
 from nomad.api import exceptions as nomad_exceptions
 
 import ai4papi.conf as papiconf
-from ai4papi.litellm_client import (
+from ai4papi.clients.litellm import (
     build_litellm_mcp_access_group_name,
     build_litellm_mcp_server_name,
 )

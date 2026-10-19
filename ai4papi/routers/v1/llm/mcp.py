@@ -9,7 +9,7 @@ import requests
 
 from ai4papi import auth, quotas, utils
 import ai4papi.conf as papiconf
-from ai4papi.litellm_client import LiteLLMClient
+from ai4papi.clients.litellm import LiteLLMClient
 from ai4papi.mcp.nomad import (
     MCPNomadClient,
     MCPNomadDeploymentNotFoundError,

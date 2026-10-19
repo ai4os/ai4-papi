@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import auth
-from ai4papi.litellm_client import build_litellm_mcp_access_group_name
+from ai4papi.clients.litellm import build_litellm_mcp_access_group_name
 import ai4papi.conf as papiconf
 
 
