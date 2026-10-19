@@ -4,20 +4,19 @@ Return stats from the user/VO/cluster
 
 import copy
 import csv
+import os
 import time
 from datetime import datetime, timedelta
-import os
 from pathlib import Path
 
-from cachetools import cached, TTLCache
+from cachetools import TTLCache, cached
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, schemas
-from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
+from ai4papi import auth, schemas
 from ai4papi.nomad_utils import Nomad
-
+from ai4papi.wattnet import green_director
 
 router = APIRouter(
     prefix="/stats",
