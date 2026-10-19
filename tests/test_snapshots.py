@@ -2,10 +2,10 @@ import asyncio
 import time
 from types import SimpleNamespace
 
-from ai4papi.routers.v1 import snapshots
-from ai4papi.routers.v1.deployments import modules
 from conf import token
 
+from ai4papi.routers.v1 import snapshots
+from ai4papi.routers.v1.deployments import modules
 
 # Create Nomad deployment
 njob = asyncio.run(
