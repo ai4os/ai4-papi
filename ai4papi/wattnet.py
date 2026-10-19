@@ -5,6 +5,7 @@ API reference: https://api.wattnet.eu/v1/docs
 
 import datetime
 import json
+import logging
 import os
 import statistics
 import warnings
@@ -16,9 +17,13 @@ from cachetools import TTLCache, cached
 import ai4papi.conf as papiconf
 from ai4papi import utils
 
+LOG = logging.getLogger(__name__)
+
 session = requests.Session()
 
 WATTNET_URL = "https://api.wattnet.eu"
+TIMEOUT = 30  # seconds; without it a stalled Wattnet would block the background threads
+FAILURE_BACKOFF = 5 * 60  # seconds a failing datacenter is not asked again
 WATTNET_EMAIL = os.environ.get("WATTNET_EMAIL")
 if not WATTNET_EMAIL:
     print("You should define a WATTNET_EMAIL")
@@ -66,6 +71,8 @@ class GreenDirector:
         # Init vars
         self.algorithm_name = algorithm
         self.metrics = {}
+        self._backoff = TTLCache(maxsize=1024, ttl=FAILURE_BACKOFF)
+        self._failing = set()  # datacenters whose last refresh failed (log on change)
 
     @cached(cache=TTLCache(maxsize=1024, ttl=20 * 60 * 60))
     def _retrieve_token(self):
@@ -75,7 +82,9 @@ class GreenDirector:
         url = f"{WATTNET_URL}/token-request/get_token"
         headers = {"Content-Type": "application/json"}
         data = {"email": WATTNET_EMAIL, "password": WATTNET_PASS}
-        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response = requests.post(
+            url, headers=headers, data=json.dumps(data), timeout=TIMEOUT
+        )
         response.raise_for_status()
         return response.json()["access_token"]
 
@@ -98,20 +107,30 @@ class GreenDirector:
         token = self._retrieve_token()
         headers = {"Authorization": f"Bearer {token}"}
 
-        r1 = session.get(f"{WATTNET_URL}/v1/footprints", headers=headers, params=params)
-        r2 = session.get(
-            f"{WATTNET_URL}/v1/environmental-score", headers=headers, params=params
+        r1 = session.get(
+            f"{WATTNET_URL}/v1/footprints",
+            headers=headers,
+            params=params,
+            timeout=TIMEOUT,
         )
+        r2 = session.get(
+            f"{WATTNET_URL}/v1/environmental-score",
+            headers=headers,
+            params=params,
+            timeout=TIMEOUT,
+        )
+        # Raise instead of returning [] so a failure is not cached for 15 min
+        # (cachetools only caches return values); the caller falls back to DEFAULTS
         if not (r1.ok and r2.ok):
-            warnings.warn(
-                f"[wattnet] Failed to retrieve Wattnet data for coordinates ({lat}, {lon})"
+            raise RuntimeError(
+                f"Wattnet request failed for coordinates ({lat}, {lon}): "
+                f"{r1.status_code}, {r2.status_code}"
             )
-            return []
 
         footprints = r1.json()
         score = r2.json()
         if (not footprints) or (not score):
-            raise Exception("Error retrieving information from Wattnet.")
+            raise RuntimeError(f"Empty Wattnet data for coordinates ({lat}, {lon})")
         score[0].update({"footprint_type": "environmental-score"})
 
         return footprints + score
@@ -140,7 +159,12 @@ class GreenDirector:
             "aggregate": "false",
         }
         headers = {"Authorization": f"Bearer {self._retrieve_token()}"}
-        r = session.get(f"{WATTNET_URL}/v1/footprints", headers=headers, params=params)
+        r = session.get(
+            f"{WATTNET_URL}/v1/footprints",
+            headers=headers,
+            params=params,
+            timeout=TIMEOUT,
+        )
         if not r.ok:
             warnings.warn(
                 f"[wattnet] Failed to retrieve footprint series for {datacenter}"
@@ -169,7 +193,30 @@ class GreenDirector:
         start = end - datetime.timedelta(days=7)
 
         for k, v in datacenters.items():
-            data = self._fetch_footprint_data(v["lat"], v["lon"])
+            if k in self._backoff:
+                continue  # failed a moment ago: do not wait on a down Wattnet again
+            try:
+                data = self._fetch_footprint_data(v["lat"], v["lon"])
+            except Exception as e:
+                self._backoff[k] = True
+                if k not in self._failing:
+                    self._failing.add(k)
+                    kept = self.metrics.get(k, {}).get("carbon")
+                    LOG.warning(
+                        "Wattnet refresh failed for %s (%s); %s",
+                        k,
+                        e,
+                        f"keeping data up to {kept[-1][0]}"
+                        if kept
+                        else "using default values",
+                    )
+                if k in self.metrics:
+                    continue  # keep the last good data rather than overwrite it
+                data = []  # never had data: fall back to DEFAULTS
+            else:
+                if k in self._failing:
+                    self._failing.discard(k)
+                    LOG.info("Wattnet refresh recovered for %s", k)
 
             # For each footprint type, we concatenate all timeseries, irrespectively of
             # whether they are [valid=True] (meaning their values are final) or
