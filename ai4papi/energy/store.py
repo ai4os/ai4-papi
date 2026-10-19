@@ -11,6 +11,7 @@ it can be swapped for a database later.
 
 import json
 import os
+import re
 import threading
 import time
 from pathlib import Path
@@ -24,19 +25,28 @@ def base_dir() -> Path | None:
     return Path(root) / "energy"
 
 
+# A namespace or deployment id is used as a file name: only a plain name is allowed
+# (no separators, no leading dot), so an id can never point outside the store.
+_SAFE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]*")
+
+
+def _name(value: str) -> str | None:
+    return os.path.basename(value) if _SAFE_NAME.fullmatch(value) else None
+
+
 def _ns_dir(ns: str) -> Path | None:
-    base = base_dir()
-    return (base / ns) if base else None
+    base, name = base_dir(), _name(ns)
+    return (base / name) if base and name else None
 
 
 def _accum_path(ns: str, uuid: str) -> Path | None:
-    d = _ns_dir(ns)
-    return (d / f"{uuid}.accum.json") if d else None
+    d, name = _ns_dir(ns), _name(uuid)
+    return (d / f"{name}.accum.json") if d and name else None
 
 
 def _series_path(ns: str, uuid: str) -> Path | None:
-    d = _ns_dir(ns)
-    return (d / f"{uuid}.series.jsonl") if d else None
+    d, name = _ns_dir(ns), _name(uuid)
+    return (d / f"{name}.series.jsonl") if d and name else None
 
 
 def _atomic_write(path: Path, text: str) -> None:

@@ -1145,3 +1145,27 @@ def test_sweep_stops_the_pass_when_mimir_is_down(monkeypatch):
     assert len(calls) == 1
     assert fetched == uuids[:2]
     assert all(store.read_accum(_NS, u) is None for u in uuids)
+
+
+def test_store_ignores_ids_that_are_not_plain_names(tmp_path):
+    # an id used as a file name can never point outside the store
+    for bad in ("../evil", "a/b", "..", ".hidden", "", "x\n", "/etc/passwd"):
+        store.write_accum(_NS, bad, {"owner": "u@egi.eu"})
+        store.append_series(_NS, bad, [{"ts": "2026-01-01T00:00:00Z"}])
+        assert store.read_accum(_NS, bad) is None
+        assert store.read_series(_NS, bad, None, None) == []
+    store.write_accum("../escape", "ok", {"owner": "u@egi.eu"})
+    assert store.read_accum("../escape", "ok") is None
+    assert [p for p in tmp_path.rglob("*") if p.is_file()] == []
+    assert not (tmp_path.parent / "evil.accum.json").exists()
+
+    # real ids still work
+    for name in (
+        "sweep-test-uuid",
+        "ifca-ai4eosc",
+        "a1b2c3d4-0000-1111-2222-333344445555",
+    ):
+        store.write_accum(_NS, name, {"owner": "u@egi.eu"})
+        assert store.read_accum(_NS, name) == {"owner": "u@egi.eu"}
+    store.write_accum(config.CLUSTER_NS, "ifca-ai4eosc", {"owner": None})
+    assert store.read_accum(config.CLUSTER_NS, "ifca-ai4eosc") is not None
