@@ -52,7 +52,9 @@ def _series_path(ns: str, uuid: str) -> Path | None:
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
+    tmp.write_text(
+        text, encoding="utf-8"
+    )  # NOSONAR: path built from names checked by _name
     os.replace(tmp, path)
 
 
