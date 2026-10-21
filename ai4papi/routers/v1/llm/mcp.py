@@ -48,7 +48,7 @@ class MCPCreateRequest(BaseModel):
             "VO used for a self-deployed MCP. Remote MCPs ignore this field; "
             "deployable MCPs use MCP_NOMAD_DEFAULT_VO when it is omitted."
         ),
-    )
+    )  # TODO: either we fix vo or we let choose. But not both because we won't know where to look mcp to list them
     conf: dict | None = Field(
         default=None,
         description=(
@@ -73,18 +73,6 @@ def get_mcp_nomad_client() -> MCPNomadClient:
     return MCPNomadClient()
 
 
-def _authorized_mcp_namespaces(auth_info: dict) -> list[str]:
-    """Return Nomad namespaces belonging to the user's Keycloak VOs."""
-
-    user_vos = {
-        vo
-        for vos in auth_info.get("groups", {}).values()
-        for vo in vos
-        if vo in papiconf.MAIN_CONF["nomad"]["namespaces"]
-    }
-    return [papiconf.MAIN_CONF["nomad"]["namespaces"][vo] for vo in user_vos]
-
-
 def _redact_mcp_registration(server: dict) -> dict:
     """Remove upstream credentials from LiteLLM admin responses."""
 
@@ -97,68 +85,6 @@ def _redact_mcp_registration(server: dict) -> dict:
     return registration
 
 
-def _format_mcp_list(
-    servers: list[dict],
-    deployments_by_id: dict[str, dict],
-) -> list[dict]:
-    """
-    Attach Nomad state only to self-deployed LiteLLM registrations.
-    It takes the list of LiteLLM visible mcp servers and the dict of Nomad deployments keyed by job_id:
-    """
-
-    result = []
-
-    for server in servers:
-        mcp_info = server.get("mcp_info") or {}
-        if not isinstance(mcp_info, dict):
-            mcp_info = {}
-        job_id = mcp_info.get("nomad_job_id")
-        deployment = deployments_by_id.get(job_id)
-
-        result.append(
-            {
-                "name": mcp_info.get("registry_name") or server.get("server_name"),
-                "version": mcp_info.get("registry_version"),
-                "deployment_type": mcp_info.get("deployment_type") or "remote",
-                "endpoint": {
-                    "transport": server.get("transport"),
-                    "url": server.get("url"),
-                },
-                "registration": _redact_mcp_registration(server),
-                "deployment": deployment,
-            }
-        )
-
-    return result
-
-
-def _rollback_mcp_creation(
-    *,
-    litellm: LiteLLMClient,
-    owner: str,
-    access_was_granted: bool,
-    server_id: str | None,
-) -> None:
-    """Best-effort compensation for a partial remote MCP registration."""
-
-    # Undo mutations in reverse order: permission -> server. Only
-    # this server is removed; the user's stable group and their other MCPs remain.
-    if access_was_granted and server_id is not None:
-        try:
-            litellm.remove_mcp_server_from_user_access_group(
-                owner=owner,
-                server_id=server_id,
-            )
-        except requests.RequestException:
-            pass
-
-    if server_id is not None:
-        try:
-            litellm.delete_mcp_server(server_id)
-        except requests.RequestException:
-            pass
-
-
 @router.get("")
 def list_mcps(
     authorization=Depends(security),
@@ -169,6 +95,7 @@ def list_mcps(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info)
 
+    # Retrieve Nomad information
     try:
         servers = litellm.list_user_accessible_mcp_servers(auth_info["id"])
         deployments_by_id = {}
@@ -204,12 +131,33 @@ def list_mcps(
         status_code = exc.response.status_code if exc.response is not None else 502
         detail = exc.response.text if exc.response is not None else str(exc)
         raise HTTPException(status_code=status_code, detail=detail) from exc
-    except (requests.RequestException, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except MCPNomadError as exc:
+    except (requests.RequestException, ValueError, MCPNomadError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return _format_mcp_list(servers, deployments_by_id)
+    # Attach Nomad state only to self-deployed LiteLLM registrations.
+    result = []
+    for server in servers:
+        mcp_info = server.get("mcp_info") or {}
+        if not isinstance(mcp_info, dict):
+            mcp_info = {}
+        job_id = mcp_info.get("nomad_job_id")
+        deployment = deployments_by_id.get(job_id)
+
+        result.append(
+            {
+                "name": mcp_info.get("registry_name") or server.get("server_name"),
+                "version": mcp_info.get("registry_version"),
+                "deployment_type": mcp_info.get("deployment_type") or "remote",
+                "endpoint": {
+                    "transport": server.get("transport"),
+                    "url": server.get("url"),
+                },
+                "registration": _redact_mcp_registration(server),
+                "deployment": deployment,
+            }
+        )
+
+    return result
 
 
 @router.post("", status_code=201)
@@ -304,9 +252,10 @@ def create_mcp(
         # All of this user's MCPs share one stable private access group. Existing
         # keys point to that group; the shared authorization team is never changed.
         key_ids = litellm.list_user_key_ids(auth_info["id"])
-        access_group = litellm.add_mcp_server_to_user_access_group(
+        access_group = litellm.add_asset_to_user_access_group(
             owner=auth_info["id"],
-            server_id=server_id,
+            asset_type="mcp",
+            asset_id=server_id,
             key_ids=key_ids,
         )
         access_was_granted = True
@@ -322,14 +271,21 @@ def create_mcp(
         registration = litellm.update_mcp_server_metadata(server_id, mcp_info)
 
     except Exception as exc:
-        # Remote creation spans Registry, LiteLLM and its access group. Compensate
-        # every completed mutation so a later retry starts from a clean state.
-        _rollback_mcp_creation(
-            litellm=litellm,
-            owner=auth_info["id"],
-            access_was_granted=access_was_granted,
-            server_id=server_id,
-        )
+        # Rollback MCP creation to avoid having dangling resources
+        if server_id is not None:
+            try:
+                litellm.delete_mcp_server(server_id)
+            except requests.RequestException:
+                pass
+            if access_was_granted:
+                try:
+                    litellm.remove_asset_from_user_access_group(
+                        owner=auth_info["id"],
+                        asset_type="mcp",
+                        asset_id=server_id,
+                    )
+                except requests.RequestException:
+                    pass
 
         # Convert errors from each backend into the same HTTP semantics used by
         # the existing remote MCP flow, after cleanup has been attempted.
@@ -402,11 +358,6 @@ def delete_mcp(
                     status_code=502,
                     detail="The self-deployed MCP has incomplete Nomad metadata.",
                 )
-            if namespace not in _authorized_mcp_namespaces(auth_info):
-                raise HTTPException(
-                    status_code=403,
-                    detail="The MCP deployment is outside your authorized namespaces.",
-                )
             nomad.delete_mcp_deployment(
                 job_id=job_id,
                 namespace=namespace,
@@ -417,8 +368,10 @@ def delete_mcp(
         # Always complete LiteLLM cleanup synchronously. The job's poststop task is
         # only a fallback for jobs removed directly through Nomad; its operations
         # are idempotent if it races with this request.
-        litellm.remove_mcp_server_from_user_access_group(
-            owner=auth_info["id"], server_id=server_id
+        litellm.remove_asset_from_user_access_group(
+            owner=auth_info["id"],
+            asset_type="mcp",
+            asset_id=server_id,
         )
         litellm.delete_mcp_server(server_id)
 

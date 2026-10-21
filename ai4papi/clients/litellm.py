@@ -42,7 +42,6 @@ class LiteLLMClient:
         timeout: float = 90,
         session: requests.Session | None = None,
     ) -> None:
-
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = session or requests.Session()
@@ -68,6 +67,168 @@ class LiteLLMClient:
         return [
             key["token"] for key in response.json().get("keys", []) if key.get("token")
         ]
+
+    # ----------------------------------------------
+    # User-specific info
+    # ----------------------------------------------
+
+    def list_user_accessible_assets(
+        self,
+        user_id: str,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve the assets (llms, mcps, agents) the user has access to.
+        Access is granted either via:
+        * teams (e.g. public access group attached to ap-b team)
+        * keys (e.g. user private access group attached to user's keys)
+        """
+        # The admin key PAPI uses sees every asset, so collect the user's key- and
+        # team-level entitlements before filtering that complete list.
+
+        # Get the user's team memberships and their object permissions.
+        user_response = self.session.get(
+            f"{self.base_url}/user/info",
+            params={"user_id": user_id},
+            timeout=self.timeout,
+        )
+        # A user can own an asset before creating a LiteLLM key. In that case there
+        # is no LiteLLM user row yet, so treat 404 as "no team memberships" and
+        # continue: owned and public assets can still be listed without creating data.
+        if user_response.status_code == 404:
+            user = {"teams": []}
+        else:
+            user_response.raise_for_status()
+            user = user_response.json()
+
+        # Get the user's keys. For a user not present in LiteLLM this is normally
+        # empty, but querying it keeps the same permission flow for every user.
+        keys_response = self.session.get(
+            f"{self.base_url}/key/list",
+            params={"user_id": user_id, "return_full_object": "true"},
+            timeout=self.timeout,
+        )
+        keys_response.raise_for_status()
+        keys = keys_response.json().get("keys", [])
+
+        # Case 1: a key can belong to a team even if the user information does not
+        # include that membership. Collect the team attached to every user key.
+        team_ids = {key.get("team_id") for key in keys if key.get("team_id")}
+
+        # Case 2: the user may belong to a team such as "researchers" even when
+        # none of their current keys uses that team. Include explicit memberships.
+        team_ids.update(
+            team.get("team_id") for team in user.get("teams", []) if team.get("team_id")
+        )
+
+        # Keys and teams can both carry permission data, so keep them in one list
+        # and process all possible visibility sources below.
+        permission_records = list(keys)
+        for team_id in team_ids:
+            # Fetching each team lets us discover grants inherited through team
+            # membership, for example access to the Access group "research".
+            team_response = self.session.get(
+                f"{self.base_url}/team/info",
+                params={"team_id": team_id},
+                timeout=self.timeout,
+            )
+            team_response.raise_for_status()
+            permission_records.append(team_response.json())
+
+        # LiteLLM permissions can grant access to an asset:
+        # 1. directly
+        # 2. via an asset groups (e.g. LLM group "demo models")
+        # 3. via an access group (e.g. "user-..." access group, "public" access group)
+        allowed_assets = {"models": set(), "mcp_servers": set(), "agents": set()}
+        allowed_asset_groups: set[str] = {
+            "models": set(),
+            "mcp_servers": set(),
+            "agents": set(),
+        }
+        access_group_ids: set[str] = set()
+        for record in permission_records:
+            # Unified access-group case: when PAPI creates a private MCP it adds
+            # the new group's ID directly to each existing key of its owner. The
+            # group, rather than the shared team, names the permitted MCP server.
+            access_group_ids.update(record.get("access_group_ids") or [])
+
+            object_permission = record.get("object_permission") or {}
+            # Externally managed records may contain null or another invalid
+            # representation. Ignore them instead of treating them as permissions.
+            if not isinstance(object_permission, dict):
+                continue
+
+            # Direct-grant case: a key or team explicitly names an MCP server ID,
+            # for example mcp_servers=["server-1"].
+            allowed_assets["models"].update(object_permission.get("models") or [])
+            allowed_assets["mcp_servers"].update(
+                object_permission.get("mcp_servers") or []
+            )
+            allowed_assets["agents"].update(object_permission.get("mcp_servers") or [])
+
+            # Group-grant case: a key or team grants a group such as "research";
+            # every MCP server assigned to that group becomes a candidate.
+            # (!): For some reason, object permissions does not have a "models_access_group"
+            allowed_asset_groups["mcp_servers"].update(
+                object_permission.get("mcp_access_groups") or []
+            )
+            allowed_asset_groups["agents"].update(
+                object_permission.get("agent_access_groups") or []
+            )
+
+        for access_group_id in access_group_ids:
+            try:
+                access_group = self.get_access_group(access_group_id)
+            except requests.HTTPError as exc:
+                # A stale group reference must not prevent listing all other MCPs.
+                if exc.response is not None and exc.response.status_code == 404:
+                    continue
+                raise
+            allowed_assets["models"].update(
+                access_group.get("access_model_names") or []
+            )
+            allowed_assets["mcp_servers"].update(
+                access_group.get("access_mcp_server_ids") or []
+            )
+            allowed_assets["agents"].update(access_group.get("access_agent_ids") or [])
+
+        return allowed_assets, allowed_asset_groups
+
+    def list_user_accessible_mcp_servers(
+        self,
+        user_id: str,
+    ) -> list[dict[str, Any]]:
+        """Return MCP servers available to a user through all supported grants."""
+        allowed_assets, allowed_asset_groups = self.list_user_accessible_assets(user_id)
+        servers = self.list_mcp_servers()
+        accessible_servers = []
+        for server in servers:
+            mcp_info = server.get("mcp_info") or {}
+            owner = mcp_info.get("owner") if isinstance(mcp_info, dict) else None
+            server_groups = set(server.get("mcp_access_groups") or [])
+
+            # Visibility case 1 — owned MCP: the user registered this server through
+            # PAPI, so mcp_info["owner"] contains their Keycloak subject ID.
+            is_owned = owner == user_id
+
+            # Visibility case 2 — public MCP: LiteLLM explicitly makes the server
+            # available to every key with allow_all_keys=true.
+            is_public = server.get("allow_all_keys") is True
+
+            # Visibility case 3 — direct permission: at least one user key or team
+            # explicitly contains this server_id in object_permission.mcp_servers.
+            has_direct_access = server.get("server_id") in allowed_assets["mcp_servers"]
+
+            # Visibility case 4 — group permission: the user belongs, through a key
+            # or team, to a group also assigned to this MCP. For example, both sides
+            # contain "research", so their set intersection is not empty.
+            # This groups are not managed by PAPI, but MCPs on that group are still visible to the user.
+            has_group_access = bool(server_groups & allowed_asset_groups["mcp_servers"])
+
+            # A server is listed when at least one independent visibility case holds.
+            if is_owned or is_public or has_direct_access or has_group_access:
+                accessible_servers.append(server)
+
+        return accessible_servers
 
     # ----------------------------------------------
     # MCP servers
@@ -150,133 +311,6 @@ class LiteLLMClient:
         )
         response.raise_for_status()
         return response.json()
-
-    def list_user_accessible_mcp_servers(
-        self,
-        user_id: str,
-    ) -> list[dict[str, Any]]:
-        """Return MCP servers available to a user through all supported grants."""
-        servers = self.list_mcp_servers()
-
-        # The admin key sees every MCP, so collect the user's key- and team-level
-        # entitlements before filtering that complete list.
-
-        # Get the user's team memberships and their object permissions.
-        user_response = self.session.get(
-            f"{self.base_url}/user/info",
-            params={"user_id": user_id},
-            timeout=self.timeout,
-        )
-        # A user can own an MCP before creating a LiteLLM key. In that case there
-        # is no LiteLLM user row yet, so treat 404 as "no team memberships" and
-        # continue: owned and public MCPs can still be listed without creating data.
-        if user_response.status_code == 404:
-            user = {"teams": []}
-        else:
-            user_response.raise_for_status()
-            user = user_response.json()
-
-        # Get the user's keys. For a user not present in LiteLLM this is normally
-        # empty, but querying it keeps the same permission flow for every user.
-        keys_response = self.session.get(
-            f"{self.base_url}/key/list",
-            params={"user_id": user_id, "return_full_object": "true"},
-            timeout=self.timeout,
-        )
-        keys_response.raise_for_status()
-        keys = keys_response.json().get("keys", [])
-
-        # Case 1: a key can belong to a team even if the user information does not
-        # include that membership. Collect the team attached to every user key.
-        team_ids = {key.get("team_id") for key in keys if key.get("team_id")}
-
-        # Case 2: the user may belong to a team such as "researchers" even when
-        # none of their current keys uses that team. Include explicit memberships.
-        team_ids.update(
-            team.get("team_id") for team in user.get("teams", []) if team.get("team_id")
-        )
-
-        # Keys and teams can both carry permission data, so keep them in one list
-        # and process all possible visibility sources below.
-        permission_records = list(keys)
-        for team_id in team_ids:
-            # Fetching each team lets us discover grants inherited through team
-            # membership, for example access to the MCP group "research".
-            team_response = self.session.get(
-                f"{self.base_url}/team/info",
-                params={"team_id": team_id},
-                timeout=self.timeout,
-            )
-            team_response.raise_for_status()
-            permission_records.append(team_response.json())
-
-        # LiteLLM permissions can grant a server ID directly or match a named MCP
-        # group stored on the server. Unified access groups instead appear as
-        # top-level ``access_group_ids`` on keys and teams.
-        allowed_server_ids: set[str] = set()  # Directly named MCP servers
-        allowed_named_mcp_groups: set[str] = set()
-        access_group_ids: set[str] = set()
-        for record in permission_records:
-            # Unified access-group case: when PAPI creates a private MCP it adds
-            # the new group's ID directly to each existing key of its owner. The
-            # group, rather than the shared team, names the permitted MCP server.
-            access_group_ids.update(record.get("access_group_ids") or [])
-
-            object_permission = record.get("object_permission") or {}
-            # Externally managed records may contain null or another invalid
-            # representation. Ignore them instead of treating them as permissions.
-            if not isinstance(object_permission, dict):
-                continue
-
-            # Direct-grant case: a key or team explicitly names an MCP server ID,
-            # for example mcp_servers=["server-1"].
-            allowed_server_ids.update(object_permission.get("mcp_servers") or [])
-
-            # Group-grant case: a key or team grants a group such as "research";
-            # every MCP server assigned to that group becomes a candidate.
-            allowed_named_mcp_groups.update(
-                object_permission.get("mcp_access_groups") or []
-            )
-
-        for access_group_id in access_group_ids:
-            try:
-                access_group = self.get_access_group(access_group_id)
-            except requests.HTTPError as exc:
-                # A stale group reference must not prevent listing all other MCPs.
-                if exc.response is not None and exc.response.status_code == 404:
-                    continue
-                raise
-            allowed_server_ids.update(access_group.get("access_mcp_server_ids") or [])
-
-        accessible_servers = []
-        for server in servers:
-            mcp_info = server.get("mcp_info") or {}
-            owner = mcp_info.get("owner") if isinstance(mcp_info, dict) else None
-            server_groups = set(server.get("mcp_access_groups") or [])
-
-            # Visibility case 1 — owned MCP: the user registered this server through
-            # PAPI, so mcp_info["owner"] contains their Keycloak subject ID.
-            is_owned = owner == user_id
-
-            # Visibility case 2 — public MCP: LiteLLM explicitly makes the server
-            # available to every key with allow_all_keys=true.
-            is_public = server.get("allow_all_keys") is True
-
-            # Visibility case 3 — direct permission: at least one user key or team
-            # explicitly contains this server_id in object_permission.mcp_servers.
-            has_direct_access = server.get("server_id") in allowed_server_ids
-
-            # Visibility case 4 — group permission: the user belongs, through a key
-            # or team, to a group also assigned to this MCP. For example, both sides
-            # contain "research", so their set intersection is not empty.
-            # This groups are not managed by PAPI, but MCPs on that group are still visible to the user.
-            has_group_access = bool(server_groups & allowed_named_mcp_groups)
-
-            # A server is listed when at least one independent visibility case holds.
-            if is_owned or is_public or has_direct_access or has_group_access:
-                accessible_servers.append(server)
-
-        return accessible_servers
 
     def delete_mcp_server(self, server_id: str) -> None:
         response = self.session.delete(
@@ -448,26 +482,11 @@ class LiteLLMClient:
             case _:
                 raise ValueError(f"Unknown asset type: {asset_type!r}")
 
-    def add_mcp_server_to_user_access_group(
-        self,
-        *,
-        owner: str,
-        server_id: str,
-        key_ids: list[str],
-    ) -> dict[str, Any]:
-        """Create or update the user's one private group with another MCP."""
-        return self.add_asset_to_user_access_group(
-            owner=owner,
-            asset_type="mcp",
-            asset_id=server_id,
-            key_ids=key_ids,
-        )
-
     def remove_asset_from_user_access_group(
         self,
         *,
         owner: str,
-        asset_type: Literal["mcp", "llm", "agent"],
+        asset_type: Literal["model", "mcp", "agent"],
         asset_id: str,
     ) -> dict[str, Any] | None:
         """
@@ -494,7 +513,7 @@ class LiteLLMClient:
                 response.raise_for_status()
                 return response.json()
 
-            case "llm":
+            case "model":
                 # TODO: Implement logic for removing LLM assets (e.g. updating access_model_names)
                 raise NotImplementedError(
                     "Removing LLM models from user access group is not yet implemented."
@@ -508,16 +527,3 @@ class LiteLLMClient:
 
             case _:
                 raise ValueError(f"Unknown asset type: {asset_type!r}")
-
-    def remove_mcp_server_from_user_access_group(
-        self,
-        *,
-        owner: str,
-        server_id: str,
-    ) -> dict[str, Any] | None:
-        """Remove one MCP from the user's group, keeping the group reusable."""
-        return self.remove_asset_from_user_access_group(
-            owner=owner,
-            asset_type="mcp",
-            asset_id=server_id,
-        )
