@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import requests
 
-from ai4papi.litellm_client import (
+from ai4papi.clients.litellm import (
     LiteLLMClient,
     build_user_access_group_name,
     build_litellm_mcp_server_name,
