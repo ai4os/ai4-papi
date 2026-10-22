@@ -47,7 +47,6 @@ HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 # LiteLLM configuration
 LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
 LITELLM_API_KEY = load_env("LITELLM_API_KEY")
-MCP_NOMAD_DEFAULT_VO = "vo.ai4eosc.eu"
 
 # Paths
 main_path = Path(__file__).parent.absolute()

@@ -42,13 +42,9 @@ class MCPCreateRequest(BaseModel):
         min_length=1,
         description="Exact name in the official MCP registry",
     )
-    vo: str | None = Field(
-        default=None,
-        description=(
-            "VO used for a self-deployed MCP. Remote MCPs ignore this field; "
-            "deployable MCPs use MCP_NOMAD_DEFAULT_VO when it is omitted."
-        ),
-    )  # TODO: either we fix vo or we let choose. But not both because we won't know where to look mcp to list them
+    vo: str = Field(
+        description=("VO used for a self-deployed MCP. Remote MCPs ignore this field."),
+    )
     conf: dict | None = Field(
         default=None,
         description=(
@@ -203,9 +199,7 @@ def create_mcp(
             )
         else:
             # Deployable case: validate the VO before consuming cluster resources.
-            vo = request.vo or papiconf.MCP_NOMAD_DEFAULT_VO
-            if vo not in papiconf.MAIN_CONF["nomad"]["namespaces"]:
-                raise HTTPException(status_code=422, detail=f'Unknown VO "{vo}".')
+            vo = request.vo
             auth.check_authorization(auth_info, vo)
 
             package = select_npm_mcp_package(registry_server)
@@ -250,7 +244,7 @@ def create_mcp(
         server_id = registration["server_id"]
 
         # All of this user's MCPs share one stable private access group. Existing
-        # keys point to that group; the shared authorization team is never changed.
+        # keys should include that group; the shared authorization team is never changed.
         key_ids = litellm.list_user_key_ids(auth_info["id"])
         access_group = litellm.add_asset_to_user_access_group(
             owner=auth_info["id"],

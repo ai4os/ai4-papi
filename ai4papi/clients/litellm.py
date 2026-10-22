@@ -5,14 +5,14 @@ It avoids direct HTTP calls to LiteLLM, and provides a convenient interface for 
 and managing LiteLLM assets (MCPs, LLMs, agents).
 """
 
-import hashlib
 import re
 from typing import Any, Literal
+import secrets
 
 import requests
 
 
-def build_litellm_mcp_server_name(registry_name: str, owner: str) -> str:
+def build_litellm_mcp_server_name(registry_name: str) -> str:
     """Build a globally unique LiteLLM/MCP-compatible server name."""
 
     readable_name = registry_name.rsplit("/", 1)[-1]
@@ -21,9 +21,9 @@ def build_litellm_mcp_server_name(registry_name: str, owner: str) -> str:
     # sending server_name to LiteLLM.
     readable_name = re.sub(r"[^A-Za-z0-9_]", "_", readable_name).strip("_")
     readable_name = readable_name[:40] or "server"
-    digest = hashlib.sha256(f"{owner}:{registry_name}".encode()).hexdigest()[:12]
+    _uuid = secrets.token_hex(8)
 
-    return f"papi_{readable_name}_{digest}"
+    return f"papi_{readable_name}_{_uuid}"
 
 
 def build_user_access_group_name(owner: str) -> str:
@@ -251,7 +251,7 @@ class LiteLLMClient:
         Returns:
             dict[str, Any]: The created MCP server information.
         """
-        server_name = build_litellm_mcp_server_name(registry_server["name"], owner)
+        server_name = build_litellm_mcp_server_name(registry_server["name"])
         payload = {
             "server_name": server_name,
             "description": registry_server.get("description"),

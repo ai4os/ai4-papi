@@ -1,30 +1,28 @@
 import time
 from types import SimpleNamespace
 
-from ai4papi.routers.v1.llm.mcp import (
-    MCPCreateRequest,
-    create_mcp,
-    delete_mcp,
-    get_litellm_client,
-    get_mcp_nomad_client,
-    get_registry_client,
-    list_mcps,
-)
+from ai4papi.routers.v1.llm import mcp
+
 from conf import token
 
-auth = SimpleNamespace(credentials=token)
-registry = get_registry_client()
-litellm = get_litellm_client()
-nomad = get_mcp_nomad_client()
 
-mcps_to_test = [
+MCPS_TO_TEST = [
     "dev.whenever/whenever",  # example of remote MCP
-    "io.github.GuardBee/security-proxy",  # example of deployable MCP (NPM)
+    "com.adrianczuczka/mason",  # example of deployable MCP (NPM)
 ]
+VO = "vo.ai4eosc.eu"
 
-for mcp_name in mcps_to_test:
+
+auth = SimpleNamespace(credentials=token)
+registry = mcp.get_registry_client()
+litellm = mcp.get_litellm_client()
+nomad = mcp.get_mcp_nomad_client()
+
+for mcp_name in MCPS_TO_TEST:
+    print(f"  Testing MCP: {mcp_name}")
+
     # List mcps
-    mcps = list_mcps(
+    mcps = mcp.list_mcps(
         authorization=auth,
         litellm=litellm,
         nomad=nomad,
@@ -35,14 +33,14 @@ for mcp_name in mcps_to_test:
     for m in mcps:
         if m.get("name") == mcp_name:
             server_id = m["registration"]["server_id"]
-            delete_mcp(
+            mcp.delete_mcp(
                 server_id=server_id,
                 authorization=auth,
                 litellm=litellm,
                 nomad=nomad,
             )
 
-    mcps = list_mcps(
+    mcps = mcp.list_mcps(
         authorization=auth,
         litellm=litellm,
         nomad=nomad,
@@ -50,8 +48,8 @@ for mcp_name in mcps_to_test:
     assert not any(m.get("name") == mcp_name for m in mcps)
 
     # Deploy the mcp
-    created = create_mcp(
-        request=MCPCreateRequest(name=mcp_name),
+    created = mcp.create_mcp(
+        request=mcp.MCPCreateRequest(name=mcp_name, vo=VO),
         authorization=auth,
         registry=registry,
         litellm=litellm,
@@ -68,7 +66,7 @@ for mcp_name in mcps_to_test:
         server_id = created["registration"]["server_id"]
 
     for _ in range(30):
-        mcps = list_mcps(
+        mcps = mcp.list_mcps(
             authorization=auth,
             litellm=litellm,
             nomad=nomad,
@@ -88,7 +86,7 @@ for mcp_name in mcps_to_test:
         assert matching
         server_id = matching[0]["registration"]["server_id"]
 
-    delete_mcp(
+    mcp.delete_mcp(
         server_id=server_id,
         authorization=auth,
         litellm=litellm,
@@ -96,7 +94,7 @@ for mcp_name in mcps_to_test:
     )
 
     # Check the mcp is not there
-    mcps = list_mcps(
+    mcps = mcp.list_mcps(
         authorization=auth,
         litellm=litellm,
         nomad=nomad,

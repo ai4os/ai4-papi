@@ -84,9 +84,11 @@ class MCPNomadClient:
             )
 
         # Basic auth is added through Traefik labels.
-        # Then, litellm authenticates using static headers
+        # Then, Litellm authenticates using static headers
         basic_auth = create_mcp_basic_auth()
         job_id = f"mcp-{uuid.uuid4()}"
+
+        server_name = build_litellm_mcp_server_name(registry_server["name"])
 
         raw_job = self.template.safe_substitute(
             {
@@ -121,6 +123,7 @@ class MCPNomadClient:
                 "cpu_num": str(resources["cpu_num"]),
                 "ram": str(resources["ram"]),
                 "disk": str(resources["disk"]),
+                "server_name": server_name,
             }
         )
 
@@ -153,9 +156,7 @@ class MCPNomadClient:
             {
                 **shared_litellm_environment,
                 "MCP_AUTHORIZATION_HEADER": basic_auth.authorization_header,
-                "MCP_SERVER_NAME": build_litellm_mcp_server_name(
-                    registry_server["name"], owner
-                ),
+                "MCP_SERVER_NAME": server_name,
                 "MCP_DESCRIPTION": registry_server.get("description") or "",
                 "MCP_REGISTRY_NAME": registry_server["name"],
                 "MCP_REGISTRY_VERSION": registry_server["version"],
@@ -163,8 +164,8 @@ class MCPNomadClient:
                 "MCP_PACKAGE_IDENTIFIER": package["identifier"],
                 "MCP_PACKAGE_VERSION": package["version"],
                 "MCP_PACKAGE_TRANSPORT": package_transport,
-                "MCP_STARTUP_TIMEOUT": 180,
-                "MCP_POLL_INTERVAL": 2,
+                "MCP_STARTUP_TIMEOUT": "180",
+                "MCP_POLL_INTERVAL": "2",
             }
         )
         register_task["Templates"][0]["EmbeddedTmpl"] = papiconf.MCP["register"]
@@ -217,7 +218,7 @@ class MCPNomadClient:
         metadata = job.get("Meta") or {}
         if (
             not job_id.startswith("mcp-")
-            or metadata.get("deployment_type") != "self_deployed"
+            and metadata.get("deployment_type") != "self_deployed"
         ):
             raise MCPNomadError(
                 f'The Nomad job "{job_id}" is not a PAPI MCP deployment.'
@@ -354,12 +355,6 @@ class MCPNomadClient:
                 id_=job_id,
                 namespace=namespace,
                 purge=True,
-            )
-        except nomad_exceptions.URLNotFoundNomadException:
-            if ignore_not_found:
-                return
-            raise MCPNomadDeploymentNotFoundError(
-                f'No MCP deployment named "{job_id}" exists in namespace "{namespace}".'
             )
         except Exception as exc:
             raise MCPNomadError(

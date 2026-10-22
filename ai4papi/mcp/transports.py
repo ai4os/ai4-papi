@@ -55,7 +55,6 @@ def create_mcp_basic_auth() -> MCPBasicAuth:
 
 def build_stdio_gateway_command(
     package: dict[str, Any],
-    gateway_package: str,
 ) -> tuple[str, dict[str, str]]:
     """
     Build a shell bootstrap that exposes a stdio package over HTTP, using Supergateway.
