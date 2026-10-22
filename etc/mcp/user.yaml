@@ -1,0 +1,21 @@
+---
+# User-customizable resources for a self-deployed MCP Nomad job.
+#
+# Keep the same declarative structure used by catalog modules and tools:
+# `value` supplies the default and `range` is enforced before submitting Nomad.
+
+hardware:
+  cpu_num:
+    name: Number of CPUs
+    value: 1
+    range: [1, 10]
+
+  ram:
+    name: RAM memory (in MB)
+    value: 1024
+    range: [512, 40000]
+
+  disk:
+    name: Disk memory (in MB)
+    value: 2048
+    range: [1000, 50000]

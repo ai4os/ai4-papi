@@ -11,6 +11,7 @@ from fastapi.security import HTTPBearer
 import requests
 
 from ai4papi import auth
+from ai4papi.clients.litellm import build_user_access_group_name
 import ai4papi.conf as papiconf
 
 
@@ -23,10 +24,11 @@ router = APIRouter(
 security = HTTPBearer()
 
 # LiteLLM API configuration
-LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
-LITELLM_API_KEY = papiconf.load_env("LITELLM_API_KEY")
+LITELLM_URL = papiconf.LITELLM_URL
+LITELLM_API_KEY = papiconf.LITELLM_API_KEY
 
 
+# TODO Update this router to use the LiteLLMClient instead of direct HTTP calls to LiteLLM.
 class LiteLLMSession(requests.Session):
     """
     Session that automatically raises a FastAPI HTTPException for failed LiteLLM
@@ -146,13 +148,31 @@ def create_api_key(
     current_levels = list(auth_info["groups"].keys())
     team_id = auth.get_highest_level(current_levels)
 
-    # Keys alias are created with pattern "<user_id>_<keyname>" as they must be globally unique.
+    # Every user has a private access group that gathers their private assets (mcps,
+    # llms, agents), whether the assets are self-deployed in Nomad or integrated
+    # externally. Because of this, we need to add the user's private access group to
+    # each key's access groups.
+    r = session.get(f"{LITELLM_URL}/v1/access_group")
+    expected_group_name = build_user_access_group_name(user_id)
+    access_group = next(
+        (
+            group
+            for group in r.json()
+            if group.get("access_group_name") == expected_group_name
+        ),
+        None,
+    )
+    mcp_access_group_ids = (
+        [access_group["access_group_id"]] if access_group is not None else []
+    )
+
     data = {
         "user_id": user_id,
         "key_alias": f"{user_id}_{key_name}",
         "key_type": "llm_api",
         "team_id": team_id,
         "duration": duration,
+        "access_group_ids": mcp_access_group_ids,
     }
     r = session.post(f"{LITELLM_URL}/key/generate", json=data)
     return r.json()["key"]

@@ -44,6 +44,10 @@ def load_env(varname: str):
 HARBOR_USER = "robot$user-snapshots+snapshot-api"
 HARBOR_PASS = load_env("HARBOR_ROBOT_PASSWORD")
 
+# LiteLLM configuration
+LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"
+LITELLM_API_KEY = load_env("LITELLM_API_KEY")
+
 # Paths
 main_path = Path(__file__).parent.absolute()
 paths = {
@@ -151,6 +155,19 @@ TRY_ME = {
 nmd = load_nomad_job(paths["conf"] / "snapshots" / "nomad.hcl")
 SNAPSHOTS = {
     "nomad": nmd,
+}
+
+# Self-deployed MCP servers
+nmd = load_nomad_job(paths["conf"] / "mcp" / "nomad.hcl")
+yml = load_yaml_conf(paths["conf"] / "mcp" / "user.yaml")
+MCP = {
+    "nomad": nmd,
+    "user": {
+        "full": yml[0],
+        "values": yml[1],
+    },
+    "register": (paths["conf"] / "mcp" / "register.py").read_text(encoding="utf-8"),
+    "deregister": (paths["conf"] / "mcp" / "deregister.py").read_text(encoding="utf-8"),
 }
 
 # Load datacenter info file

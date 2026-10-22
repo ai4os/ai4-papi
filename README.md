@@ -84,6 +84,7 @@ Once the API is running, go to http://127.0.0.1:8080/docs to check the API metho
 Swagger UI.
 
 
+
 ## Authentication
 
 Some of the API methods are authenticated (🔒) via OIDC tokens, so you will need to
@@ -181,6 +182,9 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
 * `/v1/deployments/`: (🔒)
    deploy modules/tools in the platform to perform trainings
 
+* `/v1/llm/mcp`: (🔒)
+   register, deploy, list and delete MCP servers through LiteLLM and Nomad
+
 * `/v1/stats/deployments/`: (🔒)
   retrieve usage stats for users and overall platform.
 
@@ -238,10 +242,12 @@ deployments.modules.get_deployments(
 
 These are the configuration files the API uses:
 
-* `etc/main_conf.yaml`: main configuration file of the API
+* `etc/main.yaml`: main configuration file of the API
 * `etc/modules`: configuration files for standard modules
 * `etc/tools`: configuration files for tools
   - `ai4os-federated-server`: federated server
+* `etc/mcp`: Nomad template, resource limits and LiteLLM lifecycle scripts for
+  self-deployed MCP servers
 
 The pattern for the subfolders follows:
   - `user.yaml`: user customizable configuration to make a deployment in Nomad.

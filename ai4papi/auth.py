@@ -26,6 +26,8 @@ import re
 from fastapi import HTTPException
 import jwt
 
+import ai4papi.conf as papiconf
+
 
 KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
 jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
@@ -90,7 +92,12 @@ def check_authorization(
     """
     Check that the user has permissions to use the resource (usually "ap-u")
     and check he indeed belongs to the requested VO.
+    If no VO is requested, it checks the user has at least this access level in ANY VO.
     """
+    # Check requested VO exists
+    if requested_vo and requested_vo not in papiconf.MAIN_CONF["nomad"]["namespaces"]:
+        raise HTTPException(status_code=422, detail=f'Unknown VO: "{requested_vo}".')
+
     # Retrieve the user access levels for that particular VO
     if requested_vo:
         user_levels = [k for k, v in auth_info["groups"].items() if requested_vo in v]

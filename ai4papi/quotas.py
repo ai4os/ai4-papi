@@ -85,7 +85,9 @@ def limit_resources(
     Implement hardware limits for specific users or VOs.
     """
     # Select appropriate conf
-    if item_name in papiconf.TOOLS.keys():
+    if item_name == "mcp":
+        conf = deepcopy(papiconf.MCP["user"]["full"])
+    elif item_name in papiconf.TOOLS.keys():
         conf = deepcopy(papiconf.TOOLS[item_name]["user"]["full"])
     else:
         conf = deepcopy(papiconf.MODULES["user"]["full"])
