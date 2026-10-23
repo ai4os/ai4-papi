@@ -34,6 +34,13 @@ auth:
     - kmd4eosc
     - tutorials
 
+  vo_mappings:
+    # Not all Keycloak VOs have their corresponding PAPI/Dashoboard VO
+    # In those cases we map as following
+
+    vo.fluid.ai4eosc.eu: vo.ai4eosc.eu
+    vo.arena.ai4eosc.eu: vo.ai4eosc.eu
+
 nomad:
 
   namespaces:  # map VO to Nomad namespace

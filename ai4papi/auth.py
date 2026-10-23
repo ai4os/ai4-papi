@@ -26,10 +26,10 @@ import re
 from fastapi import HTTPException
 import jwt
 
+import ai4papi.conf as papiconf
 
-# KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
-# TODO: revert when we migrate to production
-KEYCLOAK_URL = "https://login.dev.ai4eosc.eu/realms/ai4eosc"
+
+KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
 jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
 
 AI4OS_LEVELS = ["ap-a", "ap-a1", "ap-b", "ap-u", "ap-d"]
@@ -70,9 +70,13 @@ def get_user_info(token):
         )
         if not match:
             continue
+
+        # Try to map VO if needed, otherwise use original one
         level = match["level"].lower()
-        groups.setdefault(level, [])
-        groups[level].append(match["vo"])
+        vo = papiconf.MAIN_CONF["auth"]["vo_mappings"].get(match["vo"], match["vo"])
+
+        groups.setdefault(level, set())
+        groups[level].update([vo])
 
     # Sort user access levels
     groups = {level: groups[level] for level in AI4OS_LEVELS if level in groups}
