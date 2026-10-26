@@ -5,7 +5,6 @@ Common configuration for tests
 import os
 import subprocess
 
-
 # Retrieve token with oidc-token command
 try:
     result = subprocess.run(
