@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from ai4papi.routers.v1.inference import oscar
 from conf import token
 
+from ai4papi.routers.v1.inference import oscar
 
 # Create service
 sname = oscar.create_service(
