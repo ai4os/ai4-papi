@@ -26,6 +26,8 @@ auth:
     - http://localhost:8080
     - ${DASHBOARD_URL}
 
+    - https://genai.dev.ai4eosc.eu
+
   VO:  # Virtual Organizations
 
     - vo.ai4eosc.eu
