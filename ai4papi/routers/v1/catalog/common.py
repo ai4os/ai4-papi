@@ -171,7 +171,7 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
-        profile: Annotated[str, Query(enum=[""] + supported_profiles)] = "",
+        profile: Annotated[str, Query(json_schema_extra={"enum": [""] + supported_profiles})] = "",
         request: Request = None,  # ty: ignore
     ):
         """
