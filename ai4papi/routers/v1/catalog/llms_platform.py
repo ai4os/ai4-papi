@@ -72,8 +72,8 @@ class PlatformLLMsCatalog(Catalog):
         """
         models = self.get_items()
 
-        response = session.get(f"{LITELLM_URL}/health/latest")
-        health_checks = response.json().get("latest_health_checks", {})
+        response_health = session.get(f"{LITELLM_URL}/health/latest")
+        health_checks = response_health.json().get("latest_health_checks", {})
 
         status_by_model = {
             s["model_name"]: status
@@ -83,11 +83,25 @@ class PlatformLLMsCatalog(Catalog):
             if "model_name" in s
         }
 
+        response_info = session.get(f"{LITELLM_URL}/model/info")
+        all_model_info = response_info.json().get("data", [])
+        
+        info_by_model = {
+            m["model_name"]: m.get("model_info") or {} for m in all_model_info
+        }
+
         summary = []
         for m_id, m_info in models.items():
             meta = m_info.copy()
             meta["id"] = m_id
             meta["status"] = status_by_model.get(m_id, "unknown")
+            
+            info = info_by_model.get(m_id, {})
+            meta["max_input_tokens"] = info.get("max_input_tokens")
+            meta["supports_vision"] = info.get("supports_vision")
+            meta["supports_reasoning"] = info.get("supports_reasoning")
+            meta["supports_function_calling"] = info.get("supports_function_calling")
+
             summary.append(meta)
 
         return summary
