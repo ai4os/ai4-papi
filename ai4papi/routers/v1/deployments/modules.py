@@ -311,14 +311,14 @@ async def create_deployment(
         if not user_conf["hardware"]["gpu_type"]:
             usertask["Resources"]["Devices"][0]["Constraints"] = None
 
-    # If the image belong to Harbor, then it's a user snapshot
+    # Check if it's a user snapshot
     docker_image = user_conf["general"]["docker_image"]
-    if docker_image.split("/")[0] == "registry.cloud.ai4eosc.eu":
+    if docker_image.startswith("registry.cloud.ai4eosc.eu/user-snapshots"):
         # Check the user is the owner of the image
         if docker_image.split("/")[-1] != auth_info["id"].replace("@", "_at_"):
             raise HTTPException(
                 status_code=401,
-                detail="You are not the owner of the Harbor image.",
+                detail="You are not the owner of this snapshot.",
             )
 
         # Check the snapshot indeed exists

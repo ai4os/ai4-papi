@@ -272,7 +272,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
+        image      = "ai4os/docker-storage:latest"
         privileged = true
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/share:/mnt/share:rshared",
@@ -361,7 +361,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image   = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
+        image   = "ai4os/docker-storage:latest"
         mount {
           type = "bind"
           target = "/srv/.rclone/rclone.conf"
@@ -453,7 +453,7 @@ job "tool-cvat-${JOB_UUID}" {
       }
       config {
         force_pull = true
-        image   = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
+        image   = "ai4os/docker-storage:latest"
         mount {
           type = "bind"
           target = "/srv/.rclone/rclone.conf"
@@ -533,7 +533,7 @@ job "tool-cvat-${JOB_UUID}" {
         CVAT_BACKUP_REQUEST_TIMEOUT_HOURS = 1
       }
       config {
-        image = "registry.cloud.ai4eosc.eu/ai4os/ai4os-cvat-backups:0.1"
+        image = "ai4os/ai4os-cvat-backups:0.1"
         force_pull = "${NOMAD_META_force_pull_img_cvat_backups}"
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/backups-periodic:/cvat-backups"

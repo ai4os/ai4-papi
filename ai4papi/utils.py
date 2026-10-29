@@ -57,15 +57,13 @@ def validate_conf(conf):
     # Check that the Dockerhub image belongs either to "deephdc" or "ai4oshub"
     # or that it points to our Harbor instance (eg. CVAT)
     image = conf.get("general", {}).get("docker_image")
-    if image and image.split("/")[0] not in [
-        "deephdc",
-        "ai4oshub",
-        "registry.cloud.ai4eosc.eu",
-    ]:
+    if (
+        image
+        and image.split("/")[0] not in papiconf.MAIN_CONF["docker"]["valid_origins"]
+    ):
         raise HTTPException(
             status_code=400,
-            detail="The docker image should belong to either 'deephdc' or 'ai4oshub' \
-                DockerHub organizations or be hosted in the project's Harbor.",
+            detail=f"The docker image does not belong to a valid Docker origin: {image}",
         )
 
     # Check datasets_info list

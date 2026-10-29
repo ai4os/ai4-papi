@@ -20,7 +20,7 @@ The API is currently deployed here:
 * [production API](https://api.cloud.ai4eosc.eu/docs) (`master` branch)
 * [development API](https://api.dev.ai4eosc.eu/docs) (`dev` branch)
 
-Images of both API are accessible in the project's Harbor registry:
+Images of both API are accessible in the project's Harbor registry (and mirrored in [DockerHub](https://hub.docker.com/u/ai4os)):
 
 * `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod`
 * `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:dev`
