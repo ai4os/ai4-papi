@@ -1,9 +1,10 @@
+from cachetools import cached, TTLCache
 from fastapi import APIRouter
 import requests
 
 from ai4papi import schemas
 import ai4papi.conf as papiconf
-from .common import Catalog
+from ai4papi.routers.v1.catalog.common import Catalog
 
 
 # LiteLLM API configuration
@@ -31,6 +32,8 @@ session.headers.update(
     {"Authorization": f"Bearer {LITELLM_API_KEY}", "Content-Type": "application/json"}
 )
 
+EXCLUDE_PATTERNS = ["all-proxy-models", "embedding", "default"]
+
 
 class PlatformLLMsCatalog(Catalog):
     def __init__(self):
@@ -38,14 +41,8 @@ class PlatformLLMsCatalog(Catalog):
         # we use the LiteLLM proxy to retrieve them.
         super().__init__(repo="", item_type="llm-platform")
 
-    def _get_models_status(self) -> dict:
-        """
-        Retrieves the latest health checks from LiteLLM.
-        """
-        response = session.get(f"{LITELLM_URL}/health/latest")
-        return response.json().get("latest_health_checks", {})
-
-    def _get_all_items(self):
+    @cached(cache=TTLCache(maxsize=1024, ttl=60))
+    def get_items(self):
         """
         Retrieves all the models configured in LiteLLM.
         """
@@ -55,37 +52,14 @@ class PlatformLLMsCatalog(Catalog):
         items = {}
         for model in models_data:
             model_id = model.get("id")
-            if model_id:
+            if model_id and not any(
+                pattern in model_id.lower() for pattern in EXCLUDE_PATTERNS
+            ):
                 items[model_id] = model
 
         return items
 
-    def get_items(self):
-        """
-        Retrieves all the models configured in LiteLLM that are healthy.
-        """
-        response = session.get(f"{LITELLM_URL}/models")
-        models_data = response.json().get("data", [])
-
-        health_checks = self._get_models_status()
-
-        status_by_model = {
-            s["model_name"]: str(s.get("status", "unknown")).lower()
-            for s in health_checks.values()
-            if "model_name" in s
-        }
-
-        items = {}
-        for model in models_data:
-            model_id = model.get("id")
-            if model_id:
-                raw_status = status_by_model.get(model_id, "unknown")
-
-                if raw_status == "healthy":
-                    items[model_id] = model
-
-        return items
-
+    @cached(cache=TTLCache(maxsize=1024, ttl=60))
     def get_summary(
         self,
         tags: schemas.TagList = None,
@@ -96,34 +70,37 @@ class PlatformLLMsCatalog(Catalog):
         """
         Returns a summary of the available platform LLMs.
         """
-        all_models = self._get_all_items()
-        health_checks = self._get_models_status()
+        models = self.get_items()
+
+        response_health = session.get(f"{LITELLM_URL}/health/latest")
+        health_checks = response_health.json().get("latest_health_checks", {})
 
         status_by_model = {
-            s["model_name"]: str(s.get("status", "unknown")).lower()
+            s["model_name"]: status
+            if (status := str(s.get("status", "")).lower()) in ["healthy", "unhealthy"]
+            else "unknown"
             for s in health_checks.values()
             if "model_name" in s
         }
 
-        summary = []
-        for m_id, m_info in all_models.items():
-            # Remove "all-proxy-models", "default" and "embedding" models
-            if (
-                m_id == "all-proxy-models"
-                or "embedding" in m_id.lower()
-                or "default" in m_id.lower()
-            ):
-                continue
+        response_info = session.get(f"{LITELLM_URL}/model/info")
+        all_model_info = response_info.json().get("data", [])
+        
+        info_by_model = {
+            m["model_name"]: m.get("model_info") or {} for m in all_model_info
+        }
 
+        summary = []
+        for m_id, m_info in models.items():
             meta = m_info.copy()
             meta["id"] = m_id
-
-            # Add health status
-            raw_status = status_by_model.get(m_id, "unknown")
-            if raw_status not in ["healthy", "unhealthy"]:
-                raw_status = "unknown"
-
-            meta["status"] = raw_status
+            meta["status"] = status_by_model.get(m_id, "unknown")
+            
+            info = info_by_model.get(m_id, {})
+            meta["max_input_tokens"] = info.get("max_input_tokens")
+            meta["supports_vision"] = info.get("supports_vision")
+            meta["supports_reasoning"] = info.get("supports_reasoning")
+            meta["supports_function_calling"] = info.get("supports_function_calling")
 
             summary.append(meta)
 
