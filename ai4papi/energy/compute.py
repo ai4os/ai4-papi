@@ -9,6 +9,7 @@ cached node->datacenter lookup); everything else is pure and unit-testable.
 
 import bisect
 import datetime
+import itertools
 import threading
 import statistics
 from collections import namedtuple
@@ -390,22 +391,35 @@ def apply_footprint(
 
 
 def downsample(buckets: list[Bucket], target_points: int) -> list[Bucket]:
-    """Aggregate consecutive buckets so the result has at most `target_points`."""
+    """
+    Aggregate buckets into fixed, epoch-aligned time windows so the result has at
+    most `target_points` and every point spans the same time (only the first and
+    last window can be partial). Windows are by time, not by position: the
+    boundaries do not move when a new bucket arrives. Each point is stamped with
+    its window start. The bucket step is inferred from the smallest gap.
+    """
     n = len(buckets)
     if n <= target_points or target_points < 1:
         return buckets
 
-    group = -(-n // target_points)  # ceil
-    out = []
-    for i in range(0, n, group):
-        chunk = buckets[i : i + group]
-        out.append(
-            Bucket(
-                ts=chunk[0].ts,
-                energy_wh=sum(b.energy_wh for b in chunk),
-                power_w_avg=sum(b.power_w_avg for b in chunk) / len(chunk),
-                carbon_g=sum(b.carbon_g for b in chunk),
-                water_l=sum(b.water_l for b in chunk),
-            )
+    ts = [parse_iso(b.ts) for b in buckets]
+    step = min(b - a for a, b in itertools.pairwise(ts))
+    slots = round((ts[-1] - ts[0]) / step) + 1
+    # one window less than `target_points`: the first and last may be partial, so
+    # a span of `slots` can straddle one more window than it holds
+    # shortcut: target_points == 1 can still yield 2 windows, nobody asks for one
+    window = -(-slots // max(target_points - 1, 1)) * step
+
+    groups: dict[int, list[Bucket]] = {}
+    for t, b in zip(ts, buckets):
+        groups.setdefault(int(t // window), []).append(b)
+    return [
+        Bucket(
+            ts=iso(k * window),
+            energy_wh=sum(b.energy_wh for b in chunk),
+            power_w_avg=sum(b.power_w_avg for b in chunk) / len(chunk),
+            carbon_g=sum(b.carbon_g for b in chunk),
+            water_l=sum(b.water_l for b in chunk),
         )
-    return out
+        for k, chunk in groups.items()
+    ]
