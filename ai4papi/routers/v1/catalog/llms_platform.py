@@ -85,7 +85,7 @@ class PlatformLLMsCatalog(Catalog):
 
         response_info = session.get(f"{LITELLM_URL}/model/info")
         all_model_info = response_info.json().get("data", [])
-        
+
         info_by_model = {
             m["model_name"]: m.get("model_info") or {} for m in all_model_info
         }
@@ -95,7 +95,7 @@ class PlatformLLMsCatalog(Catalog):
             meta = m_info.copy()
             meta["id"] = m_id
             meta["status"] = status_by_model.get(m_id, "unknown")
-            
+
             info = info_by_model.get(m_id, {})
             meta["max_input_tokens"] = info.get("max_input_tokens")
             meta["supports_vision"] = info.get("supports_vision")
