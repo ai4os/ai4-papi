@@ -268,14 +268,28 @@ def get_user_energy(
         step_s = int(cfg["series_bucket_seconds"])
         if target_points is None:
             target_points = int(cfg.get("user_series_points", 1000))
+        lives = [live_series(doc, bucket_s=step_s) for _uuid, doc, _stats in rows]
+        # zeros only where nothing was running: past the `pointer_ts` of a running
+        # deployment the store knows nothing (the live tail covers the recent part),
+        # so a stale sweep or an empty live tail must not read as idle
+        until = min(
+            [config.now().timestamp()]
+            + [
+                compute.parse_iso(doc["pointer_ts"])
+                for _uuid, doc, _stats in rows
+                if doc.get("active_allocs") and doc.get("pointer_ts")
+            ]
+        )
         out["series"] = (
             build_series(
                 [
                     persisted(store.read_series(namespace, uuid, None, None), doc)
                     for uuid, doc, _stats in rows
                 ],
-                [live_series(doc, bucket_s=step_s) for _uuid, doc, _stats in rows],
+                lives,
                 target_points,
+                fill_s=step_s,  # idle periods show as zeros, not as missing points
+                until=until,
             )
             or None
         )

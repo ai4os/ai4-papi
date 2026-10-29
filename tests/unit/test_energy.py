@@ -8,6 +8,7 @@ monitoring stack.
 """
 
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -213,7 +214,13 @@ def test_downsample():
         compute.Bucket(compute.iso(i * 300), 1.0, 10.0, 0.1, 0.01) for i in range(100)
     ]
     ds = compute.downsample(many, 10)
-    assert len(ds) == 10
+    assert 2 <= len(ds) <= 10
+    # fixed time windows: all the same span except the first and last (partial)
+    _w = {
+        round(compute.parse_iso(b.ts) - compute.parse_iso(a.ts))
+        for a, b in itertools.pairwise(ds)
+    }
+    assert len(_w) == 1, _w
     assert abs(sum(b.energy_wh for b in ds) - sum(b.energy_wh for b in many)) < 1e-6
     assert compute.downsample(many, 500) is many  # nothing to do
 
@@ -1169,3 +1176,118 @@ def test_store_ignores_ids_that_are_not_plain_names(tmp_path):
         assert store.read_accum(_NS, name) == {"owner": "u@egi.eu"}
     store.write_accum(config.CLUSTER_NS, "ifca-ai4eosc", {"owner": None})
     assert store.read_accum(config.CLUSTER_NS, "ifca-ai4eosc") is not None
+
+
+def test_build_series_fill_gaps():
+    def b(ts, wh):
+        return {"ts": ts, "energy_wh": wh, "power_w_avg": 5.0}
+
+    persisted = [[b("2026-01-01T00:00:00Z", 1.0), b("2026-01-01T00:45:00Z", 2.0)]]
+    points = series.build_series(persisted, [], target_points=100, fill_s=900)
+    assert [(p["ts"], p["energy_wh"], p["power_w"]) for p in points] == [
+        ("2026-01-01T00:00:00Z", 1.0, 5.0),
+        ("2026-01-01T00:15:00Z", 0.0, 0.0),
+        ("2026-01-01T00:30:00Z", 0.0, 0.0),
+        ("2026-01-01T00:45:00Z", 2.0, 5.0),
+    ]
+
+
+def test_build_series_fill_until_now():
+    def b(ts, wh):
+        return {"ts": ts, "energy_wh": wh, "power_w_avg": 5.0}
+
+    persisted = [[b("2026-01-01T00:00:00Z", 1.0)]]
+    until = compute.parse_iso("2026-01-01T00:50:00Z")  # last complete bucket: 00:30
+    points = series.build_series(persisted, [], 100, fill_s=900, until=until)
+    assert [p["ts"] for p in points] == [
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:15:00Z",
+        "2026-01-01T00:30:00Z",
+    ]
+
+    # a live tail takes over where it starts: no zero is placed over it
+    live = [[b("2026-01-01T00:30:00Z", 7.0)]]
+    points = series.build_series(persisted, live, 100, fill_s=900, until=until)
+    assert [(p["ts"], p["energy_wh"], p["live"]) for p in points] == [
+        ("2026-01-01T00:00:00Z", 1.0, False),
+        ("2026-01-01T00:15:00Z", 0.0, False),
+        ("2026-01-01T00:30:00Z", 7.0, True),
+    ]
+
+
+def test_user_series_is_continuous(monkeypatch):
+    """Idle periods of the user's series are zero points, up to the last complete
+    bucket, instead of missing points."""
+    step = 900
+    base = config.floor(config.now().timestamp(), step)
+    first, second = base - 5 * step, base - 4 * step
+    stats = {"energy_wh": 3.0, "carbon_g": 0.0, "water_l": 0.0}
+    monkeypatch.setattr(energy, "enabled", lambda: True)
+    monkeypatch.setattr(
+        energy, "_owner_rows", lambda ns, owner, live: [("u", {}, stats)]
+    )
+    monkeypatch.setattr(energy, "live_series", lambda doc, bucket_s: [])
+    monkeypatch.setattr(
+        store,
+        "read_series",
+        lambda *a: [
+            {"ts": compute.iso(t), "energy_wh": 1.5, "power_w_avg": 6.0}
+            for t in (first, second)
+        ],
+    )
+    out = energy.get_user_energy(_NS, "u@egi.eu", series=True)
+    pts = out["series"]
+    assert [compute.parse_iso(p["ts"]) for p in pts] == [
+        first + i * step
+        for i in range(5)  # up to base - step, the last complete one
+    ]
+    assert [p["energy_wh"] for p in pts] == [1.5, 1.5, 0.0, 0.0, 0.0]
+    assert sum(p["energy_wh"] for p in pts) == out["energy_wh"]
+
+
+def test_build_series_uniform_resolution_with_live_tail():
+    def b(i, wh=1.0):
+        return {"ts": compute.iso(i * 900), "energy_wh": wh, "power_w_avg": 5.0}
+
+    # 100 persisted buckets + 3 live ones, squeezed into 10 points: every point
+    # spans the same time, the live tail included, and nothing is lost
+    points = series.build_series(
+        [[b(i) for i in range(100)]],
+        [[b(i) for i in range(100, 103)]],
+        target_points=10,
+    )
+    assert len(points) <= 10
+    steps = {
+        round(compute.parse_iso(q["ts"]) - compute.parse_iso(p["ts"]))
+        for p, q in itertools.pairwise(points)
+    }
+    assert len(steps) == 1, steps
+    assert sum(p["energy_wh"] for p in points) == 103.0
+    assert not points[0]["live"] and points[-1]["live"]
+    assert [p["live"] for p in points] == sorted(p["live"] for p in points)
+
+
+def test_user_series_no_trailing_zeros_when_live_tail_is_missing(monkeypatch):
+    """A running deployment whose store is behind (stale sweep, Mimir down): what
+    is past its `pointer_ts` is unknown, so the series ends there instead of zeros."""
+    step = 900
+    base = config.floor(config.now().timestamp(), step)
+    stats = {"energy_wh": 1.0, "carbon_g": 0.0, "water_l": 0.0}
+    doc = {
+        "active_allocs": [{"alloc_id": "a", "datacenter": _DC}],
+        "pointer_ts": compute.iso(base - 4 * step),  # persisted up to base - 5 * step
+    }
+    monkeypatch.setattr(energy, "enabled", lambda: True)
+    monkeypatch.setattr(
+        energy, "_owner_rows", lambda ns, owner, live: [("u", doc, stats)]
+    )
+    monkeypatch.setattr(energy, "live_series", lambda doc, bucket_s: [])
+    monkeypatch.setattr(
+        store,
+        "read_series",
+        lambda *a: [
+            {"ts": compute.iso(base - 5 * step), "energy_wh": 1.0, "power_w_avg": 4.0}
+        ],
+    )
+    pts = energy.get_user_energy(_NS, "u@egi.eu", series=True)["series"]
+    assert [p["ts"] for p in pts] == [compute.iso(base - 5 * step)]

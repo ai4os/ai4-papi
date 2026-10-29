@@ -107,7 +107,7 @@ def get_user_stats(
     * **energy**: attach the `energy` accounting block (the user's accumulated
       consumption and footprint, each deployment's live Mimir top-up included).
       Enabled by default.
-    * **full_info**: when `true`, the `energy` block also carries a merged 15-min
+    * **full_info**: when `true`, the `energy` block also carries a merged
       time series of the user's deployments. Off by default (accumulated only).
     """
 
@@ -198,7 +198,7 @@ def get_cluster_stats(
       Attach the per-datacenter `energy` block (site infrastructure power draw plus
       the accumulated energy/footprint). Enabled by default.
     full_info: bool
-      When `true`, each `datacenters[<dc>].energy` block also carries its 15-min
+      When `true`, each `datacenters[<dc>].energy` block also carries its
       time series. Off by default (accumulated numbers only); the live top-up is
       always applied either way. Energy is reported per datacenter, there is no
       platform-wide total.
@@ -467,7 +467,7 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
                     g_stats.gpu_total = n_stats.gpu_used
 
     # Per-datacenter energy (energy feature): instantaneous power draw + the
-    # accumulated energy/footprint since accounting started + a 15-min series.
+    # accumulated energy/footprint since accounting started + a time series.
     # Reported per datacenter only, there is no platform-wide total (clients sum
     # the datacenters they care about). Best-effort: a failure here must not
     # break the cluster stats.
