@@ -6,13 +6,15 @@ All of this is additive and no new endpoints were created. The data rides on end
 
 | Level | Where | Accumulated (+ top-up) | Time series (`full_info=true`) |
 |---|---|---|---|
-| Datacenter / site | `GET /v1/deployments/stats/cluster` -> `datacenters[<site>].energy` | always | per site, downsampled to `energy.cluster_series_points` |
+| Datacenter / site | `GET /v1/deployments/stats/cluster` -> `datacenters[<site>].energy` | always | per site, window picked by `energy.cluster_series_points` |
 | User | `GET /v1/deployments/stats/user?vo=<vo>` -> `energy` | always | merged across the user's deployments |
 | Deployment | `energy` key in the deployment info (list and individual endpoints, all four types) | always | per deployment. On the individual endpoint `full_info` defaults to `true`, so it comes back as `EnergyTimeSeries`; the list form is `EnergyStats` |
 
 There is **no platform-wide / VO total** in the response: `/stats/cluster` returns one `energy` block per datacenter and the client sums the datacenters it cares about.
 
 `full_info` defaults to `false` on the list-shaped endpoints (`/stats/cluster`, `/stats/user`, the deployment list) and to `true` on the single-deployment endpoint. Pass it explicitly to override.
+
+The time series (`series`) have a point cap per level: `energy.deployment_series_points` (1000), `energy.user_series_points` (1000) and `energy.cluster_series_points` (500). The points are the 15-min buckets aggregated into fixed windows, the finest of `15m`, `30m`, `1h`, `2h`, `3h`, `6h`, `12h`, `1d` and `1w` that keeps the series within the cap. There is no query param for it and the response does not state it: it is the spacing between the `ts` of consecutive points. The windows are aligned to UTC midnight (weeks start on Monday), so every point spans the same time (only the first and the last window can be partial), the boundaries do not move when new data arrives, and summing the points by UTC day (by ISO week for `1w`) gives exact totals. Each point is stamped with its window start, `power_w` is the mean over the window and `live` is `true` when the window holds any live bucket. The cap is soft: the ladder is discrete, so a series usually has fewer points than the cap (a datacenter with 34 days of data and a cap of 500 gets 3 h windows and 346 points), and past the coarsest window (weeks) the cap no longer applies.
 
 Every endpoint that attaches energy also takes `energy` (default `true`). Pass `energy=false` to drop the `energy` block entirely, for a leaner and slightly faster response when the caller does not need it. PAPI itself passes `energy=false` on its internal quota and resource checks.
 
@@ -33,7 +35,7 @@ If the feature is disabled or has no data, every one of these is `null` (or an a
 - Timestamps: ISO-8601 UTC, always with the `Z` suffix (`2026-09-07T07:50:00Z`).
 - Every numeric field is a JSON number (float), returned at full precision (not rounded): the accumulated total always equals the sum of `series`, and idle CPU workloads can legitimately sit at 1e-5 Wh. Round for display on the client.
 - Every energy, power, carbon and water value is normalized by the datacenter TUE (grid to compute ratio). The raw pre-TUE figure is not sent, but `tue_factor` is: divide by it to get the raw value. On a single-datacenter deployment `tue_factor` is that datacenter's configured TUE; on the per-user aggregate and on a deployment that moved between sites it is the blended `energy_wh / raw_energy_wh`.
-- `power_w` in the block is the **current draw**: the last sample read from Mimir (~30 to 60 s old) at every level. `series[].power_w` in the time series is different: the **mean** over that 15-min bucket (so `energy_wh ~= power_w * bucket_hours`). Either way it is a rate, not a total, and is never summed.
+- `power_w` in the block is the **current draw**: the last sample read from Mimir (~30 to 60 s old) at every level. `series[].power_w` in the time series is different: the **mean** over that window (so `energy_wh ~= power_w * window_hours`). Either way it is a rate, not a total, and is never summed.
 
 ## The `EnergyStats` object
 
@@ -71,7 +73,7 @@ One object, the same shape at every level, always with the live top-up applied: 
 | `coverage_ratio` | number or null | Deployment and per-user only: fraction of the run time that has power data (`1.0` = fully covered). `null` on the datacenter block. |
 | `datacenters` | string[] or null | Deployment and per-user only: datacenters the deployment(s) ran in. `null` on the datacenter block. |
 | `deployments` | number or null | Per-user aggregate only: how many deployments went into the sum. |
-| `series` | array or null | Per-user aggregate only, and only with `full_info=true`: the merged 15-min time series. `null` otherwise. |
+| `series` | array or null | Per-user aggregate only, and only with `full_info=true`: the merged time series, in equal windows. `null` otherwise. |
 
 The values already include the live top-up: `energy_wh` is the persisted accumulator plus the slice from the last persisted point up to `live_as_of`, computed live against Mimir on each request (cached ~25 s). That is why the counter moves between refreshes without a background job.
 
@@ -148,18 +150,18 @@ The list endpoint resolves all of the user's deployments with one or two Mimir q
 | Field | Type | Meaning |
 |---|---|---|
 | `deployment_uuid` | string | Echo of the deployment. |
-| `start` / `end` | string | Time span covered by `series`. `start` equals `accumulated.since`, `end` the live edge (the last point). Convenience only, both are derivable from the series. |
-| `series` | array | Ordered by `ts` ascending. Whole deployment life, downsampled to `energy.deployment_series_points` (default 1000). |
+| `start` / `end` | string | Time span covered by `series`. `start` equals `accumulated.since`, `end` the live edge (`accumulated.live_as_of`). Both come from `accumulated`, not from the first and last point (those are stamped with their window start). |
+| `series` | array | Ordered by `ts` ascending. Whole deployment life, in windows picked by `energy.deployment_series_points` (see above). |
 | `series[].ts` | string | Bucket start. |
-| `series[].power_w` | number or null | Mean power over the part of the bucket that had data, normalized by TUE. `energy_wh` is about `power_w` times the bucket duration. |
-| `series[].energy_wh` | number or null | Energy in that bucket (per-bucket increment). A running total is `cumsum(series[].energy_wh)` and matches `accumulated.energy_wh`. |
-| `series[].carbon_g` | number or null | Carbon in that bucket. Same, cumsum matches `accumulated.carbon_g`. |
-| `series[].water_l` | number or null | Water in that bucket. Same, cumsum matches `accumulated.water_l`. |
+| `series[].power_w` | number or null | Mean power over the part of the window that had data, normalized by TUE. `energy_wh` is about `power_w` times the window duration. |
+| `series[].energy_wh` | number or null | Energy in that window (per-window increment). A running total is `cumsum(series[].energy_wh)` and matches `accumulated.energy_wh`. |
+| `series[].carbon_g` | number or null | Carbon in that window. Same, cumsum matches `accumulated.carbon_g`. |
+| `series[].water_l` | number or null | Water in that window. Same, cumsum matches `accumulated.water_l`. |
 | `series[].live` | boolean | `true` for the tail points served live from Mimir (not yet persisted). They can change on the next refresh. |
 | `source` | string | `"store"` (only the persisted archive) or `"mixed"` (archive plus a live tail). Equivalent to `series[-1].live`. |
 | `accumulated` | EnergyStats | The current totals, same object as the list view. Use it for the headline numbers next to the chart (and its `degraded` flag). |
 
-- The persisted archive is at 15-minute resolution (`energy.series_bucket_seconds`); the response is downsampled to `energy.deployment_series_points` (default 1000) across the whole life.
+- The persisted archive is at 15-minute resolution (`energy.series_bucket_seconds`); the response aggregates it into fixed windows across the whole life, the finest that fits `energy.deployment_series_points` (see above).
 - The deployment is running, so `end` reaches "now" and the last points carry `live: true`. Calling the endpoint again a minute later returns a slightly longer series with updated `live` points. That is what makes the chart grow.
 - Poll the detail view every 30 to 60 s.
 
@@ -198,7 +200,7 @@ The existing response gains an `energy` key: all of the user's deployments in th
 
 - Same fields as the per-deployment `EnergyStats` (see above), aggregated: `since` is the earliest across the user's deployments, `as_of` / `live_as_of` the latest, `complete` is the AND, `degraded` the OR, `power_w` the sum over the running ones, `coverage_ratio` the mean, `datacenters` the union, `tue_factor` the blended `energy_wh / raw_energy_wh`.
 - `deployments`: how many accounted deployments went into the sum.
-- `series`: `null` unless `full_info=true`, then a 15-min time series of the user's deployments summed by timestamp and downsampled once to `energy.user_series_points` (default 1000; `EnergyTimeSeriesPoint` shape, uniform step across the whole series), for a "my usage over time" chart.
+- `series`: `null` unless `full_info=true`, then a time series of the user's deployments summed by timestamp and aggregated into windows that fit `energy.user_series_points` (`EnergyTimeSeriesPoint` shape, same step across the whole series), for a "my usage over time" chart. Periods when none of the user's deployments was running are filled with zero points, up to the last complete bucket, except past the last known data of a deployment that is running (there the store knows nothing, so the series simply ends and the live tail continues it).
 - `null` when the user has no accounted deployments.
 - Independent of the pre-existing CSV usage stats: if those are missing the endpoint still returns the `energy` block.
 
@@ -214,7 +216,7 @@ Each `datacenters[<dc>]` object gains an `energy` block: the same `EnergyStats` 
 
 - **`power_w`**: the current draw from the last Mimir scrape, refreshed every ~30 s, normalized by TUE. It is `(sum of scaphandre host power + sum of GPU power) * TUE`.
 - **accumulated** energy and footprint since accounting started (`energy_wh`, `carbon_g`, `water_l`, all TUE-normalized, divide by `tue_factor` for raw), kept indefinitely and topped up live on every read.
-- **`series`**: `null` by default; with `full_info=true`, a 15-min series downsampled to `energy.cluster_series_points` (default 500).
+- **`series`**: `null` by default; with `full_info=true`, a series in windows that fit `energy.cluster_series_points`. A hole in the datacenter data (a Mimir outage) stays a hole.
 
 `?vo=<vo>` filters the node lists but not the `energy` blocks: an instrumented datacenter keeps its `energy` even when the VO has no nodes there (its `nodes` map is then empty).
 

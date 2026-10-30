@@ -271,13 +271,21 @@ def get_cluster_stats(
                 stats.cluster.gpu_models[model_name].gpu_total += g_stats.gpu_total
                 stats.cluster.gpu_models[model_name].gpu_used += g_stats.gpu_used
 
-    # Per-datacenter energy time series only with `full_info=true` (it is large:
-    # ~500 points per datacenter). The accumulated numbers and the live top-up
-    # are always present.
-    if not full_info:
-        for dc_stats in stats.datacenters.values():
-            if dc_stats.energy is not None:
-                dc_stats.energy.series = None
+    # Per-datacenter energy time series only with `full_info=true` (it is large).
+    # The background thread computes the accumulated numbers and the live top-up
+    # only; the series is built here, per request.
+    if energy and full_info and energy_accounting.enabled():
+        try:
+            for dc_name, dc_energy in energy_accounting.get_cluster_energy(
+                series=True
+            ).items():
+                dc_stats = stats.datacenters.get(dc_name)
+                if dc_stats is not None and dc_stats.energy is not None:
+                    dc_stats.energy.series = schemas.EnergyStats(
+                        series=dc_energy.get("series")
+                    ).series
+        except Exception:
+            logging.exception("Error computing cluster energy series")
 
     # Add update time
     stats.updated_at = (
@@ -467,14 +475,15 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
                     g_stats.gpu_total = n_stats.gpu_used
 
     # Per-datacenter energy (energy feature): instantaneous power draw + the
-    # accumulated energy/footprint since accounting started + a time series.
+    # accumulated energy/footprint since accounting started (the series is built per request in
+    # `get_cluster_stats`).
     # Reported per datacenter only, there is no platform-wide total (clients sum
     # the datacenters they care about). Best-effort: a failure here must not
     # break the cluster stats.
     if energy_accounting.enabled():
         try:
             for dc_name, dc_energy in energy_accounting.get_cluster_energy(
-                series=True
+                series=False
             ).items():
                 if dc_name not in stats.datacenters:
                     stats.datacenters[dc_name] = schemas.DatacenterStats(
