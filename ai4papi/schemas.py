@@ -42,8 +42,8 @@ class EnergyTimeSeriesPoint(BaseModel):
     # Per-bucket increments only. A running total is `cumsum(series[].energy_wh)`
     # and matches `accumulated.energy_wh` (same for carbon and water).
     ts: str
-    power_w: Optional[float] = None  # mean over the bucket, normalized (x TUE)
-    energy_wh: Optional[float] = None  # normalized, incremental for the bucket
+    power_w: Optional[float] = None  # mean over the window, normalized (x TUE)
+    energy_wh: Optional[float] = None  # normalized, incremental for the window
     carbon_g: Optional[float] = None
     water_l: Optional[float] = None
     live: bool = False  # point from the live tail (not yet persisted)
@@ -79,14 +79,14 @@ class EnergyStats(BaseModel):
     datacenters: Optional[list[str]] = None  # per deployment / user
     deployments: Optional[int] = None  # per-user aggregate only
     series: Optional[list[EnergyTimeSeriesPoint]] = (
-        None  # 15-min buckets; only with full_info=true
+        None  # equal time windows; only with full_info=true
     )
 
 
 class EnergyTimeSeries(BaseModel):
     deployment_uuid: str
-    start: str  # first point (equivalently `accumulated.since`)
-    end: str  # last point (the live edge while running)
+    start: str  # `accumulated.since`
+    end: str  # live edge while running (`accumulated.live_as_of`)
     source: str  # "store" (archive only) | "mixed" (archive + live tail)
     series: list[EnergyTimeSeriesPoint]
     accumulated: EnergyStats

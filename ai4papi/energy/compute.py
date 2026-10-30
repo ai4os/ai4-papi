@@ -9,7 +9,6 @@ cached node->datacenter lookup); everything else is pure and unit-testable.
 
 import bisect
 import datetime
-import itertools
 import threading
 import statistics
 from collections import namedtuple
@@ -390,32 +389,30 @@ def apply_footprint(
 # ---------------------------------------------------------------------------
 
 
-def downsample(buckets: list[Bucket], target_points: int) -> list[Bucket]:
-    """
-    Aggregate buckets into fixed, epoch-aligned time windows so the result has at
-    most `target_points` and every point spans the same time (only the first and
-    last window can be partial). Windows are by time, not by position: the
-    boundaries do not move when a new bucket arrives. Each point is stamped with
-    its window start. The bucket step is inferred from the smallest gap.
-    """
-    n = len(buckets)
-    if n <= target_points or target_points < 1:
-        return buckets
+# Windows are anchored to a Monday midnight (the epoch itself is a Thursday): a
+# window that divides the day is unaffected, and a week window starts on Monday.
+WINDOW_ANCHOR_S = int(
+    datetime.datetime(1970, 1, 5, tzinfo=datetime.timezone.utc).timestamp()
+)
 
-    ts = [parse_iso(b.ts) for b in buckets]
-    step = min(b - a for a, b in itertools.pairwise(ts))
-    slots = round((ts[-1] - ts[0]) / step) + 1
-    # one window less than `target_points`: the first and last may be partial, so
-    # a span of `slots` can straddle one more window than it holds
-    # shortcut: target_points == 1 can still yield 2 windows, nobody asks for one
-    window = -(-slots // max(target_points - 1, 1)) * step
 
+def downsample(buckets: list[Bucket], window_s: int) -> list[Bucket]:
+    """
+    Aggregate buckets into fixed windows of `window_s` seconds anchored to a Monday
+    midnight UTC (energy, carbon and water summed, power averaged). Windows are by
+    time, not by position, so their boundaries never move when a new bucket
+    arrives; only the first and the last window can be partial. Each point is
+    stamped with its window start. Pass a window that divides the day or is a whole
+    number of days, so a client grouping the points by UTC day gets exact totals.
+    """
     groups: dict[int, list[Bucket]] = {}
-    for t, b in zip(ts, buckets):
-        groups.setdefault(int(t // window), []).append(b)
+    for b in buckets:
+        groups.setdefault(
+            int((parse_iso(b.ts) - WINDOW_ANCHOR_S) // window_s), []
+        ).append(b)
     return [
         Bucket(
-            ts=iso(k * window),
+            ts=iso(k * window_s + WINDOW_ANCHOR_S),
             energy_wh=sum(b.energy_wh for b in chunk),
             power_w_avg=sum(b.power_w_avg for b in chunk) / len(chunk),
             carbon_g=sum(b.carbon_g for b in chunk),

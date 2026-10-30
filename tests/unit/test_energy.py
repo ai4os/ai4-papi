@@ -213,16 +213,14 @@ def test_downsample():
     many = [
         compute.Bucket(compute.iso(i * 300), 1.0, 10.0, 0.1, 0.01) for i in range(100)
     ]
-    ds = compute.downsample(many, 10)
-    assert 2 <= len(ds) <= 10
-    # fixed time windows: all the same span except the first and last (partial)
-    _w = {
-        round(compute.parse_iso(b.ts) - compute.parse_iso(a.ts))
-        for a, b in itertools.pairwise(ds)
-    }
-    assert len(_w) == 1, _w
+    ds = compute.downsample(many, 900)
+    # fixed, epoch-aligned windows: every point spans the same time except the
+    # last (partial) one, and nothing is lost
+    assert [b.ts for b in ds[:2]] == [compute.iso(0), compute.iso(900)]
+    assert len({round(compute.parse_iso(b.ts)) % 900 for b in ds}) == 1
+    assert [b.energy_wh for b in ds[:-1]] == [3.0] * (len(ds) - 1)
     assert abs(sum(b.energy_wh for b in ds) - sum(b.energy_wh for b in many)) < 1e-6
-    assert compute.downsample(many, 500) is many  # nothing to do
+    assert ds[0].power_w_avg == 10.0  # power is averaged, not summed
 
 
 def test_merge_buckets():
@@ -303,6 +301,9 @@ def test_sweep_pipeline(monkeypatch):
     schemas.EnergyStats(**stats)
     series = energy.get_series(_NS, _UUID)
     schemas.EnergyTimeSeries(**series)
+    assert series["start"] == stats["since"]
+    _acc = series["accumulated"]
+    assert series["end"] == (_acc["live_as_of"] or _acc["as_of"])
     assert series["series"] and all(
         p["energy_wh"] is not None for p in series["series"]
     )
@@ -343,9 +344,15 @@ def test_sweep_pipeline(monkeypatch):
         round((_uts[i + 1] - _uts[i]).total_seconds()) for i in range(len(_uts) - 1)
     }
     assert len(_steps) == 1, _steps
-    # hard cap on the persisted point count, same as the other levels
-    _capped = energy.get_user_energy(_NS, "user@egi.eu", series=True, target_points=5)
-    assert len([p for p in _capped["series"] if not p["live"]]) <= 5
+    # the point cap picks the window: a tight cap forces a coarser one, and the
+    # energy adds up either way
+    monkeypatch.setitem(config.get(), "user_series_points", 5)
+    _capped = energy.get_user_energy(_NS, "user@egi.eu", series=True)
+    assert len(_capped["series"]) <= 5 + 1  # + the live window, if any
+    assert (
+        abs(sum(p["energy_wh"] for p in _capped["series"]) - _capped["energy_wh"])
+        < 1e-9
+    )
     assert energy.get_user_energy(_NS, "nobody@egi.eu") is None
 
     # live tail: a running deployment's graph keeps growing past the stored series
@@ -968,7 +975,7 @@ def test_build_series_live_tail_only_after_persisted():
 
     persisted = [[b("2026-01-01T00:00:00Z", 1.0), b("2026-01-01T00:15:00Z", 2.0)]]
     live = [[b("2026-01-01T00:15:00Z", 9.0), b("2026-01-01T00:30:00Z", 3.0)]]
-    points = series.build_series(persisted, live, target_points=100)
+    points = series.build_series(persisted, live, 1000)
     assert [(p["ts"], p["energy_wh"], p["live"]) for p in points] == [
         ("2026-01-01T00:00:00Z", 1.0, False),
         ("2026-01-01T00:15:00Z", 2.0, False),
@@ -976,7 +983,7 @@ def test_build_series_live_tail_only_after_persisted():
     ]
 
     # several entities (a user's deployments) are summed per timestamp
-    two = series.build_series([persisted[0], persisted[0]], [], target_points=100)
+    two = series.build_series([persisted[0], persisted[0]], [], 1000)
     assert [p["energy_wh"] for p in two] == [2.0, 4.0]
 
 
@@ -1183,7 +1190,7 @@ def test_build_series_fill_gaps():
         return {"ts": ts, "energy_wh": wh, "power_w_avg": 5.0}
 
     persisted = [[b("2026-01-01T00:00:00Z", 1.0), b("2026-01-01T00:45:00Z", 2.0)]]
-    points = series.build_series(persisted, [], target_points=100, fill_s=900)
+    points = series.build_series(persisted, [], 1000, fill_s=900)
     assert [(p["ts"], p["energy_wh"], p["power_w"]) for p in points] == [
         ("2026-01-01T00:00:00Z", 1.0, 5.0),
         ("2026-01-01T00:15:00Z", 0.0, 0.0),
@@ -1192,13 +1199,62 @@ def test_build_series_fill_gaps():
     ]
 
 
+def test_build_series_fill_keeps_off_grid_buckets():
+    def b(ts, wh):
+        return {"ts": ts, "energy_wh": wh, "power_w_avg": 5.0}
+
+    persisted = [[b("2026-01-01T00:05:00Z", 1.0), b("2026-01-01T00:30:00Z", 2.0)]]
+    points = series.build_series(persisted, [], 1000, fill_s=900)
+    assert sum(p["energy_wh"] for p in points) == 3.0
+
+
+def test_cluster_stats_series_only_with_full_info(monkeypatch):
+    from ai4papi.routers.v1.stats import deployments as stats_dep
+
+    dc = schemas.DatacenterStats(
+        lat=0, lon=0, PUE=1, nodes={}, energy=schemas.EnergyStats()
+    )
+    base = schemas.ClusterStats(
+        datacenters={"dc": dc}, cluster=schemas.ResourceStats(gpu_models={})
+    )
+    point = {
+        "ts": "2026-01-01T00:00:00Z",
+        "power_w": 1.0,
+        "energy_wh": 2.0,
+        "carbon_g": 0.0,
+        "water_l": 0.0,
+        "live": False,
+    }
+    calls = []
+
+    def fake_energy(series=True):
+        calls.append(series)
+        return {"dc": {"series": [point]}}
+
+    monkeypatch.setattr(stats_dep, "cluster_stats", base)
+    monkeypatch.setattr(
+        stats_dep, "cluster_stats_updated_at", __import__("time").time()
+    )
+    monkeypatch.setattr(stats_dep.energy_accounting, "enabled", lambda: True)
+    monkeypatch.setattr(stats_dep.energy_accounting, "get_cluster_energy", fake_energy)
+
+    assert (
+        stats_dep.get_cluster_stats(full_info=False).datacenters["dc"].energy.series
+        is None
+    )
+    assert calls == []
+    out = stats_dep.get_cluster_stats(full_info=True)
+    assert out.datacenters["dc"].energy.series[0].energy_wh == 2.0
+    assert calls == [True]
+
+
 def test_build_series_fill_until_now():
     def b(ts, wh):
         return {"ts": ts, "energy_wh": wh, "power_w_avg": 5.0}
 
     persisted = [[b("2026-01-01T00:00:00Z", 1.0)]]
     until = compute.parse_iso("2026-01-01T00:50:00Z")  # last complete bucket: 00:30
-    points = series.build_series(persisted, [], 100, fill_s=900, until=until)
+    points = series.build_series(persisted, [], 1000, fill_s=900, until=until)
     assert [p["ts"] for p in points] == [
         "2026-01-01T00:00:00Z",
         "2026-01-01T00:15:00Z",
@@ -1207,7 +1263,7 @@ def test_build_series_fill_until_now():
 
     # a live tail takes over where it starts: no zero is placed over it
     live = [[b("2026-01-01T00:30:00Z", 7.0)]]
-    points = series.build_series(persisted, live, 100, fill_s=900, until=until)
+    points = series.build_series(persisted, live, 1000, fill_s=900, until=until)
     assert [(p["ts"], p["energy_wh"], p["live"]) for p in points] == [
         ("2026-01-01T00:00:00Z", 1.0, False),
         ("2026-01-01T00:15:00Z", 0.0, False),
@@ -1249,14 +1305,13 @@ def test_build_series_uniform_resolution_with_live_tail():
     def b(i, wh=1.0):
         return {"ts": compute.iso(i * 900), "energy_wh": wh, "power_w_avg": 5.0}
 
-    # 100 persisted buckets + 3 live ones, squeezed into 10 points: every point
-    # spans the same time, the live tail included, and nothing is lost
+    # 100 persisted buckets + 3 live ones under a 30-point cap: the finest window
+    # that fits is 1 h; every point spans the same time, the live tail included,
+    # and nothing is lost
     points = series.build_series(
-        [[b(i) for i in range(100)]],
-        [[b(i) for i in range(100, 103)]],
-        target_points=10,
+        [[b(i) for i in range(100)]], [[b(i) for i in range(100, 103)]], 30
     )
-    assert len(points) <= 10
+    assert len(points) == 26  # 1 h windows: the finest that fits 30 points
     steps = {
         round(compute.parse_iso(q["ts"]) - compute.parse_iso(p["ts"]))
         for p, q in itertools.pairwise(points)
@@ -1291,3 +1346,57 @@ def test_user_series_no_trailing_zeros_when_live_tail_is_missing(monkeypatch):
     )
     pts = energy.get_user_energy(_NS, "u@egi.eu", series=True)["series"]
     assert [p["ts"] for p in pts] == [compute.iso(base - 5 * step)]
+
+
+@pytest.mark.parametrize("name", list(series.RESOLUTIONS))
+def test_every_resolution_keeps_calendar_totals_exact(name):
+    """Every window of the ladder lines up with the UTC day (and the week one with
+    ISO weeks): grouping the points by day, or by week for `1w`, gives the same
+    totals as the raw buckets. A window that drifts against midnight made one day
+    in three look lower and the other two higher."""
+    w = series.RESOLUTIONS[name]
+    monday = 1_700_006_400 + 5 * 86400  # a UTC midnight that is a Monday
+    assert datetime.datetime.fromtimestamp(monday, datetime.timezone.utc).weekday() == 0
+    raw = [
+        compute.Bucket(compute.iso(monday + i * 900), 1.0 + (i % 7), 10.0, 0.1, 0.01)
+        for i in range(120 * 96)
+    ]
+    unit = 7 * 86400 if name == "1w" else 86400
+
+    def per_unit(bs):
+        out = {}
+        for b in bs:
+            k = (compute.parse_iso(b.ts) - monday) // unit
+            out[k] = out.get(k, 0.0) + b.energy_wh
+        return out
+
+    ds = compute.downsample(raw, w)
+    assert per_unit(ds) == pytest.approx(per_unit(raw))
+    assert (
+        len(
+            {
+                round(compute.parse_iso(q.ts) - compute.parse_iso(p.ts))
+                for p, q in itertools.pairwise(ds)
+            }
+        )
+        == 1
+    )
+
+
+def test_pick_resolution_respects_the_cap():
+    day = 86400
+    # a short series keeps the native 15 min, a long one climbs the ladder
+    assert series.pick_resolution(0, 3 * day, 1000) == "15m"
+    assert series.pick_resolution(0, 30 * day, 1000) == "1h"
+    assert series.pick_resolution(0, 365 * day, 1000) == "12h"
+    assert series.pick_resolution(0, 365 * day, 500) == "1d"
+    assert series.pick_resolution(0, 3650 * day, 500) == "1w"
+    # the number of points never goes over the cap (until the coarsest window)
+    for span_days in (1, 7, 31, 90, 365, 730):
+        for cap in (100, 500, 1000):
+            first = 1_700_000_000
+            name = series.pick_resolution(first, first + span_days * day, cap)
+            w = series.RESOLUTIONS[name]
+            o = compute.WINDOW_ANCHOR_S
+            n = int((first + span_days * day - o) // w) - int((first - o) // w) + 1
+            assert n <= cap or name == "1w", (span_days, cap, name, n)

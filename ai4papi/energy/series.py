@@ -5,6 +5,36 @@ and live Mimir tails into the points served by the API.
 
 from ai4papi.energy import compute
 
+# Windows the 15-min buckets are aggregated into, finest first. Every one is a
+# multiple of 15 min, and from 1 h on of the hour, and they tile the UTC day (or
+# are whole weeks), so the buckets always line up and a client grouping the points
+# by day / ISO week gets exact totals.
+RESOLUTIONS: dict[str, int] = {
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "2h": 7200,
+    "3h": 10800,
+    "6h": 21600,
+    "12h": 43200,
+    "1d": 86400,
+    "1w": 604800,
+}
+
+
+def pick_resolution(first_ts: float, last_ts: float, max_points: int) -> str:
+    """
+    The finest window whose number of points over `[first_ts, last_ts]` stays
+    within `max_points`. The cap is soft: the windows are a fixed ladder, so a
+    series usually ends up under it, by up to a factor of two between rungs. Beyond
+    the coarsest window (weeks) the cap no longer applies.
+    """
+    for name, w in RESOLUTIONS.items():
+        o = compute.WINDOW_ANCHOR_S
+        if int((last_ts - o) // w) - int((first_ts - o) // w) + 1 <= max_points:
+            return name
+    return "1w"
+
 
 def _bucket(b: dict) -> compute.Bucket:
     return compute.Bucket(
@@ -36,35 +66,41 @@ def persisted(archive: list[dict], doc: dict) -> list[dict]:
 def _fill_gaps(
     buckets: list[compute.Bucket], step_s: int, end_ts: float
 ) -> list[compute.Bucket]:
-    """Zero buckets on the `step_s` grid wherever `buckets` (sorted) has a hole,
-    and from the last one up to `end_ts` (inclusive)."""
-    by_ts = {b.ts: b for b in buckets}
-    out, t = [], compute.parse_iso(buckets[0].ts)
+    """`buckets` (sorted) plus a zero bucket on the `step_s` grid at every missing
+    slot, from the first bucket up to `end_ts` (inclusive). Buckets off the grid
+    are kept, so no energy is lost."""
+    have = {b.ts for b in buckets}
+    out = list(buckets)
+    t = compute.parse_iso(buckets[0].ts)
     end = max(end_ts, compute.parse_iso(buckets[-1].ts))
     while t <= end:
         ts = compute.iso(t)
-        out.append(by_ts.get(ts) or compute.Bucket(ts, 0.0, 0.0, 0.0, 0.0))
+        if ts not in have:
+            out.append(compute.Bucket(ts, 0.0, 0.0, 0.0, 0.0))
         t += step_s
-    return out
+    return sorted(out, key=lambda b: b.ts)
 
 
 def build_series(
     persisted_lists: list[list[dict]],
     live: list[list[dict]],
-    target_points: int,
+    max_points: int,
     fill_s: int | None = None,
     until: float | None = None,
 ) -> list[dict]:
     """
     Time series of one or several entities (a deployment, a user's deployments,
-    a datacenter). The persisted buckets are merged by timestamp across entities
-    and `compute.downsample`d once together with the live Mimir tails (merged the
-    same way, only the part after the persisted buckets), so the resolution is
-    uniform and capped at `target_points`. With `fill_s`, holes in the persisted buckets (no entity
-    active) are filled with zero points on that grid, before downsampling, so
-    the series is continuous; with `until` (a timestamp) it also runs up to the last
-    complete bucket before it, stopping short of the live tail's first bucket. The points carry the per-bucket increments only; a running
-    total is `cumsum(series[].energy_wh)` and matches `accumulated.energy_wh`.
+    a datacenter). The persisted buckets are merged by
+    timestamp across entities and `compute.downsample`d together with the live
+    Mimir tails (merged the same way, only the part after the persisted buckets)
+    into fixed windows: the finest of `RESOLUTIONS` that keeps the series within
+    about `max_points` (`pick_resolution`), so every point spans the same time. With `fill_s`, holes in the persisted
+    buckets (no entity active) are filled with zero points on that grid, before
+    aggregating, so the series is continuous; with `until` (a timestamp) it also
+    runs up to the last complete bucket before it, stopping short of the live
+    tail's first bucket. The points carry the per-window increments only; a
+    running total is `cumsum(series[].energy_wh)` and matches
+    `accumulated.energy_wh`.
     """
 
     def merged(lists: list[list[dict]]) -> list[compute.Bucket]:
@@ -78,11 +114,18 @@ def build_series(
         if live_buckets:  # leave the live buckets to the live tail
             end = min(end, compute.parse_iso(live_buckets[0].ts) - fill_s)
         buckets = _fill_gaps(buckets, fill_s, end)
-    # the live tail goes through the same downsampling, so every point spans the
+    # the live tail goes through the same aggregation, so every point spans the
     # same time; a point is `live` if its window holds any live bucket
     last = buckets[-1].ts if buckets else ""
     tail = [b for b in live_buckets if b.ts > last]
-    points = compute.downsample(buckets + tail, target_points)
+    allb = buckets + tail
+    if not allb:
+        return []
+    name = pick_resolution(
+        compute.parse_iso(allb[0].ts), compute.parse_iso(allb[-1].ts), max_points
+    )
+    w = RESOLUTIONS[name]
+    points = compute.downsample(allb, w)
     if not tail:
         return [_point(p, live=False) for p in points]
     live_from = max(p.ts for p in points if p.ts <= tail[0].ts)

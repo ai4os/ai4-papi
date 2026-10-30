@@ -189,8 +189,10 @@ def get_accumulated_bulk(
 def add_to_job(job: dict, namespace: str, full_info: bool) -> None:
     """Set `job["energy"]`: the extended time series if `full_info`, else just the
     accumulated stats."""
-    get = get_series if full_info else get_accumulated
-    job["energy"] = get(namespace, job["job_ID"])
+    if full_info:
+        job["energy"] = get_series(namespace, job["job_ID"])
+    else:
+        job["energy"] = get_accumulated(namespace, job["job_ID"])
 
 
 def add_to_jobs(jobs: list[dict], namespace: str, owner: str, full_info: bool) -> None:
@@ -246,12 +248,14 @@ def _aggregate(stats_list: list[dict]) -> dict:
 
 
 def get_user_energy(
-    namespace: str, owner: str, series: bool = False, target_points: int | None = None
+    namespace: str,
+    owner: str,
+    series: bool = False,
 ) -> dict | None:
     """
     All of a user's deployments in a VO rolled into one `EnergyStats`-shaped
     block: each deployment's persisted accumulator plus its live Mimir top-up,
-    summed. With `series=True`, also a 15-min time series merged across the
+    summed. With `series=True`, also a time series merged across the
     deployments (`full_info=true` on `GET /stats/user`). `None` when the user has
     no accounted deployment.
     """
@@ -264,10 +268,7 @@ def get_user_energy(
     out = _aggregate([stats for _uuid, _doc, stats in rows])
     out["series"] = None
     if series:
-        cfg = config.get()
-        step_s = int(cfg["series_bucket_seconds"])
-        if target_points is None:
-            target_points = int(cfg.get("user_series_points", 1000))
+        step_s = int(config.get()["series_bucket_seconds"])
         lives = [live_series(doc, bucket_s=step_s) for _uuid, doc, _stats in rows]
         # zeros only where nothing was running: past the `pointer_ts` of a running
         # deployment the store knows nothing (the live tail covers the recent part),
@@ -280,19 +281,17 @@ def get_user_energy(
                 if doc.get("active_allocs") and doc.get("pointer_ts")
             ]
         )
-        out["series"] = (
-            build_series(
-                [
-                    persisted(store.read_series(namespace, uuid, None, None), doc)
-                    for uuid, doc, _stats in rows
-                ],
-                lives,
-                target_points,
-                fill_s=step_s,  # idle periods show as zeros, not as missing points
-                until=until,
-            )
-            or None
+        out["series"] = build_series(
+            [
+                persisted(store.read_series(namespace, uuid, None, None), doc)
+                for uuid, doc, _stats in rows
+            ],
+            lives,
+            int(config.get().get("user_series_points", 1000)),
+            fill_s=step_s,  # idle periods show as zeros, not as missing points
+            until=until,
         )
+        out["series"] = out["series"] or None
     return out
 
 
@@ -369,20 +368,16 @@ def _cluster_archive_series(dc: str) -> list[dict]:
     return store.read_series(CLUSTER_NS, dc, None, None)
 
 
-def get_cluster_energy(
-    series: bool = True, target_points: int | None = None
-) -> dict[str, dict]:
+def get_cluster_energy(series: bool = True) -> dict[str, dict]:
     """
     Per-datacenter energy for `/stats/cluster`: the instantaneous power from
     `get_datacenter_power()` merged with the persisted accumulator plus a live
-    top-up, plus a downsampled 15-min `series`. `{}` when the feature is disabled.
+    top-up, plus a `series` (window picked by the point cap). `{}` when the feature is disabled.
     A datacenter shows up if it has instantaneous power or an accumulator doc.
     """
     if not enabled():
         return {}
     cfg = config.get()
-    if target_points is None:
-        target_points = int(cfg.get("cluster_series_points", 500))
     bucket_s = int(cfg["series_bucket_seconds"])
 
     inst = get_datacenter_power()
@@ -419,7 +414,7 @@ def get_cluster_energy(
                 entry["series"] = build_series(
                     [persisted(_cluster_archive_series(dc), doc)],
                     [live_series(doc, bucket_s=bucket_s)],
-                    target_points,
+                    int(cfg.get("cluster_series_points", 500)),
                 )
         if entry:
             out[dc] = entry
@@ -431,9 +426,7 @@ def get_cluster_energy(
 # ---------------------------------------------------------------------------
 
 
-def get_series(
-    namespace: str, uuid: str, target_points: int | None = None
-) -> dict | None:
+def get_series(namespace: str, uuid: str) -> dict | None:
     if not enabled():
         return None
     res = _resolve(namespace, uuid, live=True)
@@ -441,22 +434,17 @@ def get_series(
         return None
     doc, stats = res
 
-    cfg = config.get()
-    if target_points is None:
-        target_points = int(cfg.get("deployment_series_points", 1000))
-    step_s = int(cfg["series_bucket_seconds"])
+    step_s = int(config.get()["series_bucket_seconds"])
     series = build_series(
         [persisted(store.read_series(namespace, uuid, None, None), doc)],
         [live_series(doc, bucket_s=step_s)],
-        target_points,
+        int(config.get().get("deployment_series_points", 1000)),
     )
 
     return {
         "deployment_uuid": uuid,
-        "start": series[0]["ts"] if series else (stats.get("since") or ""),
-        "end": series[-1]["ts"]
-        if series
-        else (stats.get("live_as_of") or stats.get("as_of") or ""),
+        "start": stats.get("since") or "",
+        "end": stats.get("live_as_of") or stats.get("as_of") or "",
         "source": "mixed" if any(p["live"] for p in series) else "store",
         "series": series,
         "accumulated": stats,
