@@ -9,8 +9,8 @@ cached node->datacenter lookup); everything else is pure and unit-testable.
 
 import bisect
 import datetime
-import threading
 import statistics
+import threading
 from collections import namedtuple
 
 from cachetools import TTLCache, cached

@@ -26,21 +26,20 @@ import configparser
 import importlib
 import json
 import re
-from typing import Annotated
 import warnings
-import yaml
+from typing import Annotated
 
 import ai4_metadata
 import ai4_metadata.exceptions
-from cachetools import cached, TTLCache
+import requests
+import yaml
+from cachetools import TTLCache, cached
 from fastapi import Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer
-import requests
 
-from ai4papi import schemas, utils
 import ai4papi.conf as papiconf
-
+from ai4papi import schemas, utils
 
 session = requests.Session()
 
