@@ -9,6 +9,11 @@ from conf import token
 # Only use mandatory config parameters, otherwise use defaults
 tools_config = {
     "ai4os-federated-server": {},
+    "arena-fl-server-llm": {
+        "general": {
+            "jupyter_password": "mock_password",
+        },
+    },
     "ai4os-cvat": {
         "general": {
             "cvat_username": "mock_user",
