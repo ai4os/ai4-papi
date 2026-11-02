@@ -80,9 +80,7 @@ class Catalog:
         self.item_type = item_type
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
-    def get_items(
-        self,
-    ):
+    def get_items(self):
         """
         Retrieve a dict of *all* items.
         ```
