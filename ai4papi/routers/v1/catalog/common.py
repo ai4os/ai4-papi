@@ -80,9 +80,7 @@ class Catalog:
         self.item_type = item_type
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
-    def get_items(
-        self,
-    ):
+    def get_items(self):
         """
         Retrieve a dict of *all* items.
         ```
@@ -171,7 +169,9 @@ class Catalog:
     def get_metadata(
         self,
         item_name: str,
-        profile: Annotated[str, Query(enum=[""] + supported_profiles)] = "",
+        profile: Annotated[
+            str, Query(json_schema_extra={"enum": [""] + supported_profiles})
+        ] = "",
         request: Request = None,  # ty: ignore
     ):
         """

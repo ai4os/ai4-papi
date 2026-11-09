@@ -121,6 +121,7 @@ tools_nomad2id = {
     "llm": "ai4os-llm",
     "ai4life": "ai4os-ai4life-loader",
     "devenv": "ai4os-dev-env",
+    "fedserver-llm": "arena-fl-server-llm",
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():
@@ -172,7 +173,8 @@ with open(pth, "r") as f:
             elif k == "country":
                 datacenters[name][k] = v
             else:
-                datacenters[name][k] = float(v)
+                # Numeric columns; allow blank cells (eg. TUE only known for some DCs)
+                datacenters[name][k] = float(v) if v not in (None, "") else None
 
 # Retrieve git info from PAPI, to show current version in the docs
 papi_commit = subprocess.run(
