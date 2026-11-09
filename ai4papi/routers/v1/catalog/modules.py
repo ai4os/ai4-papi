@@ -55,11 +55,11 @@ class ModulesCatalog(Catalog):
         conf["general"]["docker_tag"]["options"] = tags
         conf["general"]["docker_tag"]["value"] = tags[0]
 
-    # Add available datacenters
-    cluster_stats = stats_router.get_cluster_stats(vo)
-    conf["general"]["datacenter"]["options"] += list(
-        cluster_stats["datacenters"].keys()
-    )
+        # Add available datacenters
+        cluster_stats = stats_router.get_cluster_stats(vo)
+        conf["general"]["datacenter"]["options"] += list(
+            cluster_stats["datacenters"].keys()
+        )
 
         # Modify the resources limits for a given user or VO
         conf["hardware"] = quotas.limit_resources(
