@@ -22,7 +22,7 @@ router = APIRouter(
 security = HTTPBearer()
 
 
-def run_clone(command, storage_name, vo, token):
+def run_rclone(command, storage_name, vo, token):
     """
     Run an RCLONE command, setting the appropriate configuration based on the user
     secrets stored in Vault.
@@ -104,7 +104,7 @@ def storage_ls(
         subpath = os.path.normpath(subpath).strip()
 
         # Run RCLONE command
-        result = run_clone(
+        result = run_rclone(
             command=f"rclone lsjson rshare:/{subpath}",
             storage_name=storage_name,
             vo=vo,
@@ -157,7 +157,7 @@ def storage_rm(
         subpath = os.path.normpath(subpath).strip()
 
         # Run RCLONE command
-        _ = run_clone(
+        _ = run_rclone(
             command=f"rclone purge rshare:/{subpath}",
             storage_name=storage_name,
             vo=vo,

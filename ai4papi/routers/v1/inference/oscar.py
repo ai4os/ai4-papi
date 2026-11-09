@@ -6,11 +6,10 @@ from copy import deepcopy
 from datetime import datetime
 from functools import wraps
 import json
-from typing import Union
 import uuid
 import yaml
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
 import requests
@@ -136,8 +135,11 @@ def get_service_conf(
     # Parse docker registry
     registry = metadata["links"]["docker_image"]
     repo, image = registry.split("/")[-2:]
-    if repo not in ["deephdc", "ai4oshub"]:
-        repo = "ai4oshub"
+    if repo not in papiconf.MAIN_CONF["docker"]["valid_origins"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The docker image does not belong to a valid Docker origin: {registry}",
+        )
 
     # Fill with correct Docker image
     conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
@@ -185,7 +187,7 @@ def get_service_conf(
 @router.get("/services")
 def get_services_list(
     vo: str,
-    public: bool = Query(default=False),
+    public: bool = False,
     authorization=Depends(security),
 ):
     """
@@ -278,8 +280,8 @@ def make_service_definition(conf, vo):
     """
 
     # Create service definition
-    service = deepcopy(papiconf.OSCAR["service"])  # init from template
-    service = service.safe_substitute(
+    service_template = deepcopy(papiconf.OSCAR["service"])  # init from template
+    service_str = service_template.safe_substitute(
         {
             "CLUSTER_ID": papiconf.MAIN_CONF["oscar"]["clusters"][vo]["cluster_id"],
             "NAME": conf["name"],
@@ -297,7 +299,7 @@ def make_service_definition(conf, vo):
             },
         }
     )
-    service = yaml.safe_load(service)
+    service = yaml.safe_load(service_str)
 
     return service
 
@@ -305,7 +307,7 @@ def make_service_definition(conf, vo):
 @router.post("/services")
 def create_service(
     vo: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -346,7 +348,7 @@ def create_service(
 def update_service(
     vo: str,
     service_name: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -381,7 +383,7 @@ def update_service(
     return user_conf["name"]
 
 
-@router.delete("/services/{service_uuid}")
+@router.delete("/services/{service_name}")
 def delete_service(
     vo: str,
     service_name: str,

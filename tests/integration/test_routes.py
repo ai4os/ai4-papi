@@ -6,7 +6,7 @@ from ai4papi.main import app
 
 
 # Check routes
-routes = [(r.path, r.methods) for r in app.routes]
+routes = [(getattr(r, "path", ""), getattr(r, "methods", set())) for r in app.routes]
 
 for collection in ["modules", "tools"]:
     assert (f"/v1/catalog/{collection}", {"GET"}) in routes
@@ -29,7 +29,7 @@ assert ("/v1/inference/oscar/services", {"GET"}) in routes
 assert ("/v1/inference/oscar/services", {"POST"}) in routes
 assert ("/v1/inference/oscar/services/{service_name}", {"GET"}) in routes
 assert ("/v1/inference/oscar/services/{service_name}", {"PUT"}) in routes
-assert ("/v1/inference/oscar/services/{service_uuid}", {"DELETE"}) in routes
+assert ("/v1/inference/oscar/services/{service_name}", {"DELETE"}) in routes
 
 assert ("/v1/secrets", {"GET"}) in routes
 assert ("/v1/secrets", {"POST"}) in routes

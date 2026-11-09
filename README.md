@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="https://ai4eosc.eu/wp-content/uploads/sites/10/2022/09/horizontal-transparent.png" alt="logo" width="500"/>
-</div>
-
 # AI4EOSC - Platform API
 
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-%23FE5196?logo=conventionalcommits&logoColor=white)](https://conventionalcommits.org)
@@ -24,7 +20,7 @@ The API is currently deployed here:
 * [production API](https://api.cloud.ai4eosc.eu/docs) (`master` branch)
 * [development API](https://api.dev.ai4eosc.eu/docs) (`dev` branch)
 
-Images of both API are accessible in the project's Harbor registry:
+Images of both API are accessible in the project's Harbor registry (and mirrored in [DockerHub](https://hub.docker.com/u/ai4os)):
 
 * `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:prod`
 * `registry.cloud.ai4eosc.eu/ai4os/ai4-papi:dev`
@@ -36,23 +32,12 @@ The Dashboards pointing to those APIs are respectively:
 
 ## Installation
 
-**Requirements**
-To use this library you need to have
-[Nomad](https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install)
-installed to be able to interact with deployments.
-Once you have Nomad installed you have to export the following variables with the proper
-local paths and http address:
-```bash
-export NOMAD_ADDR=https://some-public-ip:4646
-export NOMAD_CACERT=/path/to/tls/nomad-ca.pem
-export NOMAD_CLIENT_CERT=/path/to/tls/nomad-cli.pem
-export NOMAD_CLIENT_KEY=/path/to/tls/nomad-cli-key.pem
-```
-For this you will need to ask the administrator of the cluster for the proper certificates.
+**External requirements**
+* Install [Nomad](https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install) to be able to interact with deployments. In addition, you will need to ask the administrator of the cluster for the proper access certificates and include the as environment variables.
+* Install [RCLONE](https://rclone.org/) to be able to connect with storages.
+* Define the following [environment variables](./template.env). You can include them in a `.env` file in the root folder.
 
-PAPI also requires an [RCLONE](https://rclone.org/) installation, to be able to connect with storages.
-
-Once you are done you can proceed to install the module:
+Once you are done with the preliminary steps, you can proceed to install the module:
 ```bash
 pip install git+https://github.com/ai4eosc/ai4-papi.git
 ```
@@ -119,14 +104,12 @@ Then, you will a token via the terminal. For this you need:
     --configuration-endpoint https://login.cloud.ai4eosc.eu/realms/ai4eosc/.well-known/openid-configuration \
     --client-id "ai4-papi" \
     --client-secret <client-secret> \
+    --scope="openid profile email roles" \
+    --redirect-uri "http://localhost:43985" \
     ai4os-keycloak
    ```
 
    To retrieve the `<client-secret>`, contact [Ignacio Heredia](https://github.com/IgnacioHeredia).
-
-   You will then be ask some question. Use _default values_, except for:
-     - Redirect_uris (space separated): `http://localhost:43985`
-
    The browser will open so you can authenticate with your AI4OS account.
    Then go back to the terminal and finish by setting and encryption password.
 
@@ -212,6 +195,8 @@ More details can be found in the [API docs](https://api.cloud.ai4eosc.eu/docs).
   It will serve the contents of the `ai4-accounting/summaries` folder.
   </details>
 
+  Energy consumption and footprint (carbon and water) is attached additively to the existing responses: an `energy` key per deployment, per user in `stats/user` and per datacenter in `stats/cluster`. It needs the `MIMIR_USER` / `MIMIR_PASSWORD` variables and the `energy` section of `etc/main.yaml`. Dashboard integration reference: [docs/energy-api.md](./docs/energy-api.md); architecture and internals: [docs/energy-accounting.md](./docs/energy-accounting.md).
+
 
 <details>
 <summary>The API methods can also be accessed by interacting directly with
@@ -268,13 +253,14 @@ The pattern for the subfolders follows:
 ### Contributing
 
 We provide some [default VScode configuration](.vscode) to make the development workflow smoother.
+We use the following development stack:
+* [ruff](https://docs.astral.sh/ruff/) for code formatting
+* [ty](https://docs.astral.sh/ty) for type checking
+* [pre-commit](https://pre-commit.com/) to enforce correct formatting in new contributions.
+  To automatically run locally the pre-commit checks before committing, install the custom pre-commit workflow:
 
-The repository is formatted with [Ruff](https://docs.astral.sh/ruff/).
-We use [Pre-commit](https://pre-commit.com/) to enforce correct formatting in new contributions.
-To automatically run locally the pre-commit checks before committing, install the custom pre-commit workflow:
+  ```bash
+  pre-commit install
+  ```
 
-```bash
-pre-commit install
-```
-
-For contributors that do not run it locally, we use [Pre-commit.CI](https://pre-commit.ci/) to enforce formatting at the Github level.
+  For contributors that do not run it locally, we use [Pre-commit.CI](https://pre-commit.ci/) to enforce formatting at the Github level.

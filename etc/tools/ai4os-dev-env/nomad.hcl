@@ -73,11 +73,19 @@ job "tool-devenv-${JOB_UUID}" {
 
   # CPU-only jobs should deploy *preferably* on CPU clients (affinity) to avoid
   # overloading GPU clients with CPU-only jobs.
+  # We also add an anti affinity to GPU nodes to make this preference even stronger
   affinity {
     attribute = "${meta.tags}"
     operator  = "regexp"
     value     = "cpu"
     weight    = 100
+  }
+
+  affinity {
+    attribute = "${meta.tags}"
+    operator  = "regexp"
+    value     = "gpu"
+    weight    = -100
   }
 
   # Avoid rescheduling the job if the job fails the first time
@@ -174,7 +182,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-storage:latest"
+        image      = "ai4os/docker-storage:latest"
         privileged = true
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
@@ -210,7 +218,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image      = "registry.cloud.ai4eosc.eu/ai4os/docker-zenodo:latest"
+        image      = "ai4os/docker-zenodo:latest"
         volumes    = [
           "/nomad-storage/${JOB_UUID}:/storage:shared",
         ]
@@ -238,7 +246,7 @@ job "tool-devenv-${JOB_UUID}" {
 
       config {
         force_pull = true
-        image = "registry.cloud.ai4eosc.eu/ai4os/docker-mail:client"
+        image = "ai4os/docker-mail:client"
       }
 
       env {
@@ -292,6 +300,7 @@ job "tool-devenv-${JOB_UUID}" {
         MLFLOW_TRACKING_URI         = "${MLFLOW_URI}"
         MLFLOW_TRACKING_USERNAME    = "${MLFLOW_USERNAME}"
         MLFLOW_TRACKING_PASSWORD    = "${MLFLOW_PASSWORD}"
+        AI4EOSC_LLM_KEY             = "${AI4EOSC_LLM_KEY}"
       }
 
       resources {

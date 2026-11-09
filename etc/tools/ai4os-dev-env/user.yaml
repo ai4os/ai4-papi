@@ -45,7 +45,7 @@ general:
     name: Interactive Development Environment
     value: 'vscode'
     description: Select your favorite Interactive Development Environment
-    options: ['vscode', 'jupyter']
+    options: ['vscode', 'jupyter', 'opencode']
 
   jupyter_password:
     name: IDE password

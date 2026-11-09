@@ -3,18 +3,20 @@ import datetime
 import os
 import subprocess
 import types
-from typing import Tuple, Union
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
-from ai4papi import auth, module_patches, quotas, utils
+from ai4papi import auth, module_patches, quotas, schemas, utils
+from ai4papi import energy as energy_accounting
+from ai4papi.wattnet import green_director
 import ai4papi.conf as papiconf
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
 from ai4papi.routers.v1 import secrets as ai4secrets
 from ai4papi.routers.v1 import deployments as ai4_deployments
+from ai4papi.routers.v1.stats import deployments as ai4_stats
 
 
 router = APIRouter(
@@ -24,17 +26,15 @@ router = APIRouter(
 )
 security = HTTPBearer()
 
-
-# When deploying in production, force the definition of a provenance token
-provenance_token = os.environ.get("PAPI_PROVENANCE_TOKEN", None)
-if not papiconf.IS_DEV and not provenance_token:
-    raise Exception('You need to define the variable "PAPI_PROVENANCE_TOKEN".')
+# Provenance token is mandatory in production
+provenance_token = papiconf.load_env("PROVENANCE_TOKEN")
 
 
 @router.get("")
 def get_deployments(
-    vos: Union[Tuple, None] = Query(default=None),
-    full_info: bool = Query(default=False),
+    vos: schemas.VoList = None,
+    full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -46,50 +46,66 @@ def get_deployments(
     * **full_info**: retrieve the full information of each deployment.
       Disabled by default, as it will increase latency too much if there are many
       deployments.
+    * **energy**: attach energy/footprint stats to each deployment (`energy`
+      key). Enabled by default. With `full_info=false` it is the accumulated
+      `EnergyStats`; with `full_info=true` it is the extended `EnergyTimeSeries`.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Always remove VOs that do not belong to the project
-    vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
-    if not vos:
+    if vos is None:
+        user_vos = set(papiconf.MAIN_CONF["auth"]["VO"])
+    else:
+        # Always remove VOs that do not belong to the project
+        user_vos = set(vos).intersection(set(papiconf.MAIN_CONF["auth"]["VO"]))
+    if not user_vos:
         raise HTTPException(
             status_code=401,
             detail=f"Your VOs do not match available VOs: {papiconf.MAIN_CONF['auth']['VO']}.",
         )
 
     user_jobs = []
-    for vo in vos:
+    for vo in user_vos:
+        namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
+
         # Retrieve all jobs in namespace
-        jobs = nomad.get_deployments(
-            namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
+        jobs = nomad_utils.get_deployments(
+            namespace=namespace,
             owner=auth_info["id"],
             prefix="module",
         )
 
         # Retrieve info for jobs in namespace
+        vo_jobs = []
         for j in jobs:
             try:
                 job_info = get_deployment(
                     vo=vo,
                     deployment_uuid=j["ID"],
                     full_info=full_info,
+                    energy=False,
                     authorization=types.SimpleNamespace(
                         credentials=authorization.credentials  # token
                     ),
                 )
             except HTTPException:  # not a module
                 continue
-            except Exception as e:  # unexpected error
-                raise (e)
 
-            user_jobs.append(job_info)
+            vo_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+        # Attach energy/footprint stats. `full_info=False` (the default) uses one
+        # batch of cheap file reads + a single cached Mimir top-up; `full_info=True`
+        # attaches the extended time series per deployment (heavier).
+        if energy:
+            energy_accounting.add_to_jobs(
+                vo_jobs, namespace, auth_info["id"], full_info
+            )
+
+        user_jobs.extend(vo_jobs)
+
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -98,7 +114,8 @@ def get_deployments(
 def get_deployment(
     vo: str,
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -110,6 +127,9 @@ def get_deployment(
     * **deployment_uuid**: uuid of deployment to gather info about
     * **full_info**: retrieve the full information of that deployment (may increase
       latency)
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. With `full_info=true` (the default here) it is the extended
+      `EnergyTimeSeries`; with `full_info=false` the accumulated `EnergyStats`.
 
     Returns a dict with info
     """
@@ -124,7 +144,7 @@ def get_deployment(
     # Retrieve the associated namespace to that VO
     namespace = papiconf.MAIN_CONF["nomad"]["namespaces"][vo]
 
-    job = nomad.get_deployment(
+    job = nomad_utils.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=namespace,
         owner=auth_info["id"],
@@ -138,13 +158,16 @@ def get_deployment(
             detail="This deployment is not a module.",
         )
 
+    if energy:
+        energy_accounting.add_to_job(job, namespace, full_info)
+
     return job
 
 
 @router.post("")
-def create_deployment(
+async def create_deployment(
     vo: str,
-    conf: Union[dict, None] = None,
+    conf: dict | None = None,
     authorization=Depends(security),
 ):
     """
@@ -175,7 +198,7 @@ def create_deployment(
     auth.check_authorization(auth_info, vo)
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.MODULES["nomad"])
+    nomad_template = deepcopy(papiconf.MODULES["nomad"])
     user_conf = deepcopy(papiconf.MODULES["user"]["values"])
 
     # Update values conf in case we received a submitted conf
@@ -198,12 +221,14 @@ def create_deployment(
     # tools)
     modules_deps = get_deployments(
         vos=[vo],
+        energy=False,
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
         ),
     )
     tools_deps = ai4_deployments.tools.get_deployments(
         vos=[vo],
+        energy=False,
         authorization=types.SimpleNamespace(
             credentials=authorization.credentials  # token
         ),
@@ -236,7 +261,7 @@ def create_deployment(
 
     # Check IDE password length
     if (
-        user_conf["general"]["service"] in ["jupyter", "vscode"]
+        user_conf["general"]["service"] in ["jupyter", "vscode", "opencode"]
         and len(user_conf["general"]["jupyter_password"]) < 9
     ):
         raise HTTPException(
@@ -245,7 +270,7 @@ def create_deployment(
         )
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
@@ -288,7 +313,14 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
+
+    # Add affinity for greener nodes
+    nomad_conf = green_director.add_green_affinities(
+        nomad_conf=nomad_conf,
+        stats=ai4_stats.get_cluster_stats(vo, energy=False),
+        workload_type="cpu" if user_conf["hardware"]["gpu_num"] == 0 else "gpu",
+    )
 
     tasks = nomad_conf["TaskGroups"][0]["Tasks"]
     usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -315,18 +347,18 @@ def create_deployment(
         if not user_conf["hardware"]["gpu_type"]:
             usertask["Resources"]["Devices"][0]["Constraints"] = None
 
-    # If the image belong to Harbor, then it's a user snapshot
+    # Check if it's a user snapshot
     docker_image = user_conf["general"]["docker_image"]
-    if docker_image.split("/")[0] == "registry.cloud.ai4eosc.eu":
+    if docker_image.startswith("registry.cloud.ai4eosc.eu/user-snapshots"):
         # Check the user is the owner of the image
         if docker_image.split("/")[-1] != auth_info["id"].replace("@", "_at_"):
             raise HTTPException(
                 status_code=401,
-                detail="You are not the owner of the Harbor image.",
+                detail="You are not the owner of this snapshot.",
             )
 
         # Check the snapshot indeed exists
-        user_snapshots = v1.snapshots.get_harbor_snapshots(
+        user_snapshots = await v1.snapshots.get_harbor_snapshots(
             owner=auth_info["id"],
             vo=vo,
         )
@@ -386,7 +418,7 @@ def create_deployment(
     services[:] = [s for s in services if s["PortLabel"] not in exclude_services]
 
     # Submit job
-    r = nomad.create_deployment(nomad_conf)
+    r = nomad_utils.create_deployment(nomad_conf)
 
     return r
 
@@ -411,7 +443,7 @@ def delete_deployment(
     auth.check_authorization(auth_info, vo)
 
     # Delete deployment
-    r = nomad.delete_deployment(
+    r = nomad_utils.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
         owner=auth_info["id"],

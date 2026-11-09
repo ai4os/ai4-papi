@@ -7,14 +7,15 @@ from copy import deepcopy
 import types
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
+from ai4papi import energy as energy_accounting
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
-import ai4papi.nomad.common as nomad
+import ai4papi.nomad_utils as nomad_utils
 
 
 router = APIRouter(
@@ -38,7 +39,8 @@ REQUIREMENTS = {
 
 @router.get("")
 def get_deployments(
-    full_info: bool = Query(default=False),
+    full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -50,13 +52,16 @@ def get_deployments(
     * **full_info**: retrieve the full information of each deployment.
       Disabled by default, as it will increase latency too much if there are many
       deployments.
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=false` -> accumulated `EnergyStats`; `full_info=true`
+      -> extended `EnergyTimeSeries`.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, access_level="ap-a")
 
     # Retrieve all jobs in namespace
-    jobs = nomad.get_deployments(
+    jobs = nomad_utils.get_deployments(
         namespace=NAMESPACE,
         owner=auth_info["id"],
         prefix="try",
@@ -67,21 +72,21 @@ def get_deployments(
             job_info = get_deployment(
                 deployment_uuid=j["ID"],
                 full_info=full_info,
+                energy=False,
                 authorization=types.SimpleNamespace(
                     credentials=authorization.credentials  # token
                 ),
             )
         except HTTPException:  # not a try-me
             continue
-        except Exception as e:  # unexpected error
-            raise (e)
 
         user_jobs.append(job_info)
 
-    # Sort deployments by creation date
-    seq = [j["submit_time"] for j in user_jobs]
-    args = sorted(range(len(seq)), key=seq.__getitem__)[::-1]
-    sorted_jobs = [user_jobs[i] for i in args]
+    if energy:
+        energy_accounting.add_to_jobs(user_jobs, NAMESPACE, auth_info["id"], full_info)
+
+    # Sort deployments by submission time in descending order
+    sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
 
     return sorted_jobs
 
@@ -89,7 +94,8 @@ def get_deployments(
 @router.get("/{deployment_uuid}")
 def get_deployment(
     deployment_uuid: str,
-    full_info: bool = Query(default=True),
+    full_info: bool = True,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -99,6 +105,9 @@ def get_deployment(
 
     Parameters:
     * **deployment_uuid**: uuid of deployment to gather info about
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=true` (default here) -> extended `EnergyTimeSeries`;
+      `full_info=false` -> accumulated `EnergyStats`.
 
     Returns a dict with info
     """
@@ -106,7 +115,7 @@ def get_deployment(
     auth_info = auth.get_user_info(token=authorization.credentials)
     auth.check_authorization(auth_info, access_level="ap-a")
 
-    job = nomad.get_deployment(
+    job = nomad_utils.get_deployment(
         deployment_uuid=deployment_uuid,
         namespace=NAMESPACE,
         owner=auth_info["id"],
@@ -116,13 +125,16 @@ def get_deployment(
     # Rewrite main endpoint, otherwise it automatically selects DEEPaaS API
     job["main_endpoint"] = "ui"
 
+    if energy:
+        energy_accounting.add_to_job(job, NAMESPACE, full_info)
+
     return job
 
 
 @router.post("")
 def create_deployment(
     module_name: str,
-    title: str = Query(default=""),
+    title: str = "",
     authorization=Depends(security),
 ):
     """
@@ -141,7 +153,7 @@ def create_deployment(
     docker_image = "/".join(registry.split("/")[-2:])
 
     # Load module configuration
-    nomad_conf = deepcopy(papiconf.TRY_ME["nomad"])
+    nomad_template = deepcopy(papiconf.TRY_ME["nomad"])
 
     # Generate UUID from (MAC address+timestamp) so it's unique
     job_uuid = uuid.uuid1()
@@ -168,7 +180,7 @@ def create_deployment(
         warning = "<ul>" + warning + "</ul>"
 
     # Replace the Nomad job template
-    nomad_conf = nomad_conf.safe_substitute(
+    nomad_conf_str = nomad_template.safe_substitute(
         {
             "JOB_UUID": job_uuid,
             "NAMESPACE": NAMESPACE,
@@ -187,21 +199,21 @@ def create_deployment(
     )
 
     # Convert template to Nomad conf
-    nomad_conf = nomad.load_job_conf(nomad_conf)
+    nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
 
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing
     # We check for every resource metric (cpu, disk, ram)
-    stats = get_cluster_stats(vo=VO)
+    cluster_stats = get_cluster_stats(vo=VO, energy=False)
     resources = ["cpu", "ram", "disk"]
     keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
-    status = {k: 0 for k in keys}
+    status = dict.fromkeys(keys, 0)
 
-    for _, datacenter in stats["datacenters"].items():
-        for _, node in datacenter["nodes"].items():
-            if node["type"] == "tryme" and node["status"] == "ready":
+    for datacenter in cluster_stats.datacenters.values():
+        for node in datacenter.nodes.values():
+            if node.type == "tryme" and node.status == "ready":
                 for k in keys:
-                    status[k] += node[k]
+                    status[k] += getattr(node, k)
     for r in resources:
         if (
             status[f"{r}_total"] == 0
@@ -216,7 +228,7 @@ def create_deployment(
             )
 
     # Check that the user hasn't too many "try-me" jobs currently running
-    jobs = nomad.get_deployments(
+    jobs = nomad_utils.get_deployments(
         namespace=NAMESPACE,
         owner=auth_info["id"],
         prefix="try",
@@ -231,7 +243,7 @@ def create_deployment(
         )
 
     # Submit job
-    r = nomad.create_deployment(nomad_conf)
+    r = nomad_utils.create_deployment(nomad_conf)
 
     return r
 
@@ -255,7 +267,7 @@ def delete_deployment(
     auth.check_authorization(auth_info, access_level="ap-a")
 
     # Delete deployment
-    r = nomad.delete_deployment(
+    r = nomad_utils.delete_deployment(
         deployment_uuid=deployment_uuid,
         namespace=NAMESPACE,
         owner=auth_info["id"],

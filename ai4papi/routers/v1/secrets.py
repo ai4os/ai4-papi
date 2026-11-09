@@ -3,6 +3,7 @@ Manage user secrets with Vault
 """
 
 import hvac
+import hvac.exceptions
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer
 

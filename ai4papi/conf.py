@@ -2,18 +2,23 @@
 Manage configurations of the API.
 """
 
-from distutils.util import strtobool
+import csv
 import os
 from pathlib import Path
 from string import Template
+from typing import Any, TypedDict
 import subprocess
 import warnings
 
+from dotenv import load_dotenv
 import yaml
+
+
+load_dotenv()
 
 # Check if we are developing in dev mode or production mode, to disable parts of the
 # code that are compute intensive (eg. disables calls to Github API)
-IS_PROD = bool(strtobool(i)) if (i := os.getenv("IS_PROD")) else False
+IS_PROD = os.getenv("IS_PROD", "false").lower() in ("true", "1", "t")
 IS_DEV = not IS_PROD
 
 
@@ -30,7 +35,7 @@ def load_env(varname: str):
             # them define variables needed for sections of code they are not developing.
             warnings.warn(f'"{varname}" envar is not defined')
         else:
-            raise Exception(f'You need to define the variable "{varname}".')
+            raise RuntimeError(f'You need to define the variable "{varname}".')
 
     return var
 
@@ -51,40 +56,41 @@ with open(paths["conf"] / "main.yaml", "r") as f:
     MAIN_CONF = yaml.safe_load(f)
 
 
-def load_nomad_job(fpath):
+def load_nomad_job(fpath: Path) -> Template:
     """
     Load default Nomad job configuration
     """
-    with open(fpath, "r") as f:
-        raw_job = f.read()
-        job_template = Template(raw_job)
-    return job_template
+    return Template(fpath.read_text(encoding="utf-8"))
 
 
-def load_yaml_conf(fpath):
+def load_yaml_conf(fpath: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Load user customizable parameters
     """
     with open(fpath, "r") as f:
-        conf_full = yaml.safe_load(f)
+        conf_full: dict[str, Any] = yaml.safe_load(f)
 
     conf_values = {}
     for group_name, params in conf_full.items():
         conf_values[group_name] = {}
         for k, v in params.items():
-            if "name" not in v.keys():
-                raise Exception(f"Parameter {k} needs to have a name.")
-            if "value" not in v.keys():
-                raise Exception(f"Parameter {k} needs to have a value.")
+            for i in ["name", "value"]:
+                if i not in v:
+                    raise ValueError(f"Parameter {k} needs to have an {i}.")
             conf_values[group_name][k] = v["value"]
 
     return conf_full, conf_values
 
 
 # Standard modules
+class AssetConfig(TypedDict):
+    nomad: Template
+    user: dict[str, Any]
+
+
 nmd = load_nomad_job(paths["conf"] / "modules" / "nomad.hcl")
 yml = load_yaml_conf(paths["conf"] / "modules" / "user.yaml")
-MODULES = {
+MODULES: AssetConfig = {
     "nomad": nmd,
     "user": {
         "full": yml[0],
@@ -95,7 +101,7 @@ MODULES = {
 # Tools
 tool_dir = paths["conf"] / "tools"
 tool_list = [f for f in tool_dir.iterdir() if f.is_dir()]
-TOOLS = {}
+TOOLS: dict[str, AssetConfig] = {}
 for tool_path in tool_list:
     nmd = load_nomad_job(tool_path / "nomad.hcl")
     yml = load_yaml_conf(tool_path / "user.yaml")
@@ -115,13 +121,15 @@ tools_nomad2id = {
     "llm": "ai4os-llm",
     "ai4life": "ai4os-ai4life-loader",
     "devenv": "ai4os-dev-env",
+    "fedserver-llm": "arena-fl-server-llm",
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():
-        raise Exception(f"The tool {tool} is missing from the mapping dictionary.")
+        raise KeyError(f"The tool {tool} is missing from the mapping dictionary.")
 
 # OSCAR template
-OSCAR = {}
+
+OSCAR: dict[str, Any] = {}
 with open(paths["conf"] / "oscar" / "service.yaml", "r") as f:
     OSCAR["service"] = Template(f.read())
 yml = load_yaml_conf(paths["conf"] / "oscar" / "user.yaml")
@@ -145,6 +153,28 @@ nmd = load_nomad_job(paths["conf"] / "snapshots" / "nomad.hcl")
 SNAPSHOTS = {
     "nomad": nmd,
 }
+
+# Load datacenter info file
+pth = main_path.parent / "var" / "datacenters.csv"
+datacenters: dict[str, dict] = {}
+with open(pth, "r") as f:
+    reader = csv.DictReader(f, delimiter=",")
+    if not reader.fieldnames:
+        raise ValueError("CSV is missing fieldnames")
+    dc_keys = list(reader.fieldnames)
+    dc_keys.remove("name")
+    for row in reader:
+        for k, v in row.items():
+            if k == "name":
+                name = str(v)
+                dc_val: dict[str, str | float | dict] = dict.fromkeys(dc_keys, 0)
+                dc_val["nodes"] = {}
+                datacenters[name] = dc_val
+            elif k == "country":
+                datacenters[name][k] = v
+            else:
+                # Numeric columns; allow blank cells (eg. TUE only known for some DCs)
+                datacenters[name][k] = float(v) if v not in (None, "") else None
 
 # Retrieve git info from PAPI, to show current version in the docs
 papi_commit = subprocess.run(

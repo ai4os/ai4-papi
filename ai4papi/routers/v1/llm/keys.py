@@ -64,14 +64,19 @@ def get_api_keys(authorization=Depends(security)):
     top_level = auth.get_highest_level(current_levels)
 
     # Retrieve the LiteLLM user
-    r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
-    user = r.json()
-
-    # If user does not exist, create it and return no keys
-    if "user_id" not in user["user_info"]:
+    try:
+        r = session.get(f"{LITELLM_URL}/user/info", params={"user_id": user_id})
+        user = r.json()
+    except HTTPException:
+        # If user does not exist, create it and return no keys
         data = {"user_id": user_id, "user_email": user_email, "teams": [top_level]}
-        session.post(f"{LITELLM_URL}/user/new", json=data)
-        return [{}]
+        r = session.post(f"{LITELLM_URL}/user/new", json=data)
+
+        # LiteLLM user is created with a key with an empty name, so we delete it
+        # to avoid confusion and errors (due to the empty name)
+        data = {"keys": [r.json()["key"]]}
+        session.post(f"{LITELLM_URL}/key/delete", json=data)
+        return []
 
     # Retrieve the API keys
     r = session.get(
@@ -98,7 +103,7 @@ def get_api_keys(authorization=Depends(security)):
     # Remove user from all teams that are not his top level
     # ⚠️ Do not update teams before changing API key team, otherwise the API keys will
     # be erased.
-    teams_to_remove = set([team["team_id"] for team in user["teams"]])
+    teams_to_remove = {team["team_id"] for team in user["teams"]}
     teams_to_remove.discard(top_level)
     for team in teams_to_remove:
         data = {"team_id": team, "user_id": user_id}
@@ -107,7 +112,7 @@ def get_api_keys(authorization=Depends(security)):
     # Build final key dict
     out = [
         {
-            "id": item["key_alias"].split("_")[-1],
+            "id": "_".join(item["key_alias"].split("_")[1:]),
             "created_at": item["created_at"],
             "team_id": top_level,
             "expires": item["expires"],
@@ -121,7 +126,7 @@ def get_api_keys(authorization=Depends(security)):
 @router.post("")
 def create_api_key(
     key_name: str,
-    duration: str = None,
+    duration: str | None = None,
     authorization=Depends(security),
 ):
     """

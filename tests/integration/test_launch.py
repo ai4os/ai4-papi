@@ -21,7 +21,7 @@ try:
     response = requests.get("http://0.0.0.0:8080")
     assert response.status_code == 200, "PAPI status code is not 200"
 except requests.exceptions.ConnectionError:
-    raise Exception("Failed to connect to the server")
+    raise ConnectionError("Failed to connect to the server")
 finally:
     server_process.kill()
 

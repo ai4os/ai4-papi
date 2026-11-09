@@ -1,3 +1,4 @@
+import asyncio
 import time
 from types import SimpleNamespace
 
@@ -7,10 +8,12 @@ from conf import token
 
 
 # Create module
-rcreate = modules.create_deployment(
-    vo="vo.ai4eosc.eu",
-    conf={},
-    authorization=SimpleNamespace(credentials=token),
+rcreate = asyncio.run(
+    modules.create_deployment(
+        vo="vo.ai4eosc.eu",
+        conf={},
+        authorization=SimpleNamespace(credentials=token),
+    )
 )
 assert isinstance(rcreate, dict)
 assert "job_ID" in rcreate.keys()

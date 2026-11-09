@@ -5,11 +5,13 @@ Create an app with FastAPI
 from contextlib import asynccontextmanager
 import fastapi
 import uvicorn
+import logging
 
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_utils.tasks import repeat_every
 
+from ai4papi import energy as energy_accounting
 from ai4papi.conf import MAIN_CONF, paths, papi_branch, papi_commit
 from ai4papi.routers import v1
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats_bg
@@ -47,6 +49,7 @@ description = (
 async def lifespan(app: fastapi.FastAPI):
     # on startup
     await get_cluster_stats_thread()
+    await energy_accounting_thread()
     yield
     # on shutdown
     # (nothing to do)
@@ -80,25 +83,35 @@ def root(
     root = str(request.url_for("root"))
     versions = [v1.get_version(request)]
 
-    response = {
-        "versions": versions,
-        "links": [
+    links = []
+    if app.docs_url is not None:
+        links.append(
             {
                 "rel": "help",
                 "type": "text/html",
                 "href": f"{root}" + app.docs_url.strip("/"),
-            },
+            }
+        )
+    if app.redoc_url is not None:
+        links.append(
             {
                 "rel": "help",
                 "type": "text/html",
                 "href": f"{root}" + app.redoc_url.strip("/"),
-            },
+            }
+        )
+    if app.openapi_url is not None:
+        links.append(
             {
                 "rel": "describedby",
                 "type": "application/json",
                 "href": f"{root}" + app.openapi_url.strip("/"),
-            },
-        ],
+            }
+        )
+
+    response = {
+        "versions": versions,
+        "links": links,
     }
     return response
 
@@ -114,8 +127,8 @@ async def favicon():
 def run(
     host: str = "0.0.0.0",
     port: int = 8080,
-    ssl_keyfile: str = None,
-    ssl_certfile: str = None,
+    ssl_keyfile: str | None = None,
+    ssl_certfile: str | None = None,
 ):
     uvicorn.run(
         app,
@@ -134,8 +147,25 @@ def get_cluster_stats_thread():
     Do *not* run as async to avoid blocking the main event.
     ref: https://stackoverflow.com/questions/67599119/fastapi-asynchronous-background-tasks-blocks-other-requests
     """
-    get_cluster_stats_bg.cache_clear()
-    get_cluster_stats_bg()
+    try:
+        get_cluster_stats_bg.cache_clear()
+        get_cluster_stats_bg()
+    except Exception:
+        logging.exception("Error in background task get_cluster_stats_bg")
+
+
+# Accumulate per-deployment energy / footprint stats in background task.
+# No-op unless the `energy` feature is enabled and Mimir credentials are set.
+@repeat_every(seconds=MAIN_CONF.get("energy", {}).get("sweep_seconds", 900))
+def energy_accounting_thread():
+    """
+    Incrementally integrate Mimir power into per-deployment energy/carbon/water.
+    Not async, same reasoning as get_cluster_stats_thread.
+    """
+    try:
+        energy_accounting.run_sweep()
+    except Exception:
+        logging.exception("Error in background task energy_accounting")
 
 
 if __name__ == "__main__":

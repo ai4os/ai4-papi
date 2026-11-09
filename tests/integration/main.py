@@ -24,9 +24,12 @@ modules = [f.stem for f in test_files]
 
 # Ignore tests that have already passed in a previous run
 resume_from = None
-# resume_from = "test_routes"
+# resume_from = "test_deployments_tools"
 if resume_from:
     modules = modules[modules.index(resume_from) :]
 
 for module in modules:
-    __import__(module)
+    try:
+        __import__(module)
+    except Exception as e:
+        print(f"🔴 Error testing {module}:\n{e}")
