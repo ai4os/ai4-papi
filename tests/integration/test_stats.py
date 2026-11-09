@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from ai4papi.routers.v1 import stats
 from conf import token
 
+from ai4papi.routers.v1 import stats
 
 SECRET_PATH = "/demo-papi-tests/demo-secret"
 SECRET_DATA = {"pwd": 12345}

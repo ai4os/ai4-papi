@@ -1,9 +1,9 @@
 import time
 from types import SimpleNamespace
 
-from ai4papi.routers.v1.try_me import nomad
 from conf import token
 
+from ai4papi.routers.v1.try_me import nomad
 
 # Create deployment
 rcreate = nomad.create_deployment(
