@@ -50,7 +50,7 @@ class ToolsCatalog(Catalog):
         # Add available datacenters
         cluster_stats = stats_router.get_cluster_stats(vo)
         conf["general"]["datacenter"]["options"] += list(
-            cluster_stats["datacenters"].keys()
+            cluster_stats.datacenters.keys()
         )
 
         # Fill with correct Docker image and tags
