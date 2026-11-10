@@ -319,7 +319,7 @@ def get_deployment(
         else:
             info["status"] = "error"
         # We have to return `placement failures message`.
-        info["error_msg"] = 'FailedTGAllocs: ' + f"{evals[0].get('FailedTGAllocs', '')}"
+        info["error_msg"] = "FailedTGAllocs: " + f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
         # If no allocs and no evals, something probably went wrong
