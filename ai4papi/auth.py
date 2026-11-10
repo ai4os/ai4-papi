@@ -26,6 +26,8 @@ import re
 from fastapi import HTTPException
 import jwt
 
+import ai4papi.conf as papiconf
+
 
 KEYCLOAK_URL = "https://login.cloud.ai4eosc.eu/realms/ai4eosc"
 jwk_client = jwt.PyJWKClient(f"{KEYCLOAK_URL}/protocol/openid-connect/certs")
@@ -60,13 +62,21 @@ def get_user_info(token):
     # projects that enabled the user into that access level.
     # eg. {"ap-a": ["vo.ai4eosc.eu", "vo.imagine-ai.eu"]}
     groups = {}
-    for role in user_infos.get("realm_access", {}).get("roles", []):
-        # Roles should be structured as "access:<vo>:<level>"
-        match = re.match(r"access:(?P<vo>[^:]+):(?P<level>.+)", role)
+    for entitlement in user_infos.get("eduperson_entitlement", []):
+        # Entitlements should be structured as "...Access:<vo>:role=<level>"
+        match = re.search(
+            r"group:Platform%20Access:(?P<vo>[^:]+):role=Access-(?P<level>.+)",
+            entitlement,
+        )
         if not match:
             continue
-        groups.setdefault(match["level"], [])
-        groups[match["level"]].append(match["vo"])
+
+        # Try to map VO if needed, otherwise use original one
+        level = match["level"].lower()
+        vo = papiconf.MAIN_CONF["auth"]["vo_mappings"].get(match["vo"], match["vo"])
+
+        groups.setdefault(level, set())
+        groups[level].update([vo])
 
     # Sort user access levels
     groups = {level: groups[level] for level in AI4OS_LEVELS if level in groups}
