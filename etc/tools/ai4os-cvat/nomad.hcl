@@ -103,6 +103,14 @@ job "tool-cvat-${JOB_UUID}" {
     value     = "${NAMESPACE}"
   }
 
+  # Sometimes the user wants the deployment to land in a particular datacenter to comply
+  # with ISO or privacy requirements (i.e. data must not leave the datacenter)
+  constraint {
+    attribute = "${node.datacenter}"
+    operator  = "="
+    value     = "${DATACENTER}"
+  }
+
   # Try to deploy iMagine jobs on nodes that are iMagine-exclusive
   # In this way, we leave AI4EOSC nodes for AI4EOSC users and for iMagine users only
   # when iMagine nodes are fully booked.
