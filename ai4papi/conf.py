@@ -121,6 +121,7 @@ tools_nomad2id = {
     "llm": "ai4os-llm",
     "ai4life": "ai4os-ai4life-loader",
     "devenv": "ai4os-dev-env",
+    "fedserver-simulation": "arena-simulation-fedllm",
     "fedserver-llm": "arena-fl-server-llm",
 }
 for tool in TOOLS.keys():
