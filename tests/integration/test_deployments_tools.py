@@ -24,6 +24,10 @@ tools_config = {
         "fed_llm_simulation": {
             "data_file_name": "mock_path",
         },
+    "arena-fl-server-llm": {
+        "general": {
+            "jupyter_password": "mock_password",
+        },
     },
     "ai4os-cvat": {
         "general": {

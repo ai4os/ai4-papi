@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 
 from ai4papi import auth
+from ai4papi import energy as energy_accounting
 import ai4papi.conf as papiconf
 from ai4papi.routers.v1.catalog.modules import Modules
 from ai4papi.routers.v1.stats.deployments import get_cluster_stats
@@ -39,6 +40,7 @@ REQUIREMENTS = {
 @router.get("")
 def get_deployments(
     full_info: bool = False,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -50,6 +52,9 @@ def get_deployments(
     * **full_info**: retrieve the full information of each deployment.
       Disabled by default, as it will increase latency too much if there are many
       deployments.
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=false` -> accumulated `EnergyStats`; `full_info=true`
+      -> extended `EnergyTimeSeries`.
     """
     # Retrieve authenticated user info
     auth_info = auth.get_user_info(token=authorization.credentials)
@@ -67,6 +72,7 @@ def get_deployments(
             job_info = get_deployment(
                 deployment_uuid=j["ID"],
                 full_info=full_info,
+                energy=False,
                 authorization=types.SimpleNamespace(
                     credentials=authorization.credentials  # token
                 ),
@@ -75,6 +81,9 @@ def get_deployments(
             continue
 
         user_jobs.append(job_info)
+
+    if energy:
+        energy_accounting.add_to_jobs(user_jobs, NAMESPACE, auth_info["id"], full_info)
 
     # Sort deployments by submission time in descending order
     sorted_jobs = sorted(user_jobs, key=lambda x: x["submit_time"], reverse=True)
@@ -86,6 +95,7 @@ def get_deployments(
 def get_deployment(
     deployment_uuid: str,
     full_info: bool = True,
+    energy: bool = True,
     authorization=Depends(security),
 ):
     """
@@ -95,6 +105,9 @@ def get_deployment(
 
     Parameters:
     * **deployment_uuid**: uuid of deployment to gather info about
+    * **energy**: attach energy/footprint stats (`energy` key). Enabled by
+      default. `full_info=true` (default here) -> extended `EnergyTimeSeries`;
+      `full_info=false` -> accumulated `EnergyStats`.
 
     Returns a dict with info
     """
@@ -111,6 +124,9 @@ def get_deployment(
 
     # Rewrite main endpoint, otherwise it automatically selects DEEPaaS API
     job["main_endpoint"] = "ui"
+
+    if energy:
+        energy_accounting.add_to_job(job, NAMESPACE, full_info)
 
     return job
 
@@ -188,7 +204,7 @@ def create_deployment(
     # Check that the target node (ie. tag='tryme') resources are available because
     # these jobs cannot be left queueing
     # We check for every resource metric (cpu, disk, ram)
-    cluster_stats = get_cluster_stats(vo=VO)
+    cluster_stats = get_cluster_stats(vo=VO, energy=False)
     resources = ["cpu", "ram", "disk"]
     keys = [f"{i}_used" for i in resources] + [f"{i}_total" for i in resources]
     status = dict.fromkeys(keys, 0)
