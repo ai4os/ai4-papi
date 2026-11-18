@@ -250,6 +250,13 @@ async def create_deployment(
     )
     mlflow_credentials = user_secrets.get("/services/mlflow/credentials", {})
 
+    # Nextcloud chunked uploads require you to use the /dav/files/USER endpoint instead
+    # of /webdav.
+    if user_conf["storage"]["rclone_vendor"] == "nextcloud":
+        user_conf["storage"]["rclone_url"] = (
+            f"{user_conf['storage']['rclone_url']}/remote.php/dav/files/{user_conf['storage']['rclone_user']}"
+        )
+
     # Replace the Nomad job template
     nomad_conf_str = nomad_template.safe_substitute(
         {

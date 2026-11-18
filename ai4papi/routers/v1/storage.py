@@ -42,19 +42,28 @@ def run_rclone(command, storage_name, vo, token):
             detail="Invalid storage name.",
         )
 
+    # Nextcloud chunked uploads require you to use the /dav/files/USER endpoint instead
+    # of /webdav.
+    if storage["vendor"] == "nextcloud":
+        storage["server"] = (
+            f"{storage['server']}/remote.php/dav/files/{storage['loginName']}"
+        )
+
     # Use rclone to delete the subpath
     result = subprocess.run(
         [
-            f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
-            f"export RCLONE_CONFIG_RSHARE_URL={storage['server']}/remote.php/dav/files/{storage['loginName']} && "
-            "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
-            f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
-            f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
-            "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
-            f"{command} ;"
-            "status=$? ;"  # we want to return the status code of the RCLONE command
-            "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
-            "exit $status"
+            (
+                f"export RCLONE_CONFIG_RSHARE_VENDOR={storage['vendor']} && "
+                f"export RCLONE_CONFIG_RSHARE_URL={storage['server']} && "
+                "export RCLONE_CONFIG_RSHARE_TYPE=webdav && "
+                f"export RCLONE_CONFIG_RSHARE_USER={storage['loginName']} && "
+                f"export RCLONE_CONFIG_RSHARE_PASS={storage['appPassword']} && "
+                "export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS) && "
+                f"{command} ;"
+                "status=$? ;"  # we want to return the status code of the RCLONE command
+                "for var in $(env | grep '^RCLONE_CONFIG_RSHARE_' | awk -F= '{print $1}'); do unset $var; done;"
+                "exit $status"
+            )
         ],
         shell=True,
         capture_output=True,
