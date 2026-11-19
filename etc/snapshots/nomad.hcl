@@ -127,7 +127,8 @@ for container_id in $container_ids; do
       sudo docker commit --change 'LABEL OWNER="${OWNER}" OWNER_NAME="${OWNER_NAME}" OWNER_EMAIL="${OWNER_EMAIL}" TITLE="${TITLE}" DESCRIPTION="${DESCRIPTION}" DATE="${SUBMIT_TIME}" VO="${VO}"' $container_id $DOCKER_IMAGE_NAME
 
       echo "Login on the registry"
-      echo "${HARBOR_ROBOT_PASSWORD}" | sudo docker login registry.cloud.ai4eosc.eu --username "${HARBOR_ROBOT_USER}" --password-stdin
+      # Use single quotes since robot usernames contain a literal '$' that must not be expanded by bash
+      echo '${HARBOR_ROBOT_PASSWORD}' | sudo docker login registry.cloud.ai4eosc.eu --username '${HARBOR_ROBOT_USER}' --password-stdin
 
       echo "Uploading image to registry"
       sudo docker push "$DOCKER_IMAGE_NAME"
