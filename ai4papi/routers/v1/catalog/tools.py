@@ -7,6 +7,7 @@ import natsort
 from ai4papi import quotas, utils, nomad_utils
 import ai4papi.conf as papiconf
 from .common import Catalog, retrieve_docker_tags, fmt_map
+import ai4papi.routers.v1.stats.deployments as stats_router
 
 
 security = HTTPBearer()
@@ -45,6 +46,12 @@ class ToolsCatalog(Catalog):
                 item_name=item_name,
                 vo=vo,
             )
+
+        # Add available datacenters
+        cluster_stats = stats_router.get_cluster_stats(vo)
+        conf["general"]["datacenter"]["options"] += list(
+            cluster_stats.datacenters.keys()
+        )
 
         # Fill with correct Docker image and tags
         if item_name in [
