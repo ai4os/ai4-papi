@@ -3,11 +3,10 @@ import io
 import time
 from types import SimpleNamespace
 
+from conf import token
 from fastapi import UploadFile
 
 from ai4papi.routers.v1 import batch
-from conf import token
-
 
 # Create a job
 content = b"""

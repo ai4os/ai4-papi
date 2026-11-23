@@ -1,7 +1,6 @@
 import fastapi
 
-from . import modules, tools, llms_self, llms_platform
-
+from . import llms_platform, llms_self, modules, tools
 
 router = fastapi.APIRouter()
 router.include_router(

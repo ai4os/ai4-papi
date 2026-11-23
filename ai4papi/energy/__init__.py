@@ -22,10 +22,10 @@ from cachetools import TTLCache, cached
 
 from ai4papi.clients import mimir
 from ai4papi.energy import compute, config, store
-from ai4papi.energy.series import build_series, persisted
 from ai4papi.energy.config import CLUSTER_NS, KEYS, enabled
 from ai4papi.energy.live import live_series, topup
 from ai4papi.energy.ondemand import ensure_swept, ensure_swept_bulk, live_only_doc
+from ai4papi.energy.series import build_series, persisted
 from ai4papi.energy.sweep import process_single, run_sweep
 
 __all__ = [

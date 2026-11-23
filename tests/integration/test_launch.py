@@ -6,9 +6,9 @@ package error).
 """
 
 import subprocess
-import requests
 import time
 
+import requests
 
 server_process = subprocess.Popen(
     ["uvicorn", "ai4papi.main:app", "--host", "0.0.0.0", "--port", "8080"],

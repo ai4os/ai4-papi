@@ -3,18 +3,14 @@ Manage Dashboard chatbot requests to the AI4OS LLM Assistante.
 """
 
 import os
-from typing import List
-
-from openai import OpenAI
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer
 from fastapi.responses import StreamingResponse
-
+from fastapi.security import HTTPBearer
+from openai import OpenAI
 from pydantic import BaseModel
 
 from ai4papi import auth
-
 
 router = APIRouter(
     prefix="/chat",
@@ -42,7 +38,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     model: str = "ai4eoscassistant"
-    messages: List[ChatMessage] = []
+    messages: list[ChatMessage] = []
 
 
 @router.post("")
@@ -82,5 +78,5 @@ def get_chat_response(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {str(e)}"
+            status_code=500, detail=f"An unexpected error occurred: {e!s}"
         )
