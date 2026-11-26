@@ -2,23 +2,22 @@
 Manage OSCAR clusters to create and execute services.
 """
 
+import json
+import uuid
 from copy import deepcopy
 from datetime import datetime
 from functools import wraps
-import json
-import uuid
-import yaml
 
+import requests
+import yaml
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from oscar_python.client import Client
-import requests
 
-from ai4papi import auth, utils
-from ai4papi.routers.v1.catalog.modules import Modules
-from ai4papi.routers.v1.catalog.common import retrieve_docker_tags
 import ai4papi.conf as papiconf
-
+from ai4papi import auth, utils
+from ai4papi.routers.v1.catalog.common import retrieve_docker_tags
+from ai4papi.routers.v1.catalog.modules import Modules
 
 router = APIRouter(
     prefix="/oscar",

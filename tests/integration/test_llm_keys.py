@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
+from conf import token
 
 from ai4papi.routers.v1.llm import keys
-from conf import token
 
 # Define test key name
 KEYNAME = "papi-tests"

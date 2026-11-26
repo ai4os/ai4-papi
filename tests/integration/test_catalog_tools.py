@@ -5,7 +5,6 @@ from fastapi import Request
 from ai4papi.routers.v1.catalog import common
 from ai4papi.routers.v1.catalog.tools import Tools
 
-
 # List tools
 tools_list = list(Tools.get_items().keys())
 

@@ -7,16 +7,15 @@ Notes:
  is a Nomad "job" (not a Nomad "deployment"!)
 """
 
-from datetime import datetime
 import re
-import urllib3
+from datetime import datetime
 
-
-from cachetools import cached, TTLCache
-from fastapi import HTTPException
 import nomad
-from nomad.api import exceptions
 import requests
+import urllib3
+from cachetools import TTLCache, cached
+from fastapi import HTTPException
+from nomad.api import exceptions
 
 import ai4papi.conf as papiconf
 

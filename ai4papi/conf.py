@@ -4,15 +4,14 @@ Manage configurations of the API.
 
 import csv
 import os
+import subprocess
+import warnings
 from pathlib import Path
 from string import Template
 from typing import Any, TypedDict
-import subprocess
-import warnings
 
-from dotenv import load_dotenv
 import yaml
-
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -124,7 +123,7 @@ tools_nomad2id = {
     "fedserver-simulation": "arena-simulation-fedllm",
     "fedserver-llm": "arena-fl-server-llm",
 }
-for tool in TOOLS.keys():
+for tool in TOOLS:
     if tool not in tools_nomad2id.values():
         raise KeyError(f"The tool {tool} is missing from the mapping dictionary.")
 

@@ -13,7 +13,6 @@ from fastapi.security import HTTPBearer
 from ai4papi import auth
 from ai4papi.routers.v1 import secrets as ai4secrets
 
-
 router = APIRouter(
     prefix="/storage",
     tags=["Storage"],

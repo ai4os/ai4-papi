@@ -1,11 +1,10 @@
-from cachetools import cached, TTLCache
-from fastapi import APIRouter
 import requests
+from cachetools import TTLCache, cached
+from fastapi import APIRouter
 
-from ai4papi import schemas
 import ai4papi.conf as papiconf
+from ai4papi import schemas
 from ai4papi.routers.v1.catalog.common import Catalog
-
 
 # LiteLLM API configuration
 LITELLM_URL = "https://vllm.cloud.ai4eosc.eu"

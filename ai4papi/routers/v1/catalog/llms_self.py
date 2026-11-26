@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from ai4papi import schemas
 import ai4papi.conf as papiconf
+from ai4papi import schemas
 from ai4papi.routers.v1.catalog.common import Catalog
 
 

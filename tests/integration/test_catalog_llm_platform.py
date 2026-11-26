@@ -1,6 +1,5 @@
 from ai4papi.routers.v1.catalog.llms_platform import PlatformLLMs
 
-
 # List
 llms_list = list(PlatformLLMs.get_items().keys())
 

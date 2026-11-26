@@ -1,6 +1,5 @@
 from ai4papi.routers.v1.catalog.llms_self import SelfLLMs
 
-
 # List
 llms_list = list(SelfLLMs.get_items().keys())
 
