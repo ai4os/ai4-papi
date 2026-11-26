@@ -357,7 +357,6 @@ def create_deployment(
             {
                 "JOB_UUID": job_uuid,
                 "NAMESPACE": papiconf.MAIN_CONF["nomad"]["namespaces"][vo],
-                "DATACENTER": user_conf["general"]["datacenter"],
                 "PRIORITY": priority,
                 "OWNER": auth_info["id"],
                 "OWNER_NAME": auth_info["name"],
@@ -394,15 +393,6 @@ def create_deployment(
 
         # Convert template to Nomad conf
         nomad_conf = nomad_utils.load_job_conf(nomad_conf_str)
-
-        # If the user didn't provide a datacenter in the conf, remove that constraint from
-        # the job
-        if not user_conf["general"]["datacenter"]:
-            nomad_conf["Constraints"] = [
-                c
-                for c in nomad_conf["Constraints"]
-                if c["LTarget"] != "${node.datacenter}"
-            ]
 
         tasks = nomad_conf["TaskGroups"][0]["Tasks"]
         usertask = [t for t in tasks if t["Name"] == "main"][0]
@@ -904,6 +894,19 @@ def create_deployment(
         elif not user_conf["hardware"]["gpu_type"]:
             # If gpu_type not provided, remove constraint to GPU model
             usertask["Resources"]["Devices"][0]["Constraints"] = None
+
+    # Sometimes the user wants the deployment to land in a particular datacenter to comply
+    # with ISO or privacy requirements (i.e. data must not leave the datacenter)
+    if user_conf["general"]["datacenter"]:
+        constraints = nomad_conf.get("Constraints") or []
+        constraints.append(
+            {
+                "LTarget": "${node.datacenter}",
+                "Operand": "=",
+                "RTarget": user_conf["general"]["datacenter"],
+            }
+        )
+        nomad_conf["Constraints"] = constraints
 
     # Add affinity for greener nodes
     nomad_conf = green_director.add_green_affinities(
