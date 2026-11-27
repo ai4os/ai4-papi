@@ -16,7 +16,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, schemas
 from ai4papi import energy as energy_accounting
-from ai4papi.wattnet import green_director
+from ai4papi.greendirector import green_director
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
 
@@ -306,7 +306,7 @@ def get_cluster_stats_bg() -> schemas.ClusterStats:
     datacenters_conf = copy.deepcopy(papiconf.datacenters)
 
     # Retrieve datacenter footprints
-    green_director.retrieve_footprints()
+    green_director.retrieve_metrics()
     for dc_name, metrics in green_director.metrics.items():
         if dc_name in datacenters_conf:
             datacenters_conf[dc_name]["footprints"] = metrics

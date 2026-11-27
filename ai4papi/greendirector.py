@@ -1,35 +1,22 @@
 """
-Utilities for the integration with Wattnet.
-API reference: https://api.wattnet.eu/v1/docs
+GreenDirector: ranks the nodes by how green they are (Wattnet footprints of their
+datacenter and hardware efficiency) and adds the matching Nomad affinities.
 """
 
 import datetime
-import json
 import logging
-import os
 import statistics
-import warnings
 from collections.abc import Iterable
 
-import requests
-from cachetools import TTLCache, cached
+from cachetools import TTLCache
 
 import ai4papi.conf as papiconf
 from ai4papi import utils
+from ai4papi.clients import wattnet
 
 LOG = logging.getLogger(__name__)
 
-session = requests.Session()
-
-WATTNET_URL = "https://api.wattnet.eu"
-TIMEOUT = 30  # seconds; without it a stalled Wattnet would block the background threads
 FAILURE_BACKOFF = 5 * 60  # seconds a failing datacenter is not asked again
-WATTNET_EMAIL = os.environ.get("WATTNET_EMAIL")
-if not WATTNET_EMAIL:
-    print("You should define a WATTNET_EMAIL")
-WATTNET_PASS = os.environ.get("WATTNET_PASSWORD")
-if not WATTNET_PASS:
-    print("You should define a WATTNET_PASSWORD")
 
 
 def algorithm(func):
@@ -74,112 +61,7 @@ class GreenDirector:
         self._backoff = TTLCache(maxsize=1024, ttl=FAILURE_BACKOFF)
         self._failing = set()  # datacenters whose last refresh failed (log on change)
 
-    @cached(cache=TTLCache(maxsize=1024, ttl=20 * 60 * 60))
-    def _retrieve_token(self):
-        """
-        Wattnet tokens last only one day, so we cache the response for 20 hours.
-        """
-        url = f"{WATTNET_URL}/token-request/get_token"
-        headers = {"Content-Type": "application/json"}
-        data = {"email": WATTNET_EMAIL, "password": WATTNET_PASS}
-        response = requests.post(
-            url, headers=headers, data=json.dumps(data), timeout=TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()["access_token"]
-
-    @cached(cache=TTLCache(maxsize=1024, ttl=15 * 60))
-    def _fetch_footprint_data(self, lat, lon):
-        """
-        Fetch footprint data and environmental score data from Wattnet for a specific
-        lat-lon location. Wattnet has a temporal resolution of 15 minutes, so we
-        cache for that amount of time.
-        """
-        end = datetime.datetime.now(datetime.timezone.utc)
-        start = end - datetime.timedelta(days=7)
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "start": start.isoformat().replace("+00:00", "Z"),
-            "end": end.isoformat().replace("+00:00", "Z"),
-            "aggregate": "false",
-        }
-        token = self._retrieve_token()
-        headers = {"Authorization": f"Bearer {token}"}
-
-        r1 = session.get(
-            f"{WATTNET_URL}/v1/footprints",
-            headers=headers,
-            params=params,
-            timeout=TIMEOUT,
-        )
-        r2 = session.get(
-            f"{WATTNET_URL}/v1/environmental-score",
-            headers=headers,
-            params=params,
-            timeout=TIMEOUT,
-        )
-        # Raise instead of returning [] so a failure is not cached for 15 min
-        # (cachetools only caches return values); the caller falls back to DEFAULTS
-        if not (r1.ok and r2.ok):
-            raise RuntimeError(
-                f"Wattnet request failed for coordinates ({lat}, {lon}): "
-                f"{r1.status_code}, {r2.status_code}"
-            )
-
-        footprints = r1.json()
-        score = r2.json()
-        if (not footprints) or (not score):
-            raise RuntimeError(f"Empty Wattnet data for coordinates ({lat}, {lon})")
-        score[0].update({"footprint_type": "environmental-score"})
-
-        return footprints + score
-
-    def footprint_series(self, datacenter: str, start, end):
-        """
-        Fetch the carbon/water intensity series for a datacenter over an
-        arbitrary [start, end] window (Wattnet serves historical data well
-        beyond the 7-day window kept in `self.metrics`). Used by the
-        energy-accounting sweep when backfilling a deployment.
-
-        Returns `{"carbon": [[iso_ts, gCO2/kWh], ...], "water": [[iso_ts, L/kWh], ...]}`
-        or `{}` if Wattnet has no data for that location (caller falls back to
-        DEFAULTS).
-        """
-        dc = papiconf.datacenters.get(datacenter, {})
-        lat, lon = dc.get("lat"), dc.get("lon")
-        if lat is None or lon is None:
-            return {}
-
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "start": start.isoformat().replace("+00:00", "Z"),
-            "end": end.isoformat().replace("+00:00", "Z"),
-            "aggregate": "false",
-        }
-        headers = {"Authorization": f"Bearer {self._retrieve_token()}"}
-        r = session.get(
-            f"{WATTNET_URL}/v1/footprints",
-            headers=headers,
-            params=params,
-            timeout=TIMEOUT,
-        )
-        if not r.ok:
-            warnings.warn(
-                f"[wattnet] Failed to retrieve footprint series for {datacenter}"
-            )
-            return {}
-
-        out = {}
-        for footprint in r.json():
-            series = []
-            for sublist in footprint.get("series", []):
-                series += sublist["values"]
-            out[footprint["footprint_type"]] = sorted(series, key=lambda x: x[0])
-        return out
-
-    def retrieve_footprints(self):
+    def retrieve_metrics(self):
         """
         Retrieve the footprints for all datacenters.
         If we are unable to retrieve a value (e.g. because location is outside Europe),
@@ -189,14 +71,14 @@ class GreenDirector:
         # be called before stats have been initialized
         datacenters = papiconf.datacenters
 
-        end = datetime.datetime.now(datetime.timezone.utc)
+        end = datetime.datetime.now(datetime.UTC)
         start = end - datetime.timedelta(days=7)
 
-        for k, v in datacenters.items():
+        for k in datacenters:
             if k in self._backoff:
                 continue  # failed a moment ago: do not wait on a down Wattnet again
             try:
-                data = self._fetch_footprint_data(v["lat"], v["lon"])
+                data = wattnet.latest_metrics(k)
             except Exception as e:
                 self._backoff[k] = True
                 if k not in self._failing:
@@ -212,24 +94,13 @@ class GreenDirector:
                     )
                 if k in self.metrics:
                     continue  # keep the last good data rather than overwrite it
-                data = []  # never had data: fall back to DEFAULTS
+                data = {}  # never had data: fall back to DEFAULTS
             else:
                 if k in self._failing:
                     self._failing.discard(k)
                     LOG.info("Wattnet refresh recovered for %s", k)
 
-            # For each footprint type, we concatenate all timeseries, irrespectively of
-            # whether they are [valid=True] (meaning their values are final) or
-            # [valid=False] (meaning that they are an estimation, subject to change)
-            self.metrics[k] = {}
-            for footprint in data:
-                fp_type = footprint["footprint_type"]
-                series = []
-                for sublist in footprint["series"]:
-                    series += sublist["values"]
-                # Make sure the joined timeseries is sorted by timestamp
-                series = sorted(series, key=lambda data: data[0])
-                self.metrics[k][fp_type] = series
+            self.metrics[k] = dict(data)
 
             # For datacenters outside Europe, Wattnet offers no data
             # Therefore we return timeseries with default values

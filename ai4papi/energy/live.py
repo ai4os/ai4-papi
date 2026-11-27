@@ -14,7 +14,7 @@ import threading
 from cachetools import cached
 
 from ai4papi.energy import compute, config, query
-from ai4papi.wattnet import green_director
+from ai4papi.greendirector import green_director
 
 LOG = logging.getLogger(__name__)
 

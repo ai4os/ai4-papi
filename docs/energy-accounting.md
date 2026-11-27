@@ -14,7 +14,7 @@ It is fully additive: nothing in the existing API changes behaviour and no new e
 | CPU power: `scaph_process_power_consumption_microwatts` (uW) | 30 s | Mimir retention (tunable, will drop to ~3 months) | label `container_label_com_hashicorp_nomad_alloc_id`; aggregates every container of the alloc (task `main` + sidecars). The Nomad nodes are VMs, so scaphandre's per-process figures are small: real CPU energy only shows up under real load. |
 | GPU power: `DCGM_FI_DEV_POWER_USAGE` (W) | 30 s | Mimir retention | board-level power, labels `UUID`, `instance` |
 | GPU to alloc mapping: `nomad_gpu_allocation_info` | 30 s | only while a GPU deployment runs | info gauge, label `alloc_id`; kept as the mapping mechanism on purpose (other accounting software relies on it to avoid depending on the Nomad API) |
-| Carbon and water intensity (Wattnet) | 15 min | full history on demand; `green_director` keeps a rolling 7-day window | already integrated in `ai4papi/wattnet.py`. Recent intervals are provisional and get revised every ~15 min until settled. `DEFAULTS` (301 gCO2/kWh, 12 L/kWh) outside coverage. |
+| Carbon and water intensity (Wattnet) | 15 min | full history on demand; `green_director` keeps a rolling 7-day window | fetched by `ai4papi/clients/wattnet.py` (official `wattnet-client`). Recent intervals are provisional and get revised every ~15 min until settled. `DEFAULTS` (301 gCO2/kWh, 12 L/kWh) outside coverage. |
 | Allocations of a deployment | event | while the Nomad job is not garbage-collected (hours) | `Nomad.job.get_allocations`; several allocations over a job's life due to reallocations |
 
 Power metrics currently exist only in the `ifca-*` datacenters, and not on every node. Availability is effectively per allocation: it is decided by whether Mimir has data for that `alloc_id`, not by the datacenter alone. The CPU (scaphandre) and GPU (DCGM) sources are independent: whichever one has data contributes, so a site that only monitors its GPUs still accounts the GPU energy (a missing metric comes back as an empty Mimir result, not an error). The feature is best-effort: if there is data it is reported; if there is none, `energy` is `null` (never zeros); if there is data for only part of the deployment's life, that part is accounted and `coverage_ratio` drops below `1.0`.
@@ -174,11 +174,11 @@ Module `ai4papi/energy/compute.py`, all pure and unit-testable except the cached
 
 ### Footprint consolidation
 
-The sweep uses `green_director.metrics[dc]` (Wattnet, already refreshed every 30 s for the cluster stats) with `DEFAULTS` as fallback. For a backfill older than the 7-day window it calls `green_director.footprint_series(dc, start, end)`, which reuses the Wattnet token and hits `/v1/footprints` for the requested range.
+The sweep uses `green_director.metrics[dc]` (Wattnet, already refreshed every 30 s for the cluster stats) with `DEFAULTS` as fallback. For a backfill older than the 7-day window it calls `clients.wattnet.metrics(dc, start, end)`, which resolves the datacenter coordinates and asks `/v1/footprints` for the requested range through `wattnet-client` (it handles the OAuth2 token).
 
 Every sweep recomputes carbon and water for all buckets newer than `now - footprint_revision_hours` (24 h) with the current intensity, so a bucket's footprint firms up as Wattnet settles it. Older buckets are frozen. The accumulated footprint is always `sum` over buckets, so it self-corrects.
 
-Wattnet failures are contained in `GreenDirector.retrieve_footprints` (`ai4papi/wattnet.py`). Every request has a 30 s timeout, so a stalled Wattnet cannot block the background threads. A failed or empty answer raises inside `_fetch_footprint_data`, so the 15-minute cache never stores it. The datacenter keeps its last good data (or gets `DEFAULTS` if it never had any), and is not asked again for 5 minutes (`FAILURE_BACKOFF`), so a Wattnet outage costs one round of timeouts per 5 minutes. The log has one warning when a datacenter starts failing (with the date up to which data is kept) and one info line when it recovers, not one per refresh.
+Wattnet failures are contained in `GreenDirector.retrieve_metrics` (`ai4papi/greendirector.py`). Every request has a 30 s timeout and no retries, so a stalled Wattnet cannot block the background threads. A failed or empty answer raises inside `clients.wattnet.latest_metrics`, so the 15-minute cache never stores it. The datacenter keeps its last good data (or gets `DEFAULTS` if it never had any), and is not asked again for 5 minutes (`FAILURE_BACKOFF`), so a Wattnet outage costs one round of timeouts per 5 minutes. The log has one warning when a datacenter starts failing (with the date up to which data is kept) and one info line when it recovers, not one per refresh.
 
 The live top-up multiplies its `delta_wh` by the current provisional intensity; the next sweep reconciles it (typical correction under 1-2%).
 
@@ -325,7 +325,8 @@ Modified (all additive):
 - `ai4papi/routers/v1/deployments/{modules,tools}.py`, `ai4papi/routers/v1/batch.py`, `ai4papi/routers/v1/try_me/nomad.py`: the `energy` key and param (`EnergyStats` or `EnergyTimeSeries` per `full_info`)
 - `ai4papi/routers/v1/stats/deployments.py`: the per-user `energy` aggregate in `get_user_stats` (`full_info` for the series) and the per-datacenter `energy` block in `get_cluster_stats` (`full_info` for the series); no response-root total
 - `ai4papi/schemas.py`: `EnergyStats` (per deployment and per user), `EnergyTimeSeriesPoint`, `EnergyTimeSeries` (its point list is `series`); `energy` on `DatacenterStats` (also `EnergyStats`)
-- `ai4papi/wattnet.py`: `GreenDirector.footprint_series`; request timeouts, failures raised instead of cached, last good data kept and failure backoff in `retrieve_footprints`
+- `ai4papi/clients/wattnet.py`: `metrics` and `latest_metrics` on top of `wattnet-client`; request timeouts, failures raised instead of cached
+- `ai4papi/greendirector.py`: last good data kept and failure backoff in `GreenDirector.retrieve_metrics`
 - `pyproject.toml`: optional `test` extra (`pytest`); `tests/main.py`: runs `test_energy` through `pytest.main`
 - `ai4papi/conf.py`: blank numeric CSV cell tolerated
 - `var/datacenters.csv`: `TUE` column
