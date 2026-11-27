@@ -990,61 +990,80 @@ def test_build_series_live_tail_only_after_persisted():
 def test_wattnet_failure_is_not_cached_nor_overwrites_good_data(monkeypatch, caplog):
     from types import SimpleNamespace
 
-    from ai4papi import wattnet
+    from wattnet.client import WattnetAPIError
 
-    ts = "2026-01-01T00:00:00Z"
-    fp = [{"footprint_type": "carbon", "series": [{"values": [[ts, 5.0]]}]}]
-    score = [{"footprint_type": "x", "series": [{"values": [[ts, 9.0]]}]}]
+    from ai4papi import greendirector
+    from ai4papi.clients import wattnet
+
+    ts0, ts = "2026-01-01T00:00:00Z", "2026-01-01T00:15:00Z"
+
+    def payload(*points, **extra):
+        series = [{"points": [{"timestamp": t, "value": v}]} for t, v in points]
+        return {**extra, "series": series}
+
+    # blocks out of order: the flattened series is still sorted
+    fp = [
+        payload((ts, 5.0), (ts0, 4.0), footprint_type="carbon"),
+        payload((ts, 1.0), footprint_type="water"),
+    ]
+    score = [payload((ts, 9.0))]
     answers = {"ok": True}
     calls = []
 
-    def fake_get(url, **kwargs):
-        calls.append(url)
-        assert kwargs["timeout"]  # a stalled Wattnet must not block the threads
-        if not answers["ok"]:
-            return SimpleNamespace(ok=False, status_code=503)
-        body = score if "environmental" in url else fp
-        return SimpleNamespace(ok=True, status_code=200, json=lambda: body)
+    def fake(body):
+        def get(**kwargs):
+            calls.append(kwargs)
+            assert (kwargs["lat"], kwargs["lon"]) == (1, 2)
+            if not answers["ok"]:
+                raise WattnetAPIError("down", 503)
+            return body
 
-    monkeypatch.setattr(wattnet.session, "get", fake_get)
+        return get
+
+    fake_client = SimpleNamespace(
+        get_footprints=fake(fp), get_environmental_score=fake(score)
+    )
+    monkeypatch.setattr(wattnet, "client", fake_client)
     monkeypatch.setattr(papiconf, "datacenters", {"wn-test": {"lat": 1, "lon": 2}})
-    g = wattnet.GreenDirector()
-    monkeypatch.setattr(g, "_retrieve_token", lambda: "t")
-    caplog.set_level(logging.INFO, logger="ai4papi.wattnet")
-    default_carbon = wattnet.GreenDirector.DEFAULTS["carbon"]
+    wattnet.latest_metrics.cache.clear()
+    g = greendirector.GreenDirector()
+    caplog.set_level(logging.INFO, logger="ai4papi.greendirector")
+    default_carbon = greendirector.GreenDirector.DEFAULTS["carbon"]
+    good = [[ts0, 4.0], [ts, 5.0]]
 
     # never had data and Wattnet is down: DEFAULTS, and nothing is cached
     answers["ok"] = False
-    g.retrieve_footprints()
+    g.retrieve_metrics()
     assert g.metrics["wn-test"]["carbon"][0][1] == default_carbon
-    assert len(calls) == 2
+    assert len(calls) == 1
     assert "using default values" in caplog.text
 
     # still within the backoff: Wattnet is not asked again
-    g.retrieve_footprints()
-    assert len(calls) == 2
+    g.retrieve_metrics()
+    assert len(calls) == 1
 
     # backoff over and recovered: asks again, gets the real data, logs it once
     g._backoff.clear()
     answers["ok"] = True
-    g.retrieve_footprints()
-    assert len(calls) == 4
-    assert g.metrics["wn-test"]["carbon"] == [[ts, 5.0]]
+    g.retrieve_metrics()
+    assert len(calls) == 3
+    assert g.metrics["wn-test"]["carbon"] == good
+    assert g.metrics["wn-test"]["environmental-score"] == [[ts, 9.0]]
     assert caplog.text.count("recovered") == 1
 
     # blip after good data: the last good data is kept, not overwritten by DEFAULTS
-    wattnet.GreenDirector._fetch_footprint_data.cache_clear()
+    wattnet.latest_metrics.cache.clear()
     g._backoff.clear()
     answers["ok"] = False
     caplog.clear()
-    g.retrieve_footprints()
-    assert g.metrics["wn-test"]["carbon"] == [[ts, 5.0]]
+    g.retrieve_metrics()
+    assert g.metrics["wn-test"]["carbon"] == good
     assert f"keeping data up to {ts}" in caplog.text
 
     # a long outage logs once (on the change), not on every refresh
     for _ in range(3):
         g._backoff.clear()
-        g.retrieve_footprints()
+        g.retrieve_metrics()
     assert caplog.text.count("refresh failed") == 1
 
 

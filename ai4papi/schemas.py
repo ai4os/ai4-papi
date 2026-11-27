@@ -102,7 +102,7 @@ class DatacenterStats(BaseModel):
     nodes: Dict[str, NodeInfo]
 
     # Optional fields (added dynamically)
-    footprints: Optional[Dict[str, Any]] = None  # from wattnet.GreenDirector
+    footprints: Optional[Dict[str, Any]] = None  # from greendirector.GreenDirector
     energy: Optional[EnergyStats] = None  # current power + accumulated energy/footprint
 
 

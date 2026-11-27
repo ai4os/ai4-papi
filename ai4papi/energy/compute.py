@@ -17,7 +17,7 @@ from cachetools import TTLCache, cached
 
 import ai4papi.conf as papiconf
 from ai4papi.nomad_utils import Nomad
-from ai4papi.wattnet import GreenDirector
+from ai4papi.greendirector import GreenDirector
 
 # Bucket start `ts` is an ISO-8601 UTC string ("...Z"). Energy in Wh (normalized
 # by the datacenter TUE), power in W, footprint per bucket.

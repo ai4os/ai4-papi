@@ -16,10 +16,10 @@ import logging
 from typing import NamedTuple
 
 import ai4papi.conf as papiconf
-from ai4papi.clients import mimir
+from ai4papi.clients import mimir, wattnet
 from ai4papi.energy import compute, config, query, store
 from ai4papi.nomad_utils import Nomad
-from ai4papi.wattnet import green_director
+from ai4papi.greendirector import green_director
 
 LOG = logging.getLogger(__name__)
 
@@ -114,11 +114,9 @@ def _footprint_series(dc: str, start_ts: float, end_ts: float):
     if start_ts >= config.now().timestamp() - 7 * 86400:
         return metrics.get("carbon"), metrics.get("water")
     try:
-        fetched = green_director.footprint_series(
-            dc, config.dt(start_ts), config.dt(end_ts)
-        )
+        fetched = wattnet.metrics(dc, config.dt(start_ts), config.dt(end_ts))
     except Exception:
-        LOG.warning("wattnet footprint_series failed for %s", dc)
+        LOG.warning("wattnet metrics failed for %s", dc)
         fetched = {}
     return (
         fetched.get("carbon") or metrics.get("carbon"),

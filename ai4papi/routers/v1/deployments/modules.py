@@ -10,7 +10,7 @@ from fastapi.security import HTTPBearer
 
 from ai4papi import auth, module_patches, quotas, schemas, utils
 from ai4papi import energy as energy_accounting
-from ai4papi.wattnet import green_director
+from ai4papi.greendirector import green_director
 import ai4papi.conf as papiconf
 import ai4papi.nomad_utils as nomad_utils
 from ai4papi.routers import v1
